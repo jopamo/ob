@@ -4,6 +4,8 @@
 #include "geom.h"
 #include "obrender/render.h"
 
+void frame_round_corners( Window window );
+
 typedef struct _ObFrame ObFrame;
 
 struct _ObClient;
