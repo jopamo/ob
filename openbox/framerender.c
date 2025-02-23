@@ -21,6 +21,7 @@
 #include "openbox.h"
 #include "screen.h"
 #include "client.h"
+#include "config.h"
 #include "framerender.h"
 #include "obrender/theme.h"
 
@@ -55,6 +56,12 @@ framerender_frame(ObFrame *self)
 
     /* Mark we've now rendered. */
     self->need_render = FALSE;
+
+	if (config_theme_cornerradius &&
+		!self->client->fullscreen &&
+		!self->client->shaped &&
+		!(self->client->type == OB_CLIENT_TYPE_DOCK))
+		frame_round_corners(self->window);
 
     /*
      * First, we paint the background for the client border areas

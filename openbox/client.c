@@ -931,7 +931,7 @@ static ObAppSettings *client_get_settings_state(ObClient *self)
             match = FALSE;
         else if (app->role && !g_pattern_spec_match_string(app->role, self->role))
             match = FALSE;
-        else if (app->title && !g_pattern_spec_match_string(app->title, self->title))
+        else if (app->title && self->title && !g_pattern_spec_match_string(app->title, self->title))
             match = FALSE;
         else if ((signed)app->type >= 0 && app->type != self->type) {
             match = FALSE;
