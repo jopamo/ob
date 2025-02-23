@@ -1,22 +1,3 @@
-/* -*- indent-tabs-mode: nil; tab-width: 4; c-basic-offset: 4; -*-
-
-   frame.h for the Openbox window manager
-   Copyright (c) 2006        Mikael Magnusson
-   Copyright (c) 2003-2007   Dana Jansens
-
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   See the COPYING file for a copy of the GNU General Public License.
-*/
-
 #ifndef __frame_h
 #define __frame_h
 
@@ -29,6 +10,9 @@ struct _ObClient;
 
 typedef void (*ObFrameIconifyAnimateFunc)(gpointer data);
 
+/*!
+ * \brief Different contexts for parts of the frame (titlebar, corners, etc.).
+ */
 typedef enum {
     OB_FRAME_CONTEXT_NONE,
     OB_FRAME_CONTEXT_DESKTOP,
@@ -50,20 +34,24 @@ typedef enum {
     OB_FRAME_CONTEXT_ICONIFY,
     OB_FRAME_CONTEXT_ICON,
     OB_FRAME_CONTEXT_CLOSE,
-    /*! This is a special context, which occurs while dragging a window in
-      a move/resize */
+    /*! Special context for while dragging/resizing a window */
     OB_FRAME_CONTEXT_MOVE_RESIZE,
     OB_FRAME_CONTEXT_DOCK,
     OB_FRAME_NUM_CONTEXTS
 } ObFrameContext;
 
-#define FRAME_CONTEXT(co, cl) ((cl && cl->type != OB_CLIENT_TYPE_DESKTOP) ? \
-                               co == OB_FRAME_CONTEXT_FRAME : FALSE)
-#define CLIENT_CONTEXT(co, cl) ((cl && cl->type == OB_CLIENT_TYPE_DESKTOP) ? \
-                                co == OB_FRAME_CONTEXT_DESKTOP : \
-                                co == OB_FRAME_CONTEXT_CLIENT)
+/*! Helper macros for detecting frame/client contexts */
+#define FRAME_CONTEXT(co, cl) \
+    ((cl && cl->type != OB_CLIENT_TYPE_DESKTOP) ? \
+     co == OB_FRAME_CONTEXT_FRAME : FALSE)
+#define CLIENT_CONTEXT(co, cl) \
+    ((cl && cl->type == OB_CLIENT_TYPE_DESKTOP) ? \
+     co == OB_FRAME_CONTEXT_DESKTOP : \
+     co == OB_FRAME_CONTEXT_CLIENT)
 
-/*! The decorations the client window wants to be displayed on it */
+/*!
+ * \brief Decorations bitmask that indicates which UI elements a window wants.
+ */
 typedef enum {
     OB_FRAME_DECOR_TITLEBAR    = 1 << 0, /*!< Display a titlebar */
     OB_FRAME_DECOR_HANDLE      = 1 << 1, /*!< Display a handle (bottom) */
@@ -72,27 +60,30 @@ typedef enum {
     OB_FRAME_DECOR_ICON        = 1 << 4, /*!< Display the window's icon */
     OB_FRAME_DECOR_ICONIFY     = 1 << 5, /*!< Display an iconify button */
     OB_FRAME_DECOR_MAXIMIZE    = 1 << 6, /*!< Display a maximize button */
-    /*! Display a button to toggle the window's placement on
-      all desktops */
+    /*! Button to toggle "on all desktops" mode */
     OB_FRAME_DECOR_ALLDESKTOPS = 1 << 7,
     OB_FRAME_DECOR_SHADE       = 1 << 8, /*!< Display a shade button */
     OB_FRAME_DECOR_CLOSE       = 1 << 9  /*!< Display a close button */
 } ObFrameDecorations;
 
+/*!
+ * \brief The main frame structure that wraps a client window.
+ */
 struct _ObFrame
 {
-    struct _ObClient *client;
+    struct _ObClient *client; /*!< The client window we are framing */
 
-    Window    window;
+    Window    window;         /*!< The top-level X window for the frame */
 
-    Strut     size;    /* the size of the frame */
-    Strut     oldsize; /* the size of the frame last told to the client */
-    Rect      area;
-    gboolean  visible;
+    Strut     size;           /*!< The current sizes of each frame edge */
+    Strut     oldsize;        /*!< The last published sizes to the client */
+    Rect      area;           /*!< The absolute geometry of the frame window */
+    gboolean  visible;        /*!< TRUE if this frame is currently mapped */
 
-    guint     functions;
-    guint     decorations;
+    guint     functions;      /*!< Window management functions bitmask */
+    guint     decorations;    /*!< Which decorations are shown (bitmask) */
 
+    /* Windows used for decorations and border areas */
     Window    title;
     Window    label;
     Window    max;
@@ -105,7 +96,7 @@ struct _ObFrame
     Window    lgrip;
     Window    rgrip;
 
-    /* These are borders of the frame and its elements */
+    /* Borders and sub-windows for corners, edges, etc. */
     Window    titleleft;
     Window    titletop;
     Window    titletopleft;
@@ -124,57 +115,58 @@ struct _ObFrame
     Window    rgriptop;
     Window    rgripright;
     Window    rgripbottom;
-    Window    innerleft;    /*!< For drawing the inner client border */
-    Window    innertop;     /*!< For drawing the inner client border */
-    Window    innerright;   /*!< For drawing the inner client border */
-    Window    innerbottom;  /*!< For drawing the inner client border */
+    Window    innerleft;      /*!< For drawing an inner client border */
+    Window    innertop;
+    Window    innerright;
+    Window    innerbottom;
     Window    innerblb;
     Window    innerbll;
     Window    innerbrb;
     Window    innerbrr;
-    Window    backback;     /*!< A colored window shown while resizing */
-    Window    backfront;    /*!< An undrawn-in window, to prevent flashing on
-                                 unmap */
+    Window    backback;       /*!< Colored window shown while resizing */
+    Window    backfront;      /*!< Prevents flashing on unmap */
 
-    /* These are resize handles inside the titlebar */
+    /* Resize handles inside the titlebar */
     Window    topresize;
     Window    tltresize;
     Window    tllresize;
     Window    trtresize;
     Window    trrresize;
 
-    Colormap  colormap;
+    Colormap  colormap;       /*!< Possibly from a 32-bit visual if needed */
 
-    gint      icon_on;    /* if the window icon button is on */
-    gint      label_on;   /* if the window title is on */
-    gint      iconify_on; /* if the window iconify button is on */
-    gint      desk_on;    /* if the window all-desktops button is on */
-    gint      shade_on;   /* if the window shade button is on */
-    gint      max_on;     /* if the window maximize button is on */
-    gint      close_on;   /* if the window close button is on */
+    /* Booleans indicating which titlebar buttons are visible */
+    gint      icon_on;
+    gint      label_on;
+    gint      iconify_on;
+    gint      desk_on;
+    gint      shade_on;
+    gint      max_on;
+    gint      close_on;
 
-    gint      width;         /* width of the titlebar and handle */
-    gint      label_width;   /* width of the label in the titlebar */
-    gint      icon_x;        /* x-position of the window icon button */
-    gint      label_x;       /* x-position of the window title */
-    gint      iconify_x;     /* x-position of the window iconify button */
-    gint      desk_x;        /* x-position of the window all-desktops button */
-    gint      shade_x;       /* x-position of the window shade button */
-    gint      max_x;         /* x-position of the window maximize button */
-    gint      close_x;       /* x-position of the window close button */
-    gint      bwidth;        /* border width */
-    gint      cbwidth_l;     /* client border width */
-    gint      cbwidth_t;     /* client border width */
-    gint      cbwidth_r;     /* client border width */
-    gint      cbwidth_b;     /* client border width */
-    gboolean  max_horz;      /* when maxed some decorations are hidden */
-    gboolean  max_vert;      /* when maxed some decorations are hidden */
-    gboolean  shaded;        /* decorations adjust when shaded */
+    gint      width;          /*!< Overall width of the titlebar+handle area */
+    gint      label_width;    /*!< Computed width of the window label */
+    gint      icon_x;         /*!< X-position of the icon button */
+    gint      label_x;        /*!< X-position of the label */
+    gint      iconify_x;      /*!< X-position of the iconify button */
+    gint      desk_x;         /*!< X-position of the all-desktops button */
+    gint      shade_x;        /*!< X-position of the shade button */
+    gint      max_x;          /*!< X-position of the maximize button */
+    gint      close_x;        /*!< X-position of the close button */
+    gint      bwidth;         /*!< Border width */
+    gint      cbwidth_l;      /*!< Client border width, left */
+    gint      cbwidth_t;      /*!< Client border width, top */
+    gint      cbwidth_r;      /*!< Client border width, right */
+    gint      cbwidth_b;      /*!< Client border width, bottom */
+    gboolean  max_horz;       /*!< Window maximized horizontally? */
+    gboolean  max_vert;       /*!< Window maximized vertically? */
+    gboolean  shaded;         /*!< Window is shaded? */
 
-    /* the leftmost and rightmost elements in the titlebar */
+    /*! The leftmost and rightmost clickable elements in the titlebar */
     ObFrameContext leftmost;
     ObFrameContext rightmost;
 
+    /* Press/hover states for buttons */
     gboolean  max_press;
     gboolean  close_press;
     gboolean  desk_press;
@@ -186,24 +178,38 @@ struct _ObFrame
     gboolean  shade_hover;
     gboolean  iconify_hover;
 
-    gboolean  focused;
-    gboolean  need_render;
+    gboolean  focused;        /*!< Is the client/focus in this frame? */
+    gboolean  need_render;    /*!< Need re-rendering after changes? */
 
+    /*! Whether we're in a "flash" state (for focus alerting, etc.) */
     gboolean  flashing;
     gboolean  flash_on;
-    GTimeVal  flash_end;
+    /*! When the flash effect ends, in microseconds since epoch (g_get_real_time) */
+    gint64    flash_end;
+    /*! Timer ID for the flash g_timeout */
     guint     flash_timer;
 
-    /*! Is the frame currently in an animation for iconify or restore.
-      0 means that it is not animating. > 0 means it is animating an iconify.
-      < 0 means it is animating a restore.
-    */
-    gint iconify_animation_going;
-    guint iconify_animation_timer;
-    GTimeVal  iconify_animation_end;
+    /*!
+     * \brief Is the frame currently in an animation for iconify or restore?
+     *  0 means no animation; >0 means iconify; <0 means restore.
+     */
+    gint      iconify_animation_going;
+    /*! Timer ID for the iconify animation */
+    guint     iconify_animation_timer;
+    /*!
+     * \brief When the iconify/restore animation ends (microseconds since epoch).
+     */
+    gint64    iconify_animation_end;
 };
 
+/*!
+ * \brief Creates a new frame for a given client.
+ */
 ObFrame *frame_new(struct _ObClient *c);
+
+/*!
+ * \brief Frees (destroys) the frame and all its windows.
+ */
 void frame_free(ObFrame *self);
 
 void frame_show(ObFrame *self);
@@ -223,50 +229,64 @@ void frame_adjust_icon(ObFrame *self);
 void frame_grab_client(ObFrame *self);
 void frame_release_client(ObFrame *self);
 
+/*! Convert a string to a frame context, e.g. "Titlebar" => OB_FRAME_CONTEXT_TITLEBAR. */
 ObFrameContext frame_context_from_string(const gchar *name);
 
-/*! Parses a ObFrameContext from a string of space-separated context names.
-  @names The list of context names, the first of which is removed from the
-         string.
-  @cx The ObFrameContext is returned here.  If an invalid name is found, this
-      is set to OB_FRAME_CONTEXT_NONE.
-  @return TRUE if there was something to read in @names, FALSE if it was an
-          empty input.
-*/
+/*!
+ * \brief Parses one ObFrameContext from a space-delimited string.
+ * \param names The string. The first recognized context is removed from it.
+ * \param cx The parsed context, or OB_FRAME_CONTEXT_NONE if invalid.
+ * \return TRUE if a context was read, FALSE if the input is empty.
+ */
 gboolean frame_next_context_from_string(gchar *names, ObFrameContext *cx);
 
-ObFrameContext frame_context(struct _ObClient *self, Window win,
-                             gint x, gint y);
+/*!
+ * \brief Determines which part of the frame a click belongs to (titlebar, handle, etc.).
+ */
+ObFrameContext frame_context(struct _ObClient *self, Window win, gint x, gint y);
 
-/*! Applies gravity to the client's position to find where the frame should
-  be positioned.
-  @return The proper coordinates for the frame, based on the client.
-*/
+/*!
+ * \brief Applies gravity to a client's position so we know where to place the frame.
+ */
 void frame_client_gravity(ObFrame *self, gint *x, gint *y);
 
-/*! Reversly applies gravity to the frame's position to find where the client
-  should be positioned.
-    @return The proper coordinates for the client, based on the frame.
-*/
+/*!
+ * \brief Reverses gravity from the frame to find where to place the client window.
+ */
 void frame_frame_gravity(ObFrame *self, gint *x, gint *y);
 
-/*! Convert a rectangle in client coordinates/sizes to what it would be
-  for the frame, given its current decorations sizes */
+/*!
+ * \brief Convert a rectangle in client coords to frame coords.
+ */
 void frame_rect_to_frame(ObFrame *self, Rect *r);
 
-/*! Convert a rectangle in frame coordinates/sizes to what it would be for the
-  client, given its current decorations sizes */
+/*!
+ * \brief Convert a rectangle in frame coords to client coords.
+ */
 void frame_rect_to_client(ObFrame *self, Rect *r);
 
+/*!
+ * \brief Start flashing the frame (e.g., user alert). A timer stops it automatically.
+ */
 void frame_flash_start(ObFrame *self);
+
+/*!
+ * \brief Stop the flashing effect immediately.
+ */
 void frame_flash_stop(ObFrame *self);
 
-/*! Start an animation for iconifying or restoring a frame. The callback
-  will be called when the animation finishes. But if another animation is
-  started in the meantime, the callback will never get called. */
+/*!
+ * \brief Start iconify animation. If iconifying=TRUE, it animates "zooming out" to an icon location;
+ *        if iconifying=FALSE, it animates restoring from icon to full size.
+ */
 void frame_begin_iconify_animation(ObFrame *self, gboolean iconifying);
+
+/*!
+ * \brief Called when the animation finishes or is canceled.
+ */
 void frame_end_iconify_animation(gpointer data);
 
-#define frame_iconify_animating(f) (f->iconify_animation_going != 0)
+/*! Check if a frame is currently in iconify animation. */
+#define frame_iconify_animating(f) ((f)->iconify_animation_going != 0)
 
 #endif

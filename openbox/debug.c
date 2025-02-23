@@ -116,6 +116,7 @@ static inline void log_print(FILE *out, const gchar* log_domain,
 static void log_handler(const gchar *log_domain, GLogLevelFlags log_level,
                         const gchar *message, gpointer data)
 {
+	UNUSED(data);
     FILE *out;
     const gchar *level;
 

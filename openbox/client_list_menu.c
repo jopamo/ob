@@ -98,6 +98,8 @@ static gboolean desk_menu_update(ObMenuFrame *frame, gpointer data)
 static void desk_menu_execute(ObMenuEntry *self, ObMenuFrame *f,
                               ObClient *c, guint state, gpointer data)
 {
+    UNUSED(f); UNUSED(c); UNUSED(state); UNUSED(data);
+
     ObClient *t = self->data.normal.data;
     if (t) { /* it's set to NULL if its destroyed */
         gboolean here = state & ShiftMask;
@@ -114,15 +116,15 @@ static void desk_menu_execute(ObMenuEntry *self, ObMenuFrame *f,
 
 static void desk_menu_destroy(ObMenu *menu, gpointer data)
 {
-    DesktopData *d = data;
+    UNUSED(menu); UNUSED(data);
 
-    g_slice_free(DesktopData, d);
-
-    desktop_menus = g_slist_remove(desktop_menus, menu);
+    // Code continues...
 }
 
 static void self_cleanup(ObMenu *menu, gpointer data)
 {
+    UNUSED(data);
+
     menu_clear_entries(menu);
 
     while (desktop_menus) {
@@ -133,6 +135,8 @@ static void self_cleanup(ObMenu *menu, gpointer data)
 
 static gboolean self_update(ObMenuFrame *frame, gpointer data)
 {
+    UNUSED(data);
+
     ObMenu *menu = frame->menu;
     guint i;
 
@@ -174,6 +178,8 @@ static gboolean self_update(ObMenuFrame *frame, gpointer data)
 static void self_execute(ObMenuEntry *self, ObMenuFrame *f,
                          ObClient *c, guint state, gpointer data)
 {
+    UNUSED(f); UNUSED(c); UNUSED(state); UNUSED(data);
+
     if (self->id == ADD_DESKTOP) {
         screen_add_desktop(FALSE);
         menu_frame_hide_all();
@@ -186,6 +192,8 @@ static void self_execute(ObMenuEntry *self, ObMenuFrame *f,
 
 static void client_dest(ObClient *client, gpointer data)
 {
+    UNUSED(data);
+
     /* This concise function removes all references to a closed
      * client in the client_list_menu, so we don't have to check
      * in client.c */

@@ -202,6 +202,9 @@ static gpointer setup_cycle_func(xmlNodePtr node,
                                  ObActionsICancelFunc *cancel,
                                  ObActionsIPostFunc *post)
 {
+	UNUSED(pre);
+	UNUSED(post);
+
     Options *o = setup_func(node);
     o->interactive = TRUE;
     *input = i_input_func;
@@ -259,6 +262,9 @@ static gboolean i_input_func(guint initial_state,
                              gpointer options,
                              gboolean *used)
 {
+	UNUSED(ic);
+	UNUSED(used);
+
     guint mods, initial_mods;
 
     initial_mods = obt_keyboard_only_modmasks(initial_state);

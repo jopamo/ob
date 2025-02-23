@@ -73,7 +73,7 @@ static RrImagePic* RrImagePicNew(gint w, gint h, RrPixel32 *data)
     RrImagePic *pic;
 
     pic = g_slice_new(RrImagePic);
-    RrImagePicInit(pic, w, h, g_memdup(data, w*h*sizeof(RrPixel32)));
+    RrImagePicInit(pic, w, h, g_memdup2(data, w*h*sizeof(RrPixel32)));  // Use g_memdup2
     return pic;
 }
 
@@ -533,6 +533,7 @@ void DestroyRsvgLoader(RsvgLoader *loader)
     g_slice_free(RsvgLoader, loader);
 }
 
+/*! Load an image with RSVG, using the updated API. */
 RsvgLoader* LoadWithRsvg(gchar *path,
                          RrPixel32 **pixel_data,
                          gint *width,
@@ -545,35 +546,44 @@ RsvgLoader* LoadWithRsvg(gchar *path,
         return NULL;
     }
 
-    if (!rsvg_handle_close(loader->handle, NULL)) {
+    // Correct usage of rsvg_handle_read_stream_sync with GError and GCancellable
+    GError *error = NULL;
+    GCancellable *cancellable = NULL; // You can use NULL if you don't need cancellation
+    if (!rsvg_handle_read_stream_sync(loader->handle, NULL, cancellable, &error)) {
+        g_error("Error reading SVG file: %s", error->message);
+        g_clear_error(&error);
         DestroyRsvgLoader(loader);
         return NULL;
     }
 
-    RsvgDimensionData dimension_data;
-    rsvg_handle_get_dimensions(loader->handle, &dimension_data);
-    *width = dimension_data.width;
-    *height = dimension_data.height;
+    // Correct usage of rsvg_handle_get_intrinsic_size_in_pixels
+    gdouble out_width, out_height;
+    if (!rsvg_handle_get_intrinsic_size_in_pixels(loader->handle, &out_width, &out_height)) {
+        g_warning("Failed to get intrinsic size for SVG.");
+        DestroyRsvgLoader(loader);
+        return NULL;
+    }
+    *width = (gint)out_width;
+    *height = (gint)out_height;
 
-    loader->surface = cairo_image_surface_create(
-        CAIRO_FORMAT_ARGB32, *width, *height);
-
+    loader->surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, *width, *height);
     cairo_t* context = cairo_create(loader->surface);
-    gboolean success = rsvg_handle_render_cairo(loader->handle, context);
+
+    // Create a RsvgRectangle viewport
+    RsvgRectangle viewport = {0, 0, *width, *height};
+
+    // Correct usage of rsvg_handle_render_document with the viewport argument
+    gboolean success = rsvg_handle_render_document(loader->handle, context, &viewport, &error);
     cairo_destroy(context);
 
     if (!success) {
+        g_error("Error rendering SVG: %s", error->message);
+        g_clear_error(&error);
         DestroyRsvgLoader(loader);
         return NULL;
     }
 
     loader->pixel_data = g_new(guint32, *width * *height);
-
-    /*
-      Cairo has its data in ARGB with premultiplied alpha, but RrPixel32
-      non-premultipled, so convert that. Also, RrPixel32 doesn't allow
-      strides not equal to the width of the image.
-    */
 
     /* Verify that RrPixel32 has the same ordering as cairo. */
     g_assert(RrDefaultAlphaOffset == 24);

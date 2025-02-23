@@ -40,7 +40,7 @@ typedef enum
 
 static int fd = 0;
 
-static void gdm_disconnect()
+static void gdm_disconnect(void)
 {
     if (fd > 0)
         close(fd);
@@ -106,7 +106,7 @@ static char* gdm_send_protocol_msg (const char *msg)
     return retval ? g_string_free(retval, FALSE) : NULL;
 }
 
-static gboolean gdm_authenticate()
+static gboolean gdm_authenticate(void)
 {
     FILE       *f;
     Xauth      *xau;
@@ -148,7 +148,6 @@ static gboolean gdm_authenticate()
         g_free (msg);
 
         if (response && !strcmp(response, "OK")) {
-            /*auth_cookie = g_strdup(buffer);*/
             g_free(response);
             retval = TRUE;
             break;
@@ -161,7 +160,7 @@ static gboolean gdm_authenticate()
     return retval;
 }
 
-static gboolean gdm_connect()
+static gboolean gdm_connect(void)
 {
     struct sockaddr_un  addr;
     char               *response;
@@ -190,7 +189,7 @@ static gboolean gdm_connect()
     }
 
     response = gdm_send_protocol_msg(GDM_PROTOCOL_MSG_VERSION);
-    if (!response || strncmp(response, "GDM ", strlen("GDM ") != 0)) {
+    if (!response || strncmp(response, "GDM ", strlen("GDM ")) != 0) {
         g_free(response);
 
         g_warning("Failed to get protocol version from GDM");

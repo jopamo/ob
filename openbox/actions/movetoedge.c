@@ -83,6 +83,7 @@ static gboolean run_func(ObActionsData *data, gpointer options)
 /* 3.4-compatibility */
 static gpointer setup_north_func(xmlNodePtr node)
 {
+	UNUSED(node);
     Options *o = g_slice_new0(Options);
     o->dir = OB_DIRECTION_NORTH;
     return o;
@@ -90,6 +91,7 @@ static gpointer setup_north_func(xmlNodePtr node)
 
 static gpointer setup_south_func(xmlNodePtr node)
 {
+	UNUSED(node);
     Options *o = g_slice_new0(Options);
     o->dir = OB_DIRECTION_SOUTH;
     return o;
@@ -97,6 +99,7 @@ static gpointer setup_south_func(xmlNodePtr node)
 
 static gpointer setup_east_func(xmlNodePtr node)
 {
+	UNUSED(node);
     Options *o = g_slice_new0(Options);
     o->dir = OB_DIRECTION_EAST;
     return o;
@@ -104,6 +107,7 @@ static gpointer setup_east_func(xmlNodePtr node)
 
 static gpointer setup_west_func(xmlNodePtr node)
 {
+	UNUSED(node);
     Options *o = g_slice_new0(Options);
     o->dir = OB_DIRECTION_WEST;
     return o;

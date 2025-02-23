@@ -14,6 +14,8 @@ void action_move_startup(void)
 /* Always return FALSE because its not interactive */
 static gboolean run_func(ObActionsData *data, gpointer options)
 {
+	UNUSED(options);
+
     if (data->client) {
         guint32 corner;
 

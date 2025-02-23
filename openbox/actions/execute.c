@@ -40,6 +40,8 @@ void action_execute_startup(void)
 
 static void client_dest(ObClient *client, gpointer data)
 {
+	UNUSED(data);
+
     GSList *it;
 
     for (it = prompt_opts; it; it = g_slist_next(it)) {
@@ -119,6 +121,8 @@ static Options* dup_options(Options *in, ObActionsData *data)
 
 static gboolean prompt_cb(ObPrompt *p, gint result, gpointer options)
 {
+	UNUSED(p);
+
     Options *o = options;
     if (result)
         run_func(o->data, o);

@@ -100,7 +100,7 @@ void screen_show_desktop(ObScreenShowDestopMode show_mode,
                          struct _ObClient *show_only);
 
 /*! Returns true if showing desktop mode is enabled. */
-gboolean screen_showing_desktop();
+gboolean screen_showing_desktop(void);
 
 /*! Updates the desktop layout from the root property if available */
 void screen_update_layout(void);

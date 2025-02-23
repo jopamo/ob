@@ -4,7 +4,7 @@
 static gboolean run_func_sl(ObActionsData *data, gpointer options);
 static gboolean run_func_ur(ObActionsData *data, gpointer options);
 
-void action_shadelowerraise_startup()
+void action_shadelowerraise_startup(void)
 {
     /* 3.4-compatibility */
     actions_register("ShadeLower", NULL, NULL, run_func_sl);
@@ -14,6 +14,8 @@ void action_shadelowerraise_startup()
 /* Always return FALSE because its not interactive */
 static gboolean run_func_sl(ObActionsData *data, gpointer options)
 {
+	UNUSED(options);
+
     if (data->client) {
         actions_client_move(data, TRUE);
         if (data->client->shaded)
@@ -28,6 +30,9 @@ static gboolean run_func_sl(ObActionsData *data, gpointer options)
 /* Always return FALSE because its not interactive */
 static gboolean run_func_ur(ObActionsData *data, gpointer options)
 {
+	UNUSED(data);
+	UNUSED(options);
+
     if (data->client) {
         actions_client_move(data, TRUE);
         if (data->client->shaded)

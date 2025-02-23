@@ -4,6 +4,9 @@
 #include "openbox/openbox.h"
 #include "obt/keyboard.h"
 
+/*!
+ * \brief Enumerates the different types of desktop switching.
+ */
 typedef enum {
     LAST,
     CURRENT,
@@ -11,13 +14,20 @@ typedef enum {
     ABSOLUTE
 } SwitchType;
 
+/*!
+ * \brief Stores options for switching or sending a client to a particular desktop.
+ *
+ * \c type  => Whether we're switching to LAST, CURRENT, RELATIVE, or ABSOLUTE
+ * \c u     => Union containing either a desktop number (ABSOLUTE) or relative info
+ * \c send  => TRUE if we're sending a client, instead of just going to the desktop
+ * \c follow => TRUE if we should follow the client after sending it
+ */
 typedef struct {
     SwitchType type;
     union {
         struct {
             guint desktop;
         } abs;
-
         struct {
             gboolean linear;
             gboolean wrap;
@@ -28,12 +38,13 @@ typedef struct {
     gboolean follow;
 } Options;
 
+/* Forward declarations */
 static gpointer setup_func(xmlNodePtr node);
 static gpointer setup_send_func(xmlNodePtr node);
-static void free_func(gpointer o);
+static void     free_func(gpointer o);
 static gboolean run_func(ObActionsData *data, gpointer options);
 
-/* 3.4-compatibility */
+/* 3.4-compatibility: these setup_* functions emulate older naming conventions */
 static gpointer setup_go_last_func(xmlNodePtr node);
 static gpointer setup_send_last_func(xmlNodePtr node);
 static gpointer setup_go_abs_func(xmlNodePtr node);
@@ -49,129 +60,214 @@ static gpointer setup_go_up_func(xmlNodePtr node);
 static gpointer setup_send_up_func(xmlNodePtr node);
 static gpointer setup_go_down_func(xmlNodePtr node);
 static gpointer setup_send_down_func(xmlNodePtr node);
+static gpointer setup_follow(xmlNodePtr node);
+static void     setup_rel(Options *o, xmlNodePtr node, gboolean lin, ObDirection dir);
 
-void action_desktop_startup(void)
+/*!
+ * \brief Registers the actions for switching desktops, sending clients to them,
+ *        and the 3.4-compatibility versions ("DesktopLast", etc.).
+ */
+void
+action_desktop_startup(void)
 {
-    actions_register("GoToDesktop", setup_func, free_func, run_func);
-    actions_register("SendToDesktop", setup_send_func, free_func, run_func);
+    /* Modern actions */
+    actions_register("GoToDesktop",
+                     setup_func,
+                     free_func,
+                     run_func);
+
+    actions_register("SendToDesktop",
+                     setup_send_func,
+                     free_func,
+                     run_func);
+
     /* 3.4-compatibility */
-    actions_register("DesktopLast", setup_go_last_func, free_func, run_func);
-    actions_register("SendToDesktopLast", setup_send_last_func,
-                     free_func, run_func);
-    actions_register("Desktop", setup_go_abs_func, free_func, run_func);
-    actions_register("DesktopNext", setup_go_next_func, free_func, run_func);
-    actions_register("SendToDesktopNext", setup_send_next_func,
-                     free_func, run_func);
-    actions_register("DesktopPrevious", setup_go_prev_func,
-                     free_func, run_func);
-    actions_register("SendToDesktopPrevious", setup_send_prev_func,
-                     free_func, run_func);
-    actions_register("DesktopLeft", setup_go_left_func, free_func, run_func);
-    actions_register("SendToDesktopLeft", setup_send_left_func,
-                     free_func, run_func);
-    actions_register("DesktopRight", setup_go_right_func,
-                     free_func, run_func);
-    actions_register("SendToDesktopRight", setup_send_right_func,
-                     free_func, run_func);
-    actions_register("DesktopUp", setup_go_up_func, free_func, run_func);
-    actions_register("SendToDesktopUp", setup_send_up_func,
-                     free_func, run_func);
-    actions_register("DesktopDown", setup_go_down_func, free_func, run_func);
-    actions_register("SendToDesktopDown", setup_send_down_func,
-                     free_func, run_func);
+    actions_register("DesktopLast",
+                     setup_go_last_func,
+                     free_func,
+                     run_func);
+    actions_register("SendToDesktopLast",
+                     setup_send_last_func,
+                     free_func,
+                     run_func);
+    actions_register("Desktop",
+                     setup_go_abs_func,
+                     free_func,
+                     run_func);
+    actions_register("DesktopNext",
+                     setup_go_next_func,
+                     free_func,
+                     run_func);
+    actions_register("SendToDesktopNext",
+                     setup_send_next_func,
+                     free_func,
+                     run_func);
+    actions_register("DesktopPrevious",
+                     setup_go_prev_func,
+                     free_func,
+                     run_func);
+    actions_register("SendToDesktopPrevious",
+                     setup_send_prev_func,
+                     free_func,
+                     run_func);
+    actions_register("DesktopLeft",
+                     setup_go_left_func,
+                     free_func,
+                     run_func);
+    actions_register("SendToDesktopLeft",
+                     setup_send_left_func,
+                     free_func,
+                     run_func);
+    actions_register("DesktopRight",
+                     setup_go_right_func,
+                     free_func,
+                     run_func);
+    actions_register("SendToDesktopRight",
+                     setup_send_right_func,
+                     free_func,
+                     run_func);
+    actions_register("DesktopUp",
+                     setup_go_up_func,
+                     free_func,
+                     run_func);
+    actions_register("SendToDesktopUp",
+                     setup_send_up_func,
+                     free_func,
+                     run_func);
+    actions_register("DesktopDown",
+                     setup_go_down_func,
+                     free_func,
+                     run_func);
+    actions_register("SendToDesktopDown",
+                     setup_send_down_func,
+                     free_func,
+                     run_func);
 }
 
-static gpointer setup_func(xmlNodePtr node)
+/*!
+ * \brief Common setup function for "GoToDesktop".
+ * \param node The XML node with <to>, <wrap>, etc.
+ * \return A newly allocated Options pointer.
+ */
+static gpointer
+setup_func(xmlNodePtr node)
 {
     xmlNodePtr n;
-    Options *o;
+    Options *o = g_new0(Options, 1);
 
-    o = g_slice_new0(Options);
-    /* don't go anywhere if there are no options given */
+    /* By default, use ABSOLUTE to the current screen's desktop */
     o->type = ABSOLUTE;
     o->u.abs.desktop = screen_desktop;
-    /* wrap by default - it's handy! */
+
+    /* For RELATIVE movement, wrap by default */
     o->u.rel.wrap = TRUE;
 
     if ((n = obt_xml_find_node(node, "to"))) {
         gchar *s = obt_xml_node_string(n);
-        if (!g_ascii_strcasecmp(s, "last"))
-            o->type = LAST;
-        else if (!g_ascii_strcasecmp(s, "current"))
-            o->type = CURRENT;
-        else if (!g_ascii_strcasecmp(s, "next")) {
-            o->type = RELATIVE;
-            o->u.rel.linear = TRUE;
-            o->u.rel.dir = OB_DIRECTION_EAST;
+        if (s) {
+            if (!g_ascii_strcasecmp(s, "last")) {
+                o->type = LAST;
+            }
+            else if (!g_ascii_strcasecmp(s, "current")) {
+                o->type = CURRENT;
+            }
+            else if (!g_ascii_strcasecmp(s, "next")) {
+                o->type = RELATIVE;
+                o->u.rel.linear = TRUE;
+                o->u.rel.dir    = OB_DIRECTION_EAST;
+            }
+            else if (!g_ascii_strcasecmp(s, "previous")) {
+                o->type = RELATIVE;
+                o->u.rel.linear = TRUE;
+                o->u.rel.dir    = OB_DIRECTION_WEST;
+            }
+            else if (!g_ascii_strcasecmp(s, "north") ||
+                     !g_ascii_strcasecmp(s, "up")) {
+                o->type = RELATIVE;
+                o->u.rel.dir = OB_DIRECTION_NORTH;
+            }
+            else if (!g_ascii_strcasecmp(s, "south") ||
+                     !g_ascii_strcasecmp(s, "down")) {
+                o->type = RELATIVE;
+                o->u.rel.dir = OB_DIRECTION_SOUTH;
+            }
+            else if (!g_ascii_strcasecmp(s, "west") ||
+                     !g_ascii_strcasecmp(s, "left")) {
+                o->type = RELATIVE;
+                o->u.rel.dir = OB_DIRECTION_WEST;
+            }
+            else if (!g_ascii_strcasecmp(s, "east") ||
+                     !g_ascii_strcasecmp(s, "right")) {
+                o->type = RELATIVE;
+                o->u.rel.dir = OB_DIRECTION_EAST;
+            }
+            else {
+                /* interpret as a desktop number (1-based) */
+                o->type = ABSOLUTE;
+                o->u.abs.desktop = (guint)(atoi(s) - 1);
+            }
+            g_free(s);
         }
-        else if (!g_ascii_strcasecmp(s, "previous")) {
-            o->type = RELATIVE;
-            o->u.rel.linear = TRUE;
-            o->u.rel.dir = OB_DIRECTION_WEST;
-        }
-        else if (!g_ascii_strcasecmp(s, "north") ||
-                 !g_ascii_strcasecmp(s, "up")) {
-            o->type = RELATIVE;
-            o->u.rel.dir = OB_DIRECTION_NORTH;
-        }
-        else if (!g_ascii_strcasecmp(s, "south") ||
-                 !g_ascii_strcasecmp(s, "down")) {
-            o->type = RELATIVE;
-            o->u.rel.dir = OB_DIRECTION_SOUTH;
-        }
-        else if (!g_ascii_strcasecmp(s, "west") ||
-                 !g_ascii_strcasecmp(s, "left")) {
-            o->type = RELATIVE;
-            o->u.rel.dir = OB_DIRECTION_WEST;
-        }
-        else if (!g_ascii_strcasecmp(s, "east") ||
-                 !g_ascii_strcasecmp(s, "right")) {
-            o->type = RELATIVE;
-            o->u.rel.dir = OB_DIRECTION_EAST;
-        }
-        else {
-            o->type = ABSOLUTE;
-            o->u.abs.desktop = atoi(s) - 1;
-        }
-        g_free(s);
     }
 
-    if ((n = obt_xml_find_node(node, "wrap")))
+    if ((n = obt_xml_find_node(node, "wrap"))) {
         o->u.rel.wrap = obt_xml_node_bool(n);
+    }
 
     return o;
 }
 
-static gpointer setup_send_func(xmlNodePtr node)
+/*!
+ * \brief Common setup function for "SendToDesktop".
+ * \param node The XML node (may contain <desktop>, <follow>, etc.).
+ * \return A newly allocated Options pointer, with send=TRUE.
+ */
+static gpointer
+setup_send_func(xmlNodePtr node)
 {
     xmlNodePtr n;
-    Options *o;
+    /* Reuse the base logic from setup_func() */
+    Options *o = setup_func(node);
 
-    o = setup_func(node);
     if ((n = obt_xml_find_node(node, "desktop"))) {
-        /* 3.4 compatibility */
+        /* 3.4 compatibility: if <desktop> is found, force ABSOLUTE and set value */
         o->u.abs.desktop = obt_xml_node_int(n) - 1;
         o->type = ABSOLUTE;
     }
     o->send = TRUE;
-    o->follow = TRUE;
+    o->follow = TRUE;  /* default to following */
 
-    if ((n = obt_xml_find_node(node, "follow")))
+    if ((n = obt_xml_find_node(node, "follow"))) {
         o->follow = obt_xml_node_bool(n);
+    }
 
     return o;
 }
 
-static void free_func(gpointer o)
+/*!
+ * \brief Frees the allocated Options struct.
+ */
+static void
+free_func(gpointer o)
 {
-    g_slice_free(Options, o);
+    g_free(o);
 }
 
-static gboolean run_func(ObActionsData *data, gpointer options)
+/*!
+ * \brief The run function that performs desktop switching or sending a client
+ *        to a desktop (depending on Options).
+ *
+ * \param data    Action data (contains .client, .x, .y, etc.)
+ * \param options The Options struct describing which desktop to go/send to
+ * \return FALSE => non-interactive (completes immediately).
+ */
+static gboolean
+run_func(ObActionsData *data, gpointer options)
 {
-    Options *o = options;
+    Options *o = (Options *)options;
     guint d;
 
+    /* Determine which desktop we want to target */
     switch (o->type) {
     case LAST:
         d = screen_last_desktop;
@@ -184,165 +280,211 @@ static gboolean run_func(ObActionsData *data, gpointer options)
         break;
     case RELATIVE:
         d = screen_find_desktop(screen_desktop,
-                                o->u.rel.dir, o->u.rel.wrap, o->u.rel.linear);
+                                o->u.rel.dir,
+                                o->u.rel.wrap,
+                                o->u.rel.linear);
         break;
     default:
         g_assert_not_reached();
     }
 
+    /*
+     * Only switch if:
+     *  (1) d is a valid desktop
+     *  (2) d != current desktop, or (3) we have a client whose desktop
+     *      differs from screen_desktop (meaning we might need to move it)
+     */
     if (d < screen_num_desktops &&
         (d != screen_desktop ||
-         (data->client && data->client->desktop != screen_desktop))) {
+         (data->client && data->client->desktop != screen_desktop)))
+    {
         gboolean go = TRUE;
 
+        /* Indicate we might be moving a window */
         actions_client_move(data, TRUE);
+
+        /* If sending a normal window to 'd', do so. Decide if we also follow. */
         if (o->send && data->client && client_normal(data->client)) {
             client_set_desktop(data->client, d, o->follow, FALSE);
             go = o->follow;
         }
 
+        /* If we are going to 'd' ourselves, switch the screen there. */
         if (go) {
             screen_set_desktop(d, TRUE);
-            if (data->client)
+            if (data->client) {
                 client_bring_helper_windows(data->client);
+            }
         }
 
+        /* End the move operation */
         actions_client_move(data, FALSE);
     }
 
-    return FALSE;
+    return FALSE;  /* Non-interactive */
 }
 
-/* 3.4-compatilibity */
-static gpointer setup_follow(xmlNodePtr node)
+/* --------------------------------------------------------------------------
+ * 3.4-compatibility functions
+ * -------------------------------------------------------------------------- */
+
+/*!
+ * \brief Allocates a minimal Options with send=TRUE & follow=TRUE by default,
+ *        reading <follow> from XML if present.
+ */
+static gpointer
+setup_follow(xmlNodePtr node)
 {
     xmlNodePtr n;
-    Options *o = g_slice_new0(Options);
-    o->send = TRUE;
+    Options *o = g_new0(Options, 1);
+    o->send   = TRUE;
     o->follow = TRUE;
-    if ((n = obt_xml_find_node(node, "follow")))
+
+    if ((n = obt_xml_find_node(node, "follow"))) {
         o->follow = obt_xml_node_bool(n);
+    }
     return o;
 }
 
-static gpointer setup_go_last_func(xmlNodePtr node)
+static gpointer
+setup_go_last_func(xmlNodePtr node)
 {
-    Options *o = g_slice_new0(Options);
+    (void)node; /* Unused */
+    Options *o = g_new0(Options, 1);
     o->type = LAST;
     return o;
 }
 
-static gpointer setup_send_last_func(xmlNodePtr node)
+static gpointer
+setup_send_last_func(xmlNodePtr node)
 {
     Options *o = setup_follow(node);
     o->type = LAST;
     return o;
 }
 
-static gpointer setup_go_abs_func(xmlNodePtr node)
+static gpointer
+setup_go_abs_func(xmlNodePtr node)
 {
     xmlNodePtr n;
-    Options *o = g_slice_new0(Options);
+    Options *o = g_new0(Options, 1);
     o->type = ABSOLUTE;
-    if ((n = obt_xml_find_node(node, "desktop")))
+    if ((n = obt_xml_find_node(node, "desktop"))) {
         o->u.abs.desktop = obt_xml_node_int(n) - 1;
-    else
+    } else {
         o->u.abs.desktop = screen_desktop;
+    }
     return o;
 }
 
-static void setup_rel(Options *o, xmlNodePtr node, gboolean lin,
-                      ObDirection dir)
+/*!
+ * \brief Helper for setting up relative movement.
+ */
+static void
+setup_rel(Options *o, xmlNodePtr node, gboolean lin, ObDirection dir)
 {
     xmlNodePtr n;
 
-    o->type = RELATIVE;
+    o->type       = RELATIVE;
     o->u.rel.linear = lin;
-    o->u.rel.dir = dir;
-    o->u.rel.wrap = TRUE;
+    o->u.rel.dir    = dir;
+    o->u.rel.wrap   = TRUE;
 
-    if ((n = obt_xml_find_node(node, "wrap")))
+    if ((n = obt_xml_find_node(node, "wrap"))) {
         o->u.rel.wrap = obt_xml_node_bool(n);
+    }
 }
 
-static gpointer setup_go_next_func(xmlNodePtr node)
+static gpointer
+setup_go_next_func(xmlNodePtr node)
 {
-    Options *o = g_slice_new0(Options);
+    Options *o = g_new0(Options, 1);
     setup_rel(o, node, TRUE, OB_DIRECTION_EAST);
     return o;
 }
 
-static gpointer setup_send_next_func(xmlNodePtr node)
+static gpointer
+setup_send_next_func(xmlNodePtr node)
 {
     Options *o = setup_follow(node);
     setup_rel(o, node, TRUE, OB_DIRECTION_EAST);
     return o;
 }
 
-static gpointer setup_go_prev_func(xmlNodePtr node)
+static gpointer
+setup_go_prev_func(xmlNodePtr node)
 {
-    Options *o = g_slice_new0(Options);
+    Options *o = g_new0(Options, 1);
     setup_rel(o, node, TRUE, OB_DIRECTION_WEST);
     return o;
 }
 
-static gpointer setup_send_prev_func(xmlNodePtr node)
+static gpointer
+setup_send_prev_func(xmlNodePtr node)
 {
     Options *o = setup_follow(node);
     setup_rel(o, node, TRUE, OB_DIRECTION_WEST);
     return o;
 }
 
-static gpointer setup_go_left_func(xmlNodePtr node)
+static gpointer
+setup_go_left_func(xmlNodePtr node)
 {
-    Options *o = g_slice_new0(Options);
+    Options *o = g_new0(Options, 1);
     setup_rel(o, node, FALSE, OB_DIRECTION_WEST);
     return o;
 }
 
-static gpointer setup_send_left_func(xmlNodePtr node)
+static gpointer
+setup_send_left_func(xmlNodePtr node)
 {
     Options *o = setup_follow(node);
     setup_rel(o, node, FALSE, OB_DIRECTION_WEST);
     return o;
 }
 
-static gpointer setup_go_right_func(xmlNodePtr node)
+static gpointer
+setup_go_right_func(xmlNodePtr node)
 {
-    Options *o = g_slice_new0(Options);
+    Options *o = g_new0(Options, 1);
     setup_rel(o, node, FALSE, OB_DIRECTION_EAST);
     return o;
 }
 
-static gpointer setup_send_right_func(xmlNodePtr node)
+static gpointer
+setup_send_right_func(xmlNodePtr node)
 {
     Options *o = setup_follow(node);
     setup_rel(o, node, FALSE, OB_DIRECTION_EAST);
     return o;
 }
 
-static gpointer setup_go_up_func(xmlNodePtr node)
+static gpointer
+setup_go_up_func(xmlNodePtr node)
 {
-    Options *o = g_slice_new0(Options);
+    Options *o = g_new0(Options, 1);
     setup_rel(o, node, FALSE, OB_DIRECTION_NORTH);
     return o;
 }
 
-static gpointer setup_send_up_func(xmlNodePtr node)
+static gpointer
+setup_send_up_func(xmlNodePtr node)
 {
     Options *o = setup_follow(node);
     setup_rel(o, node, FALSE, OB_DIRECTION_NORTH);
     return o;
 }
 
-static gpointer setup_go_down_func(xmlNodePtr node)
+static gpointer
+setup_go_down_func(xmlNodePtr node)
 {
-    Options *o = g_slice_new0(Options);
+    Options *o = g_new0(Options, 1);
     setup_rel(o, node, FALSE, OB_DIRECTION_SOUTH);
     return o;
 }
 
-static gpointer setup_send_down_func(xmlNodePtr node)
+static gpointer
+setup_send_down_func(xmlNodePtr node)
 {
     Options *o = setup_follow(node);
     setup_rel(o, node, FALSE, OB_DIRECTION_SOUTH);

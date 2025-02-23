@@ -47,6 +47,9 @@ static void do_exit(void)
 
 static gboolean prompt_cb(ObPrompt *p, gint result, gpointer data)
 {
+	UNUSED(p);
+	UNUSED(data);
+
     if (result)
         do_exit();
     return TRUE; /* call the cleanup func */
@@ -54,6 +57,8 @@ static gboolean prompt_cb(ObPrompt *p, gint result, gpointer data)
 
 static void prompt_cleanup(ObPrompt *p, gpointer data)
 {
+	UNUSED(data);
+
     prompt_unref(p);
 }
 
@@ -61,6 +66,8 @@ static void prompt_cleanup(ObPrompt *p, gpointer data)
 /* Always return FALSE because its not interactive */
 static gboolean run_func(ObActionsData *data, gpointer options)
 {
+	UNUSED(data);
+
     Options *o = options;
 
     if (o->prompt) {

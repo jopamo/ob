@@ -318,156 +318,115 @@ static gboolean get_text_property(Window win, Atom prop,
     }
 }
 
-/*! Returns one or more UTF-8 encoded strings from the text property.
-  @param tprop The XTextProperty to convert into UTF-8 string(s).
-  @param type The type which specifies the format that the text must meet, or
-    0 to allow any valid characters that can be converted to UTF-8 through.
-  @param max The maximum number of strings to return.  -1 to return them all.
-  @return If max is 1, then this returns a gchar* with the single string.
-    Otherwise, this returns a gchar** of no more than max strings (or all
-    strings read, if max is negative). If an error occurs, NULL is returned.
- */
-static void* convert_text_property(XTextProperty *tprop,
-                                   ObtPropTextType type, gint max)
-{
-    enum {
-        LATIN1,
-        UTF8,
-        LOCALE
-    } encoding;
-    const gboolean return_single = (max == 1);
+static gchar* convert_string_to_utf8(const gchar *input, gboolean *valid) {
+    // Convert a string to UTF-8 and validate it
+    const gchar *end;
+    g_utf8_validate(input, -1, &end);
+    *valid = (input == end) ? FALSE : TRUE;
+    return g_strndup(input, end - input);
+}
+
+static gchar* convert_locale_to_utf8(const gchar *input) {
+    // Convert a locale-encoded string to UTF-8
+    gsize nvalid;
+    gchar *utf = g_locale_to_utf8(input, -1, &nvalid, NULL, NULL);
+    if (!utf) {
+        utf = g_locale_to_utf8(input, nvalid, NULL, NULL, NULL);
+    }
+    g_assert(utf);
+    return utf;
+}
+
+static gchar* convert_latin1_to_utf8(const gchar *input, ObtPropTextType type) {
+    gsize nvalid = 0;
+    gchar *utf;
+    gchar *p = (gchar*)input;
+
+    while (*p) {
+        const guchar c = (guchar)*p;  // unsigned value at p
+        // Look for invalid characters based on type
+        if ((c < 32 && c != 9 && c != 10) || (c >= 127 && c <= 160)) {
+            break; // Found an invalid control character
+        }
+
+        if (type == OBT_PROP_TEXT_STRING_NO_CC && c < 32) {
+            break; // No control characters allowed
+        }
+
+        if (type == OBT_PROP_TEXT_STRING_XPCS) {
+            if (!((c >= 32 && c < 128) || c == 9 || c == 10)) {
+                break; // Strict whitelisting for XPCS
+            }
+        }
+        ++p;
+        ++nvalid;
+    }
+
+    // Convert from Latin1 to UTF-8
+    utf = g_convert(input, nvalid, "utf-8", "iso-8859-1", &nvalid, NULL, NULL);
+    if (!utf) {
+        utf = g_convert(input, nvalid, "utf-8", "iso-8859-1", NULL, NULL, NULL);
+    }
+    g_assert(utf);
+    return utf;
+}
+
+static void* convert_text_property(XTextProperty *tprop, ObtPropTextType type, gint max) {
     gboolean ok = FALSE;
     gchar **strlist = NULL;
-    gchar *single[1] = { NULL };
-    gchar **retlist = single; /* single is used when max == 1 */
+    gchar **retlist = NULL;
     gint i, n_strs;
 
-    /* Read each string in the text property and store a pointer to it in
-       retlist.  These pointers point into the X data structures directly.
+    // Direct integer value for OBT_PROP_ATOM(UTF8_STRING) and OBT_PROP_ATOM(STRING)
+    const Atom UTF8_STRING = OBT_PROP_ATOM(UTF8_STRING);
+    const Atom STRING = OBT_PROP_ATOM(STRING);
 
-       Then we will convert them to UTF-8, and replace the retlist pointer with
-       a new one.
-    */
-    if (tprop->encoding == OBT_PROP_ATOM(COMPOUND_TEXT))
-    {
-        encoding = LOCALE;
-        ok = (XmbTextPropertyToTextList(
-                   obt_display, tprop, &strlist, &n_strs) == Success);
+    // Check for encoding and process based on type
+    if (tprop->encoding == OBT_PROP_ATOM(COMPOUND_TEXT)) {
+        ok = (XmbTextPropertyToTextList(obt_display, tprop, &strlist, &n_strs) == Success);
         if (ok) {
-            if (max >= 0)
-                n_strs = MIN(max, n_strs);
-            if (!return_single)
-                retlist = g_new0(gchar*, n_strs+1);
-            if (retlist)
-                for (i = 0; i < n_strs; ++i)
-                    retlist[i] = strlist[i];
-        }
-    }
-    else if (tprop->encoding == OBT_PROP_ATOM(UTF8_STRING) ||
-             tprop->encoding == OBT_PROP_ATOM(STRING))
-    {
-        gchar *p; /* iterator */
-
-        if (tprop->encoding == OBT_PROP_ATOM(STRING))
-            encoding = LATIN1;
-        else
-            encoding = UTF8;
-        ok = TRUE;
-
-        /* First, count the number of strings. Then make a structure for them
-           and copy pointers to them into it. */
-        p = (gchar*)tprop->value;
-        n_strs = 0;
-        while (p < (gchar*)tprop->value + tprop->nitems) {
-            p += strlen(p) + 1; /* next string */
-            ++n_strs;
-        }
-
-        if (max >= 0)
-            n_strs = MIN(max, n_strs);
-        if (!return_single)
-            retlist = g_new0(gchar*, n_strs+1);
-        if (retlist) {
-            p = (gchar*)tprop->value;
+            n_strs = (max >= 0) ? MIN(max, n_strs) : n_strs;
+            retlist = g_new0(gchar*, n_strs + 1);
             for (i = 0; i < n_strs; ++i) {
-                retlist[i] = p;
-                p += strlen(p) + 1; /* next string */
+                retlist[i] = convert_locale_to_utf8(strlist[i]);
             }
         }
     }
+    else if (tprop->encoding == UTF8_STRING || tprop->encoding == STRING) {
+        gchar *p = (gchar*)tprop->value;
+        n_strs = 0;
+        while (p < (gchar*)tprop->value + tprop->nitems) {
+            p += strlen(p) + 1;  // Move to the next string
+            ++n_strs;
+        }
 
-    if (!(ok && retlist)) {
+        n_strs = (max >= 0) ? MIN(max, n_strs) : n_strs;
+        retlist = g_new0(gchar*, n_strs + 1);
+
+        p = (gchar*)tprop->value;
+        for (i = 0; i < n_strs; ++i) {
+            if (tprop->encoding == UTF8_STRING) {
+                retlist[i] = convert_string_to_utf8(p, &ok);
+            } else if (tprop->encoding == STRING) {
+                retlist[i] = convert_latin1_to_utf8(p, type);
+            } else {
+                ok = FALSE;
+            }
+            p += strlen(p) + 1;
+        }
+    }
+
+    if (!ok || !retlist) {
         if (strlist) XFreeStringList(strlist);
         return NULL;
     }
 
-    /* convert each element in retlist to UTF-8, and replace it. */
-    for (i = 0; i < n_strs; ++i) {
-        if (encoding == UTF8) {
-            const gchar *end; /* the first byte past the valid data */
-
-            g_utf8_validate(retlist[i], -1, &end);
-            retlist[i] = g_strndup(retlist[i], end-retlist[i]);
-        }
-        else if (encoding == LOCALE) {
-            gsize nvalid; /* the number of valid bytes at the front of the
-                             string */
-            gchar *utf; /* the string converted into utf8 */
-
-            utf = g_locale_to_utf8(retlist[i], -1, &nvalid, NULL, NULL);
-            if (!utf)
-                utf = g_locale_to_utf8(retlist[i], nvalid, NULL, NULL, NULL);
-            g_assert(utf);
-            retlist[i] = utf;
-        }
-        else { /* encoding == LATIN1 */
-            gsize nvalid; /* the number of valid bytes at the front of the
-                             string */
-            gchar *utf; /* the string converted into utf8 */
-            gchar *p; /* iterator */
-
-            /* look for invalid characters */
-            for (p = retlist[i], nvalid = 0; *p; ++p, ++nvalid) {
-                /* The only valid control characters are TAB(HT)=9 and
-                   NEWLINE(LF)=10.
-                   This is defined in ICCCM section 2:
-                     http://tronche.com/gui/x/icccm/sec-2.html.
-                   See a definition of the latin1 codepage here:
-                     http://en.wikipedia.org/wiki/ISO/IEC_8859-1.
-                   The above page includes control characters in the table,
-                   which we must explicitly exclude, as the g_convert function
-                   will happily take them.
-                */
-                const register guchar c = (guchar)*p; /* unsigned value at p */
-                if ((c < 32 && c != 9 && c != 10) || (c >= 127 && c <= 160))
-                    break; /* found a control character that isn't allowed */
-
-                if (type == OBT_PROP_TEXT_STRING_NO_CC && c < 32)
-                    break; /* absolutely no control characters are allowed */
-
-                if (type == OBT_PROP_TEXT_STRING_XPCS) {
-                    const gboolean valid = (
-                        (c >= 32 && c < 128) || c == 9 || c == 10);
-                    if (!valid)
-                        break; /* strict whitelisting for XPCS */
-                }
-            }
-            /* look for invalid latin1 characters */
-            utf = g_convert(retlist[i], nvalid, "utf-8", "iso-8859-1",
-                            &nvalid, NULL, NULL);
-            if (!utf)
-                utf = g_convert(retlist[i], nvalid, "utf-8", "iso-8859-1",
-                                NULL, NULL, NULL);
-            g_assert(utf);
-            retlist[i] = utf;
-        }
-    }
-
     if (strlist) XFreeStringList(strlist);
-    if (return_single)
+    if (max == 1) {
         return retlist[0];
-    else
+    } else {
         return retlist;
+    }
 }
 
 gboolean obt_prop_get32(Window win, Atom prop, Atom type, guint32 *ret)

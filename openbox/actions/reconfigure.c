@@ -11,6 +11,8 @@ void action_reconfigure_startup(void)
 /* Always return FALSE because its not interactive */
 static gboolean run_func(ObActionsData *data, gpointer options)
 {
+	UNUSED(data);
+	UNUSED(options);
     ob_reconfigure();
 
     return FALSE;

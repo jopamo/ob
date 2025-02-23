@@ -358,6 +358,7 @@ static void parse_single_per_app_settings(xmlNodePtr app,
 */
 static void parse_per_app_settings(xmlNodePtr node, gpointer d)
 {
+	UNUSED(d);
     xmlNodePtr app = obt_xml_find_node(node->children, "application");
     for (; app; app = obt_xml_find_node(app->next, "application")) {
         ObAppSettings *settings;
@@ -487,6 +488,7 @@ static void parse_key(xmlNodePtr node, GList *keylist)
 
 static void parse_keyboard(xmlNodePtr node, gpointer d)
 {
+	UNUSED(d);
     xmlNodePtr n;
     gchar *key;
 
@@ -521,6 +523,7 @@ static void parse_keyboard(xmlNodePtr node, gpointer d)
 
 static void parse_mouse(xmlNodePtr node, gpointer d)
 {
+	UNUSED(d);
     xmlNodePtr n, nbut, nact;
     gchar *buttonstr;
     gchar *cxstr;
@@ -617,6 +620,7 @@ static void parse_mouse(xmlNodePtr node, gpointer d)
 
 static void parse_focus(xmlNodePtr node, gpointer d)
 {
+	UNUSED(d);
     xmlNodePtr n;
 
     node = node->children;
@@ -639,6 +643,7 @@ static void parse_focus(xmlNodePtr node, gpointer d)
 
 static void parse_placement(xmlNodePtr node, gpointer d)
 {
+	UNUSED(d);
     xmlNodePtr n;
 
     node = node->children;
@@ -669,6 +674,7 @@ static void parse_placement(xmlNodePtr node, gpointer d)
 
 static void parse_margins(xmlNodePtr node, gpointer d)
 {
+	UNUSED(d);
     xmlNodePtr n;
 
     node = node->children;
@@ -685,6 +691,7 @@ static void parse_margins(xmlNodePtr node, gpointer d)
 
 static void parse_theme(xmlNodePtr node, gpointer d)
 {
+	UNUSED(d);
     xmlNodePtr n;
 
     node = node->children;
@@ -778,6 +785,7 @@ static void parse_theme(xmlNodePtr node, gpointer d)
 
 static void parse_desktops(xmlNodePtr node, gpointer d)
 {
+	UNUSED(d);
     xmlNodePtr n;
 
     node = node->children;
@@ -816,6 +824,7 @@ static void parse_desktops(xmlNodePtr node, gpointer d)
 
 static void parse_resize(xmlNodePtr node, gpointer d)
 {
+	UNUSED(d);
     xmlNodePtr n;
 
     node = node->children;
@@ -860,6 +869,7 @@ static void parse_resize(xmlNodePtr node, gpointer d)
 
 static void parse_dock(xmlNodePtr node, gpointer d)
 {
+	UNUSED(d);
     xmlNodePtr n;
 
     node = node->children;
@@ -936,6 +946,7 @@ static void parse_dock(xmlNodePtr node, gpointer d)
 
 static void parse_menu(xmlNodePtr node, gpointer d)
 {
+	UNUSED(d);
     xmlNodePtr n;
     node = node->children;
 
@@ -970,6 +981,7 @@ static void parse_menu(xmlNodePtr node, gpointer d)
 
 static void parse_resistance(xmlNodePtr node, gpointer d)
 {
+	UNUSED(d);
     xmlNodePtr n;
 
     node = node->children;

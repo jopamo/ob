@@ -32,6 +32,7 @@
 #include "obt/display.h"
 #include "obt/xqueue.h"
 #include "obt/prop.h"
+#include <glib.h>  /* For g_get_real_time(), gint64, etc. */
 
 #define FRAME_EVENTMASK (EnterWindowMask | LeaveWindowMask | \
                          ButtonPressMask | ButtonReleaseMask | \
@@ -40,37 +41,50 @@
                            ButtonMotionMask | PointerMotionMask | \
                            EnterWindowMask | LeaveWindowMask)
 
-#define FRAME_ANIMATE_ICONIFY_TIME 150000 /* .15 seconds */
-#define FRAME_ANIMATE_ICONIFY_STEP_TIME (1000 / 60) /* 60 Hz */
+/*!
+ * \brief For a 0.15s (150ms) iconify animation, store times in microseconds.
+ */
+#define FRAME_ANIMATE_ICONIFY_TIME      150000   /* 150k µs => 0.15s */
+#define FRAME_ANIMATE_ICONIFY_STEP_TIME (1000/60)/* ~16ms => 60 FPS */
 
 #define FRAME_HANDLE_Y(f) (f->size.top + f->client->area.height + f->cbwidth_b)
 
-static void flash_done(gpointer data);
+/* Forward-declared static functions */
+static void     flash_done(gpointer data);
 static gboolean flash_timeout(gpointer data);
+static gboolean frame_animate_iconify(gpointer self);
+static void     frame_adjust_cursors(ObFrame *self);
 
 static void layout_title(ObFrame *self);
 static void set_theme_statics(ObFrame *self);
 static void free_theme_statics(ObFrame *self);
-static gboolean frame_animate_iconify(gpointer self);
-static void frame_adjust_cursors(ObFrame *self);
 
-static Window createWindow(Window parent, Visual *visual,
-                           gulong mask, XSetWindowAttributes *attrib)
+/*!
+ * \brief Helper for creating an X window with an optional 32-bit visual.
+ */
+static Window
+createWindow(Window parent, Visual *visual, gulong mask, XSetWindowAttributes *attrib)
 {
-    return XCreateWindow(obt_display, parent, 0, 0, 1, 1, 0,
-                         (visual ? 32 : RrDepth(ob_rr_inst)), InputOutput,
+    return XCreateWindow(obt_display,
+                         parent,
+                         0, 0, 1, 1,
+                         0, /* border width */
+                         (visual ? 32 : RrDepth(ob_rr_inst)),
+                         InputOutput,
                          (visual ? visual : RrVisual(ob_rr_inst)),
                          mask, attrib);
-
 }
 
-static Visual *check_32bit_client(ObClient *c)
+/*!
+ * \brief Check if the client is a 32-bit RGBA window; if so, returns its visual.
+ */
+static Visual *
+check_32bit_client(ObClient *c)
 {
     XWindowAttributes wattrib;
     Status ret;
 
-    /* we're already running at 32 bit depth, yay. we don't need to use their
-       visual */
+    /* If the current root depth is already 32, no need to adapt. */
     if (RrDepth(ob_rr_inst) == 32)
         return NULL;
 
@@ -80,68 +94,69 @@ static Visual *check_32bit_client(ObClient *c)
 
     if (wattrib.depth == 32)
         return wattrib.visual;
+
     return NULL;
 }
 
-ObFrame *frame_new(ObClient *client)
+/*!
+ * \brief Create a new ObFrame and child windows for a client.
+ */
+ObFrame *
+frame_new(ObClient *client)
 {
     XSetWindowAttributes attrib;
     gulong mask;
     ObFrame *self;
-    Visual *visual;
+    Visual  *visual;
 
     self = g_slice_new0(ObFrame);
     self->client = client;
 
     visual = check_32bit_client(client);
 
-    /* create the non-visible decor windows */
-
+    /* Create the top-level frame window (non-visible decor) */
     mask = 0;
     if (visual) {
-        /* client has a 32-bit visual */
         mask = CWColormap | CWBackPixel | CWBorderPixel;
-        /* create a colormap with the visual */
-        self->colormap = attrib.colormap =
-            XCreateColormap(obt_display, obt_root(ob_screen),
-                            visual, AllocNone);
+        self->colormap =
+            attrib.colormap = XCreateColormap(obt_display,
+                                              obt_root(ob_screen),
+                                              visual,
+                                              AllocNone);
         attrib.background_pixel = BlackPixel(obt_display, ob_screen);
-        attrib.border_pixel = BlackPixel(obt_display, ob_screen);
+        attrib.border_pixel     = BlackPixel(obt_display, ob_screen);
     }
-    self->window = createWindow(obt_root(ob_screen), visual,
-                                mask, &attrib);
+    self->window = createWindow(obt_root(ob_screen), visual, mask, &attrib);
 
-    /* create the visible decor windows */
-
+    /* Create visible decor windows */
     mask = 0;
     if (visual) {
-        /* client has a 32-bit visual */
         mask = CWColormap | CWBackPixel | CWBorderPixel;
         attrib.colormap = RrColormap(ob_rr_inst);
     }
 
-    self->backback = createWindow(self->window, NULL, mask, &attrib);
+    self->backback  = createWindow(self->window, NULL, mask, &attrib);
     self->backfront = createWindow(self->backback, NULL, mask, &attrib);
 
     mask |= CWEventMask;
     attrib.event_mask = ELEMENT_EVENTMASK;
-    self->innerleft = createWindow(self->window, NULL, mask, &attrib);
-    self->innertop = createWindow(self->window, NULL, mask, &attrib);
-    self->innerright = createWindow(self->window, NULL, mask, &attrib);
+    self->innerleft   = createWindow(self->window, NULL, mask, &attrib);
+    self->innertop    = createWindow(self->window, NULL, mask, &attrib);
+    self->innerright  = createWindow(self->window, NULL, mask, &attrib);
     self->innerbottom = createWindow(self->window, NULL, mask, &attrib);
 
-    self->innerblb = createWindow(self->innerbottom, NULL, mask, &attrib);
-    self->innerbrb = createWindow(self->innerbottom, NULL, mask, &attrib);
-    self->innerbll = createWindow(self->innerleft, NULL, mask, &attrib);
-    self->innerbrr = createWindow(self->innerright, NULL, mask, &attrib);
+    self->innerblb    = createWindow(self->innerbottom, NULL, mask, &attrib);
+    self->innerbrb    = createWindow(self->innerbottom, NULL, mask, &attrib);
+    self->innerbll    = createWindow(self->innerleft,   NULL, mask, &attrib);
+    self->innerbrr    = createWindow(self->innerright,  NULL, mask, &attrib);
 
-    self->title = createWindow(self->window, NULL, mask, &attrib);
-    self->titleleft = createWindow(self->window, NULL, mask, &attrib);
-    self->titletop = createWindow(self->window, NULL, mask, &attrib);
+    self->title        = createWindow(self->window, NULL, mask, &attrib);
+    self->titleleft    = createWindow(self->window, NULL, mask, &attrib);
+    self->titletop     = createWindow(self->window, NULL, mask, &attrib);
     self->titletopleft = createWindow(self->window, NULL, mask, &attrib);
-    self->titletopright = createWindow(self->window, NULL, mask, &attrib);
-    self->titleright = createWindow(self->window, NULL, mask, &attrib);
-    self->titlebottom = createWindow(self->window, NULL, mask, &attrib);
+    self->titletopright= createWindow(self->window, NULL, mask, &attrib);
+    self->titleright   = createWindow(self->window, NULL, mask, &attrib);
+    self->titlebottom  = createWindow(self->window, NULL, mask, &attrib);
 
     self->topresize = createWindow(self->title, NULL, mask, &attrib);
     self->tltresize = createWindow(self->title, NULL, mask, &attrib);
@@ -149,57 +164,58 @@ ObFrame *frame_new(ObClient *client)
     self->trtresize = createWindow(self->title, NULL, mask, &attrib);
     self->trrresize = createWindow(self->title, NULL, mask, &attrib);
 
-    self->left = createWindow(self->window, NULL, mask, &attrib);
+    self->left  = createWindow(self->window, NULL, mask, &attrib);
     self->right = createWindow(self->window, NULL, mask, &attrib);
 
-    self->label = createWindow(self->title, NULL, mask, &attrib);
-    self->max = createWindow(self->title, NULL, mask, &attrib);
-    self->close = createWindow(self->title, NULL, mask, &attrib);
-    self->desk = createWindow(self->title, NULL, mask, &attrib);
-    self->shade = createWindow(self->title, NULL, mask, &attrib);
-    self->icon = createWindow(self->title, NULL, mask, &attrib);
+    self->label   = createWindow(self->title, NULL, mask, &attrib);
+    self->max     = createWindow(self->title, NULL, mask, &attrib);
+    self->close   = createWindow(self->title, NULL, mask, &attrib);
+    self->desk    = createWindow(self->title, NULL, mask, &attrib);
+    self->shade   = createWindow(self->title, NULL, mask, &attrib);
+    self->icon    = createWindow(self->title, NULL, mask, &attrib);
     self->iconify = createWindow(self->title, NULL, mask, &attrib);
 
-    self->handle = createWindow(self->window, NULL, mask, &attrib);
-    self->lgrip = createWindow(self->handle, NULL, mask, &attrib);
-    self->rgrip = createWindow(self->handle, NULL, mask, &attrib);
-
+    self->handle     = createWindow(self->window, NULL, mask, &attrib);
+    self->lgrip      = createWindow(self->handle, NULL, mask, &attrib);
+    self->rgrip      = createWindow(self->handle, NULL, mask, &attrib);
     self->handleleft = createWindow(self->handle, NULL, mask, &attrib);
-    self->handleright = createWindow(self->handle, NULL, mask, &attrib);
+    self->handleright= createWindow(self->handle, NULL, mask, &attrib);
 
-    self->handletop = createWindow(self->window, NULL, mask, &attrib);
+    self->handletop    = createWindow(self->window, NULL, mask, &attrib);
     self->handlebottom = createWindow(self->window, NULL, mask, &attrib);
-    self->lgripleft = createWindow(self->window, NULL, mask, &attrib);
-    self->lgriptop = createWindow(self->window, NULL, mask, &attrib);
-    self->lgripbottom = createWindow(self->window, NULL, mask, &attrib);
-    self->rgripright = createWindow(self->window, NULL, mask, &attrib);
-    self->rgriptop = createWindow(self->window, NULL, mask, &attrib);
-    self->rgripbottom = createWindow(self->window, NULL, mask, &attrib);
+    self->lgripleft    = createWindow(self->window, NULL, mask, &attrib);
+    self->lgriptop     = createWindow(self->window, NULL, mask, &attrib);
+    self->lgripbottom  = createWindow(self->window, NULL, mask, &attrib);
+    self->rgripright   = createWindow(self->window, NULL, mask, &attrib);
+    self->rgriptop     = createWindow(self->window, NULL, mask, &attrib);
+    self->rgripbottom  = createWindow(self->window, NULL, mask, &attrib);
 
     self->focused = FALSE;
 
-    /* the other stuff is shown based on decor settings */
+    /* Some parts are always visible by default */
     XMapWindow(obt_display, self->label);
     XMapWindow(obt_display, self->backback);
     XMapWindow(obt_display, self->backfront);
 
+    /* Initialize pressing/hover states */
     self->max_press = self->close_press = self->desk_press =
         self->iconify_press = self->shade_press = FALSE;
     self->max_hover = self->close_hover = self->desk_hover =
         self->iconify_hover = self->shade_hover = FALSE;
 
-    /* make sure the size will be different the first time, so the extent hints
-       will be set */
+    /* Force oldsize to -1 so we definitely update extents next time. */
     STRUT_SET(self->oldsize, -1, -1, -1, -1);
 
+    /* Initialize static theme geometry for the new frame */
     set_theme_statics(self);
 
     return self;
 }
 
-static void set_theme_statics(ObFrame *self)
+static void
+set_theme_statics(ObFrame *self)
 {
-    /* set colors/appearance/sizes for stuff that doesn't change */
+    /* Example: set geometry on certain windows once at creation */
     XResizeWindow(obt_display, self->max,
                   ob_rr_theme->button_size, ob_rr_theme->button_size);
     XResizeWindow(obt_display, self->iconify,
@@ -212,6 +228,7 @@ static void set_theme_statics(ObFrame *self)
                   ob_rr_theme->button_size, ob_rr_theme->button_size);
     XResizeWindow(obt_display, self->shade,
                   ob_rr_theme->button_size, ob_rr_theme->button_size);
+
     XResizeWindow(obt_display, self->tltresize,
                   ob_rr_theme->grip_width, ob_rr_theme->paddingy + 1);
     XResizeWindow(obt_display, self->trtresize,
@@ -222,29 +239,34 @@ static void set_theme_statics(ObFrame *self)
                   ob_rr_theme->paddingx + 1, ob_rr_theme->title_height);
 }
 
-static void free_theme_statics(ObFrame *self)
+static void
+free_theme_statics(ObFrame *self)
 {
+    /* If there's special theme data to free, do it here. */
 }
 
-void frame_free(ObFrame *self)
+void
+frame_free(ObFrame *self)
 {
     free_theme_statics(self);
 
+    /* Destroy top-level frame window (and its children). */
     XDestroyWindow(obt_display, self->window);
+
     if (self->colormap)
         XFreeColormap(obt_display, self->colormap);
 
     g_slice_free(ObFrame, self);
 }
 
-void frame_show(ObFrame *self)
+void
+frame_show(ObFrame *self)
 {
     if (!self->visible) {
         self->visible = TRUE;
         framerender_frame(self);
-        /* Grab the server to make sure that the frame window is mapped before
-           the client gets its MapNotify, i.e. to make sure the client is
-           _visible_ when it gets MapNotify. */
+
+        /* Grab the server to ensure frame is mapped before client sees MapNotify. */
         grab_server(TRUE);
         XMapWindow(obt_display, self->client->window);
         XMapWindow(obt_display, self->window);
@@ -252,27 +274,30 @@ void frame_show(ObFrame *self)
     }
 }
 
-void frame_hide(ObFrame *self)
+void
+frame_hide(ObFrame *self)
 {
     if (self->visible) {
         self->visible = FALSE;
         if (!frame_iconify_animating(self))
             XUnmapWindow(obt_display, self->window);
-        /* we unmap the client itself so that we can get MapRequest
-           events, and because the ICCCM tells us to! */
+
+        /* Unmap the client so we get MapRequest when it reappears. ICCCM compliance. */
         XUnmapWindow(obt_display, self->client->window);
         self->client->ignore_unmaps += 1;
     }
 }
 
-void frame_adjust_theme(ObFrame *self)
+void
+frame_adjust_theme(ObFrame *self)
 {
     free_theme_statics(self);
     set_theme_statics(self);
 }
 
 #ifdef SHAPE
-void frame_adjust_shape_kind(ObFrame *self, int kind)
+void
+frame_adjust_shape_kind(ObFrame *self, int kind)
 {
     gint num;
     XRectangle xrect[2];
@@ -284,36 +309,33 @@ void frame_adjust_shape_kind(ObFrame *self, int kind)
 #endif
 
     if (!shaped) {
-        /* clear the shape on the frame window */
+        /* Clear shape on the frame window */
         XShapeCombineMask(obt_display, self->window, kind,
-                          self->size.left,
-                          self->size.top,
+                          self->size.left, self->size.top,
                           None, ShapeSet);
     } else {
-        /* make the frame's shape match the clients */
+        /* Make the frame shape match the client's shape */
         XShapeCombineShape(obt_display, self->window, kind,
-                           self->size.left,
-                           self->size.top,
+                           self->size.left, self->size.top,
                            self->client->window,
                            kind, ShapeSet);
 
         num = 0;
         if (self->decorations & OB_FRAME_DECOR_TITLEBAR) {
-            xrect[0].x = 0;
-            xrect[0].y = 0;
-            xrect[0].width = self->area.width;
-            xrect[0].height = self->size.top;
+            xrect[num].x      = 0;
+            xrect[num].y      = 0;
+            xrect[num].width  = self->area.width;
+            xrect[num].height = self->size.top;
             ++num;
         }
 
-        if (self->decorations & OB_FRAME_DECOR_HANDLE &&
+        if ((self->decorations & OB_FRAME_DECOR_HANDLE) &&
             ob_rr_theme->handle_height > 0)
         {
-            xrect[1].x = 0;
-            xrect[1].y = FRAME_HANDLE_Y(self);
-            xrect[1].width = self->area.width;
-            xrect[1].height = ob_rr_theme->handle_height +
-                self->bwidth * 2;
+            xrect[num].x      = 0;
+            xrect[num].y      = FRAME_HANDLE_Y(self);
+            xrect[num].width  = self->area.width;
+            xrect[num].height = ob_rr_theme->handle_height + self->bwidth * 2;
             ++num;
         }
 
@@ -324,12 +346,13 @@ void frame_adjust_shape_kind(ObFrame *self, int kind)
 }
 #endif
 
-void frame_adjust_shape(ObFrame *self)
+void
+frame_adjust_shape(ObFrame *self)
 {
 #ifdef SHAPE
-  frame_adjust_shape_kind(self, ShapeBounding);
+    frame_adjust_shape_kind(self, ShapeBounding);
 #ifdef ShapeInput
-  frame_adjust_shape_kind(self, ShapeInput);
+    frame_adjust_shape_kind(self, ShapeInput);
 #endif
 #endif
 }
@@ -418,7 +441,7 @@ void frame_adjust_area(ObFrame *self, gboolean moved,
             if (self->cbwidth_l && innercornerheight > 0) {
                 XMoveResizeWindow(obt_display, self->innerbll,
                                   0,
-                                  self->client->area.height - 
+                                  self->client->area.height -
                                   (ob_rr_theme->grip_width -
                                    self->size.bottom),
                                   self->cbwidth_l,
@@ -441,7 +464,7 @@ void frame_adjust_area(ObFrame *self, gboolean moved,
             if (self->cbwidth_r && innercornerheight > 0) {
                 XMoveResizeWindow(obt_display, self->innerbrr,
                                   0,
-                                  self->client->area.height - 
+                                  self->client->area.height -
                                   (ob_rr_theme->grip_width -
                                    self->size.bottom),
                                   self->cbwidth_r,
@@ -1667,80 +1690,100 @@ static void flash_done(gpointer data)
     self->flash_timer = 0;
 }
 
+/*
+ * Called every 600ms while the frame is flashing.
+ * Toggles the "focused" look on/off until the current time >= self->flash_end.
+ */
 static gboolean flash_timeout(gpointer data)
 {
     ObFrame *self = data;
-    GTimeVal now;
+    gint64 now = g_get_real_time();  /* microseconds since the Unix epoch */
 
-    g_get_current_time(&now);
-    if (now.tv_sec > self->flash_end.tv_sec ||
-        (now.tv_sec == self->flash_end.tv_sec &&
-         now.tv_usec >= self->flash_end.tv_usec))
+    /* If we've passed the flash_end time, stop flashing. */
+    if (now >= self->flash_end) {
         self->flashing = FALSE;
-
-    if (!self->flashing) {
-        if (self->focused != self->flash_on)
-            frame_adjust_focus(self, self->focused);
-
-        return FALSE; /* we are done */
     }
 
+    if (!self->flashing) {
+        /* If we were faking focus (flash_on) but the window is not truly focused, restore it. */
+        if (self->focused != self->flash_on) {
+            frame_adjust_focus(self, self->focused);
+        }
+        return FALSE; /* Done => remove the timeout */
+    }
+
+    /* Otherwise, flip the flashing state. */
     self->flash_on = !self->flash_on;
+
+    /* If the window isn't actually focused, but flash_on = TRUE, display it as focused. */
     if (!self->focused) {
         frame_adjust_focus(self, self->flash_on);
+        /* Keep the logical 'self->focused' as FALSE so we know it's a "fake" highlight. */
         self->focused = FALSE;
     }
 
-    return TRUE; /* go again */
+    return TRUE; /* Keep going */
 }
 
+/*
+ * Starts a 5-second flash, toggling every 600ms.
+ */
 void frame_flash_start(ObFrame *self)
 {
+    /* If the window was truly focused, we start with flash_on = TRUE. Otherwise, false. */
     self->flash_on = self->focused;
 
-    if (!self->flashing)
+    if (!self->flashing) {
         self->flash_timer = g_timeout_add_full(G_PRIORITY_DEFAULT,
-                                               600, flash_timeout, self,
-                                               flash_done);
-    g_get_current_time(&self->flash_end);
-    g_time_val_add(&self->flash_end, G_USEC_PER_SEC * 5);
+                                               600,              // 600ms interval
+                                               flash_timeout,    // toggles flash_on
+                                               self,
+                                               flash_done);      // called when timer is removed
+    }
 
+    /* End the flashing in 5 seconds. */
+    self->flash_end = g_get_real_time() + 5LL * G_USEC_PER_SEC;
     self->flashing = TRUE;
 }
 
+/*
+ * Immediately stops flashing.
+ */
 void frame_flash_stop(ObFrame *self)
 {
     self->flashing = FALSE;
 }
 
-static gulong frame_animate_iconify_time_left(ObFrame *self,
-                                              const GTimeVal *now)
+/*!
+ * \brief Returns how many microseconds remain until iconify animation ends.
+ *        0 if we've passed the end time.
+ */
+static gulong
+frame_animate_iconify_time_left(ObFrame *self, gint64 now)
 {
-    glong sec, usec;
-    sec = self->iconify_animation_end.tv_sec - now->tv_sec;
-    usec = self->iconify_animation_end.tv_usec - now->tv_usec;
-    if (usec < 0) {
-        usec += G_USEC_PER_SEC;
-        sec--;
-    }
-    /* no negative values */
-    return MAX(sec * G_USEC_PER_SEC + usec, 0);
+    gint64 left = self->iconify_animation_end - now;
+    if (left < 0) left = 0;
+    return (gulong)left;
 }
 
-static gboolean frame_animate_iconify(gpointer p)
+/*!
+ * \brief The actual timeout step for iconify/restore animation.
+ * \return FALSE if animation is done, TRUE if we keep animating.
+ */
+static gboolean
+frame_animate_iconify(gpointer p)
 {
     ObFrame *self = p;
+    gint64 now    = g_get_real_time();
+    gulong time   = frame_animate_iconify_time_left(self, now);
+
+    gboolean iconifying  = (self->iconify_animation_going > 0);
     gint x, y, w, h;
     gint iconx, icony, iconw;
-    GTimeVal now;
-    gulong time;
-    gboolean iconifying;
 
+    /* If client has no explicit icon geometry, guess one. */
     if (self->client->icon_geometry.width == 0) {
-        /* there is no icon geometry set so just go straight down */
-        const Rect *a;
-
-        a = screen_physical_area_monitor(screen_find_monitor(&self->area));
+        const Rect *a = screen_physical_area_monitor(screen_find_monitor(&self->area));
         iconx = self->area.x + self->area.width / 2 + 32;
         icony = a->y + a->width;
         iconw = 64;
@@ -1750,127 +1793,134 @@ static gboolean frame_animate_iconify(gpointer p)
         iconw = self->client->icon_geometry.width;
     }
 
-    iconifying = self->iconify_animation_going > 0;
-
-    /* how far do we have left to go ? */
-    g_get_current_time(&now);
-    time = frame_animate_iconify_time_left(self, &now);
-
+    /* Decide initial position based on which direction the animation is going. */
     if ((time > 0 && iconifying) || (time == 0 && !iconifying)) {
-        /* start where the frame is supposed to be */
+        /* Start at the frame's current position */
         x = self->area.x;
         y = self->area.y;
         w = self->area.width;
         h = self->area.height;
     } else {
-        /* start at the icon */
+        /* Start at the icon position */
         x = iconx;
         y = icony;
         w = iconw;
-        h = self->size.top; /* just the titlebar */
+        h = self->size.top; /* just the titlebar's height */
     }
 
     if (time > 0) {
-        glong dx, dy, dw;
-        glong elapsed;
+        /* We'll do a linear interpolation based on how much time is left. */
+        glong elapsed = FRAME_ANIMATE_ICONIFY_TIME - time;
+        glong dx = self->area.x - iconx;
+        glong dy = self->area.y - icony;
+        glong dw = self->area.width - self->bwidth * 2 - iconw;
 
-        dx = self->area.x - iconx;
-        dy = self->area.y - icony;
-        dw = self->area.width - self->bwidth * 2 - iconw;
-         /* if restoring, we move in the opposite direction */
-        if (!iconifying) { dx = -dx; dy = -dy; dw = -dw; }
+        if (!iconifying) {
+            /* If restoring, invert the direction. */
+            dx = -dx;
+            dy = -dy;
+            dw = -dw;
+        }
 
-        elapsed = FRAME_ANIMATE_ICONIFY_TIME - time;
-        x = x - (dx * elapsed) / FRAME_ANIMATE_ICONIFY_TIME;
-        y = y - (dy * elapsed) / FRAME_ANIMATE_ICONIFY_TIME;
-        w = w - (dw * elapsed) / FRAME_ANIMATE_ICONIFY_TIME;
-        h = self->size.top; /* just the titlebar */
+        x -= (dx * elapsed) / FRAME_ANIMATE_ICONIFY_TIME;
+        y -= (dy * elapsed) / FRAME_ANIMATE_ICONIFY_TIME;
+        w -= (dw * elapsed) / FRAME_ANIMATE_ICONIFY_TIME;
+        h  = self->size.top; /* keep only the titlebar's height */
     }
 
     XMoveResizeWindow(obt_display, self->window, x, y, w, h);
     XFlush(obt_display);
 
-    return time > 0; /* repeat until we're out of time */
+    return (time > 0); /* keep going if time > 0 */
 }
 
-void frame_end_iconify_animation(gpointer data)
+/*!
+ * \brief Called after the animation timer is removed (either it finished or was canceled).
+ */
+void
+frame_end_iconify_animation(gpointer data)
 {
     ObFrame *self = data;
-    /* see if there is an animation going */
-    if (self->iconify_animation_going == 0) return;
+    /* If no animation is active, do nothing. */
+    if (self->iconify_animation_going == 0)
+        return;
 
+    /* If the frame is hidden, unmap it now; else do a ConfigureNotify. */
     if (!self->visible)
         XUnmapWindow(obt_display, self->window);
-    else {
-        /* Send a ConfigureNotify when the animation is done, this fixes
-           KDE's pager showing the window in the wrong place.  since the
-           window is mapped at a different location and is then moved, we
-           need to send the synthetic configurenotify, since apps may have
-           read the position when the client mapped, apparently. */
+    else
         client_reconfigure(self->client, TRUE);
-    }
 
-    /* we're not animating any more ! */
     self->iconify_animation_going = 0;
     self->iconify_animation_timer = 0;
 
-    XMoveResizeWindow(obt_display, self->window,
-                      self->area.x, self->area.y,
-                      self->area.width, self->area.height);
-    /* we delay re-rendering until after we're done animating */
+    /* Restore final geometry. */
+    XMoveResizeWindow(obt_display,
+                      self->window,
+                      self->area.x,
+                      self->area.y,
+                      self->area.width,
+                      self->area.height);
+    /* Re-render after animation ends. */
     framerender_frame(self);
     XFlush(obt_display);
 }
 
-void frame_begin_iconify_animation(ObFrame *self, gboolean iconifying)
+/*!
+ * \brief Begin an iconify (zoom out) or restore (zoom in) animation.
+ * \param iconifying TRUE => iconify; FALSE => restore
+ */
+void
+frame_begin_iconify_animation(ObFrame *self, gboolean iconifying)
 {
-    gulong time;
-    gboolean new_anim = FALSE;
-    gboolean set_end = TRUE;
-    GTimeVal now;
-
-    /* if there is no titlebar, just don't animate for now
-       XXX it would be nice tho.. */
+    /* If no titlebar, skip animation for now. */
     if (!(self->decorations & OB_FRAME_DECOR_TITLEBAR))
         return;
 
-    /* get the current time */
-    g_get_current_time(&now);
+    gint64 now = g_get_real_time();
+    gint64 total_time = FRAME_ANIMATE_ICONIFY_TIME;
 
-    /* get how long until the end */
-    time = FRAME_ANIMATE_ICONIFY_TIME;
+    gboolean new_anim = FALSE;
+    gboolean set_end  = TRUE;
+
+    /* If already animating, handle partial reversing or continuing. */
     if (self->iconify_animation_going) {
-        if (!!iconifying != (self->iconify_animation_going > 0)) {
-            /* animation was already going on in the opposite direction */
-            time = time - frame_animate_iconify_time_left(self, &now);
-        } else
-            /* animation was already going in the same direction */
+        gboolean old_dir = (self->iconify_animation_going > 0);
+        if (!!iconifying != old_dir) {
+            /* reversing direction => time left is what's left from old animation. */
+            gulong leftover = frame_animate_iconify_time_left(self, now);
+            total_time = leftover; /* continue from partial remainder */
+        } else {
+            /* same direction => don't reset end time */
             set_end = FALSE;
-    } else
+        }
+    } else {
         new_anim = TRUE;
-    self->iconify_animation_going = iconifying ? 1 : -1;
-
-    /* set the ending time */
-    if (set_end) {
-        self->iconify_animation_end.tv_sec = now.tv_sec;
-        self->iconify_animation_end.tv_usec = now.tv_usec;
-        g_time_val_add(&self->iconify_animation_end, time);
     }
 
+    self->iconify_animation_going = (iconifying ? 1 : -1);
+
+    /* If we do need a new end time, set it now. */
+    if (set_end) {
+        self->iconify_animation_end = now + total_time;
+    }
+
+    /* If newly animating, create the timer. */
     if (new_anim) {
         if (self->iconify_animation_timer)
             g_source_remove(self->iconify_animation_timer);
+
         self->iconify_animation_timer =
             g_timeout_add_full(G_PRIORITY_DEFAULT,
                                FRAME_ANIMATE_ICONIFY_STEP_TIME,
-                               frame_animate_iconify, self,
+                               frame_animate_iconify,
+                               self,
                                frame_end_iconify_animation);
-                               
 
-        /* do the first step */
+        /* do the first animation step */
         frame_animate_iconify(self);
 
-        /* show it during the animation even if it is not "visible" */
+        /* If we are iconifying from a hidden state, ensure we map the window for the animation. */
         if (!self->visible)
             XMapWindow(obt_display, self->window);
     }

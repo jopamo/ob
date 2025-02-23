@@ -12,6 +12,8 @@ void action_omnipresent_startup(void)
 /* Always return FALSE because its not interactive */
 static gboolean run_func_toggle(ObActionsData *data, gpointer options)
 {
+	UNUSED(options);
+
     if (data->client) {
         actions_client_move(data, TRUE);
         client_set_desktop(data->client,

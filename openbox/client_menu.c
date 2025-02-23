@@ -55,6 +55,10 @@ enum {
     CLIENT_CLOSE
 };
 
+#ifndef UNUSED
+    #define UNUSED(x) (void)(x)
+#endif
+
 static void set_icon_color(ObMenuEntry *e)
 {
     e->data.normal.mask_normal_color = ob_rr_theme->menu_color;
@@ -66,6 +70,8 @@ static void set_icon_color(ObMenuEntry *e)
 
 static gboolean client_menu_update(ObMenuFrame *frame, gpointer data)
 {
+    UNUSED(data);  // Mark unused parameter
+
     ObMenu *menu = frame->menu;
     GList *it;
 
@@ -115,6 +121,8 @@ static gboolean client_menu_update(ObMenuFrame *frame, gpointer data)
 static void client_menu_execute(ObMenuEntry *e, ObMenuFrame *f,
                                 ObClient *c, guint state, gpointer data)
 {
+    UNUSED(f); UNUSED(state); UNUSED(data);
+
     gint x, y;
     gulong ignore_start;
 
@@ -181,6 +189,8 @@ static void client_menu_execute(ObMenuEntry *e, ObMenuFrame *f,
 
 static gboolean layer_menu_update(ObMenuFrame *frame, gpointer data)
 {
+    UNUSED(data);  // Mark unused parameter
+
     ObMenu *menu = frame->menu;
     GList *it;
 
@@ -214,6 +224,8 @@ static gboolean layer_menu_update(ObMenuFrame *frame, gpointer data)
 static void layer_menu_execute(ObMenuEntry *e, ObMenuFrame *f,
                                ObClient *c, guint state, gpointer data)
 {
+    UNUSED(f); UNUSED(state); UNUSED(data);
+
     gulong ignore_start;
 
     g_assert(c);
@@ -235,6 +247,8 @@ static void layer_menu_execute(ObMenuEntry *e, ObMenuFrame *f,
 
 static gboolean send_to_menu_update(ObMenuFrame *frame, gpointer data)
 {
+    UNUSED(data);  // Mark unused parameter
+
     ObMenu *menu = frame->menu;
     ObClient *c = frame->client;
     guint i;
@@ -288,6 +302,8 @@ static gboolean send_to_menu_update(ObMenuFrame *frame, gpointer data)
 static void send_to_menu_execute(ObMenuEntry *e, ObMenuFrame *f,
                                  ObClient *c, guint state, gpointer data)
 {
+    UNUSED(f); UNUSED(state); UNUSED(data);
+
     g_assert(c);
 
     client_set_desktop(c, e->id, FALSE, FALSE);
@@ -303,6 +319,8 @@ static void send_to_menu_execute(ObMenuEntry *e, ObMenuFrame *f,
 static void client_menu_place(ObMenuFrame *frame, gint *x, gint *y,
                               gboolean mouse, gpointer data)
 {
+    UNUSED(data);  // Mark unused parameter
+
     gint dx, dy;
 
     if (!mouse && frame->client) {

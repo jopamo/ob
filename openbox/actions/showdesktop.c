@@ -36,6 +36,8 @@ static void free_func(gpointer o)
 /* Always return FALSE because its not interactive */
 static gboolean run_func(ObActionsData *data, gpointer options)
 {
+	UNUSED(data);
+
     Options *o = options;
 
     ObScreenShowDestopMode show_mode;

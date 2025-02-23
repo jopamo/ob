@@ -205,6 +205,8 @@ static gboolean run_func(ObActionsData *data, gpointer options)
 /* 3.4-compatibility */
 static gpointer setup_center_func(xmlNodePtr node)
 {
+	UNUSED(node);
+
     Options *o;
 
     o = g_slice_new0(Options);

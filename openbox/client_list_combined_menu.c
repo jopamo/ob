@@ -39,11 +39,14 @@ static ObMenu *combined_menu;
 
 static void self_cleanup(ObMenu *menu, gpointer data)
 {
+    UNUSED(data);
     menu_clear_entries(menu);
 }
 
 static gboolean self_update(ObMenuFrame *frame, gpointer data)
 {
+    UNUSED(data);
+
     ObMenu *menu = frame->menu;
     ObMenuEntry *e;
     GList *it;
@@ -109,6 +112,8 @@ static gboolean self_update(ObMenuFrame *frame, gpointer data)
 static void menu_execute(ObMenuEntry *self, ObMenuFrame *f,
                          ObClient *c, guint state, gpointer data)
 {
+    UNUSED(f); UNUSED(c); UNUSED(state); UNUSED(data);
+
     if (self->id == ADD_DESKTOP) {
         screen_add_desktop(FALSE);
         menu_frame_hide_all();
@@ -135,6 +140,8 @@ static void menu_execute(ObMenuEntry *self, ObMenuFrame *f,
 
 static void client_dest(ObClient *client, gpointer data)
 {
+    UNUSED(data);
+
     /* This concise function removes all references to a closed
      * client in the client_list_menu, so we don't have to check
      * in client.c */

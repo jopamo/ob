@@ -11,6 +11,8 @@ void action_raiselower_startup(void)
 /* Always return FALSE because its not interactive */
 static gboolean run_func(ObActionsData *data, gpointer options)
 {
+	UNUSED(options);
+
     if (data->client) {
         actions_client_move(data, TRUE);
         stacking_restack_request(data->client, NULL, Opposite);

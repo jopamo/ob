@@ -34,6 +34,10 @@
 #  include <sys/types.h> /* for pid_t */
 #endif
 
+#ifndef UNUSED
+    #define UNUSED(x) (void)(x)
+#endif
+
 struct _ObFrame;
 struct _ObGroup;
 struct _ObSessionState;

@@ -35,6 +35,7 @@ void action_layer_startup(void)
 
 static gpointer setup_func_top(xmlNodePtr node)
 {
+	UNUSED(node);
     Options *o = g_slice_new0(Options);
     o->layer = 1;
     o->toggle = TRUE;
@@ -43,6 +44,7 @@ static gpointer setup_func_top(xmlNodePtr node)
 
 static gpointer setup_func_bottom(xmlNodePtr node)
 {
+	UNUSED(node);
     Options *o = g_slice_new0(Options);
     o->layer = -1;
     o->toggle = TRUE;
@@ -108,6 +110,7 @@ static gboolean run_func(ObActionsData *data, gpointer options)
 /* 3.4-compatibility */
 static gpointer setup_sendtop_func(xmlNodePtr node)
 {
+	UNUSED(node);
     Options *o = g_slice_new0(Options);
     o->layer = 1;
     o->toggle = FALSE;
@@ -116,6 +119,7 @@ static gpointer setup_sendtop_func(xmlNodePtr node)
 
 static gpointer setup_sendbottom_func(xmlNodePtr node)
 {
+	UNUSED(node);
     Options *o = g_slice_new0(Options);
     o->layer = -1;
     o->toggle = FALSE;
@@ -124,6 +128,7 @@ static gpointer setup_sendbottom_func(xmlNodePtr node)
 
 static gpointer setup_sendnormal_func(xmlNodePtr node)
 {
+	UNUSED(node);
     Options *o = g_slice_new0(Options);
     o->layer = 0;
     o->toggle = FALSE;

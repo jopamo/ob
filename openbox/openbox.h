@@ -27,6 +27,10 @@
 
 #include <glib.h>
 
+#ifndef UNUSED
+    #define UNUSED(x) (void)(x)
+#endif
+
 extern RrInstance *ob_rr_inst;
 extern RrImageCache *ob_rr_icons;
 extern RrTheme    *ob_rr_theme;

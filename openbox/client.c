@@ -921,29 +921,17 @@ static ObAppSettings *client_get_settings_state(ObClient *self)
                  app->group_name != NULL || app->group_class != NULL ||
                  (signed)app->type >= 0);
 
-        if (app->name &&
-            !g_pattern_match(app->name, strlen(self->name), self->name, NULL))
+        if (app->name && !g_pattern_spec_match_string(app->name, self->name))
             match = FALSE;
-        else if (app->group_name &&
-            !g_pattern_match(app->group_name,
-                             strlen(self->group_name), self->group_name, NULL))
+        else if (app->group_name && !g_pattern_spec_match_string(app->group_name, self->group_name))
             match = FALSE;
-        else if (app->class &&
-                 !g_pattern_match(app->class,
-                                  strlen(self->class), self->class, NULL))
+        else if (app->class && !g_pattern_spec_match_string(app->class, self->class))
             match = FALSE;
-        else if (app->group_class &&
-                 !g_pattern_match(app->group_class,
-                                  strlen(self->group_class), self->group_class,
-                                  NULL))
+        else if (app->group_class && !g_pattern_spec_match_string(app->group_class, self->group_class))
             match = FALSE;
-        else if (app->role &&
-                 !g_pattern_match(app->role,
-                                  strlen(self->role), self->role, NULL))
+        else if (app->role && !g_pattern_spec_match_string(app->role, self->role))
             match = FALSE;
-        else if (app->title &&
-                 !g_pattern_match(app->title,
-                                  strlen(self->title), self->title, NULL))
+        else if (app->title && !g_pattern_spec_match_string(app->title, self->title))
             match = FALSE;
         else if ((signed)app->type >= 0 && app->type != self->type) {
             match = FALSE;
@@ -3607,6 +3595,8 @@ void client_close(ObClient *self)
 
 static gboolean client_kill_requested(ObPrompt *p, gint result, gpointer data)
 {
+	UNUSED(p);
+
     ObClient *self = data;
 
     if (result == OB_KILL_RESULT_YES)

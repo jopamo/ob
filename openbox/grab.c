@@ -28,75 +28,145 @@
 #include <glib.h>
 #include <X11/Xlib.h>
 
+/*!
+ * \brief Bitmask for pointer grabs: listen for button presses/releases and pointer motion.
+ */
 #define GRAB_PTR_MASK (ButtonPressMask | ButtonReleaseMask | PointerMotionMask)
+
+/*!
+ * \brief Bitmask for keyboard grabs: listen for key presses/releases.
+ */
 #define GRAB_KEY_MASK (KeyPressMask | KeyReleaseMask)
 
+/*!
+ * \brief Maximum number of lock-mask combinations (num/caps/scroll).
+ */
 #define MASK_LIST_SIZE 8
 
-/*! A list of all possible combinations of keyboard lock masks */
+/*!
+ * \brief A list of all possible combinations of keyboard lock masks:
+ *        No locks, NumLock, CapsLock, ScrollLock, or any combination of these.
+ */
 static guint mask_list[MASK_LIST_SIZE];
+
+/*!
+ * \brief Count of how many times the keyboard has been grabbed.
+ */
 static guint kgrabs = 0;
+
+/*!
+ * \brief Count of how many times the pointer has been grabbed.
+ */
 static guint pgrabs = 0;
-/*! The time at which the last grab was made */
+
+/*!
+ * \brief The timestamp of the most recent grab operation.
+ *        Defaults to CurrentTime until a successful grab updates it.
+ */
 static Time  grab_time = CurrentTime;
+
+/*!
+ * \brief Tracks how many "passive" keyboard grabs are active (see \c grab_key_passive_count).
+ */
 static gint passive_count = 0;
+
+/*!
+ * \brief The input context used when grabbing keyboard input.
+ */
 static ObtIC *ic = NULL;
 
-static Time ungrab_time(void)
+/*!
+ * \brief Computes the appropriate X timestamp to use when ungrabbing.
+ * \return An X timestamp, either CurrentTime or \c event_time().
+ *
+ * If the clock has moved backward, the last known \c grab_time could be
+ * in the future relative to the server time, so we fallback to CurrentTime.
+ */
+static Time
+ungrab_time(void)
 {
     Time t = event_time();
+
+    /* If last grab_time is invalid or t is behind it, use CurrentTime. */
     if (grab_time == CurrentTime ||
         !(t == CurrentTime || event_time_after(t, grab_time)))
-        /* When the time moves backward on the server, then we can't use
-           the grab time because that will be in the future. So instead we
-           have to use CurrentTime.
-
-           "XUngrabPointer does not release the pointer if the specified time
-           is earlier than the last-pointer-grab time or is later than the
-           current X server time."
-        */
-        t = CurrentTime; /*grab_time;*/
+    {
+        t = CurrentTime;
+    }
     return t;
 }
 
-static Window grab_window(void)
+/*!
+ * \brief Returns the Window used for pointer/keyboard grabbing.
+ *        Typically the \c screen_support_win from Openbox's screen code.
+ */
+static Window
+grab_window(void)
 {
     return screen_support_win;
 }
 
-gboolean grab_on_keyboard(void)
+/*!
+ * \brief Checks if any keyboard grabs are active.
+ */
+gboolean
+grab_on_keyboard(void)
 {
-    return kgrabs > 0;
+    return (kgrabs > 0);
 }
 
-gboolean grab_on_pointer(void)
+/*!
+ * \brief Checks if any pointer grabs are active.
+ */
+gboolean
+grab_on_pointer(void)
 {
-    return pgrabs > 0;
+    return (pgrabs > 0);
 }
 
-ObtIC *grab_input_context(void)
+/*!
+ * \brief Returns the \c ObtIC (input context) used for grabbing input events.
+ */
+ObtIC *
+grab_input_context(void)
 {
     return ic;
 }
 
-gboolean grab_keyboard_full(gboolean grab)
+/*!
+ * \brief Grabs (or ungrabs) the keyboard in "stacked" fashion.
+ *
+ * \param grab TRUE to grab, FALSE to ungrab.
+ * \return TRUE if the (un)grab was successful, FALSE otherwise.
+ *
+ * If the keyboard is already grabbed (kgrabs > 0), subsequent calls increment
+ * and simply return TRUE. On the first successful grab, we store \c grab_time
+ * from \c event_time().
+ */
+gboolean
+grab_keyboard_full(gboolean grab)
 {
     gboolean ret = FALSE;
 
     if (grab) {
         if (kgrabs++ == 0) {
-            ret = XGrabKeyboard(obt_display, grab_window(),
-                                False, GrabModeAsync, GrabModeAsync,
-                                event_time()) == Success;
-            if (!ret)
-                --kgrabs;
-            else {
+            /* attempt the actual XGrabKeyboard */
+            ret = (XGrabKeyboard(obt_display, grab_window(),
+                                 False, GrabModeAsync, GrabModeAsync,
+                                 event_time()) == Success);
+            if (!ret) {
+                --kgrabs;  /* revert increment if it failed */
+            } else {
+                /* reset passive_count and store new grab_time */
                 passive_count = 0;
                 grab_time = event_time();
             }
-        } else
+        } else {
+            /* already grabbed, so success by definition */
             ret = TRUE;
+        }
     } else if (kgrabs > 0) {
+        /* ungrab scenario */
         if (--kgrabs == 0) {
             XUngrabKeyboard(obt_display, ungrab_time());
         }
@@ -106,24 +176,42 @@ gboolean grab_keyboard_full(gboolean grab)
     return ret;
 }
 
-gboolean grab_pointer_full(gboolean grab, gboolean owner_events,
-                           gboolean confine, ObCursor cur)
+/*!
+ * \brief Grabs (or ungrabs) the pointer in "stacked" fashion.
+ *
+ * \param grab         TRUE to grab, FALSE to ungrab.
+ * \param owner_events If TRUE, events go to the grabbing window if in it.
+ * \param confine      If TRUE, pointer is confined to the root window.
+ * \param cur          The \c ObCursor to show while pointer is grabbed.
+ * \return TRUE if successful.
+ *
+ * Similar to \c grab_keyboard_full, but for pointer. If the pointer is
+ * already grabbed (pgrabs > 0), we increment the count and succeed immediately.
+ */
+gboolean
+grab_pointer_full(gboolean grab, gboolean owner_events,
+                  gboolean confine, ObCursor cur)
 {
     gboolean ret = FALSE;
 
     if (grab) {
         if (pgrabs++ == 0) {
-            ret = XGrabPointer(obt_display, grab_window(), owner_events,
-                               GRAB_PTR_MASK,
-                               GrabModeAsync, GrabModeAsync,
-                               (confine ? obt_root(ob_screen) : None),
-                               ob_cursor(cur), event_time()) == Success;
-            if (!ret)
-                --pgrabs;
-            else
+            Window confine_to = (confine ? obt_root(ob_screen) : None);
+            int status = XGrabPointer(obt_display, grab_window(), owner_events,
+                                      GRAB_PTR_MASK,
+                                      GrabModeAsync, GrabModeAsync,
+                                      confine_to,
+                                      ob_cursor(cur),
+                                      event_time());
+            ret = (status == Success);
+            if (!ret) {
+                --pgrabs;  /* revert increment if failed */
+            } else {
                 grab_time = event_time();
-        } else
+            }
+        } else {
             ret = TRUE;
+        }
     } else if (pgrabs > 0) {
         if (--pgrabs == 0) {
             XUngrabPointer(obt_display, ungrab_time());
@@ -133,9 +221,19 @@ gboolean grab_pointer_full(gboolean grab, gboolean owner_events,
     return ret;
 }
 
-gint grab_server(gboolean grab)
+/*!
+ * \brief Grabs or ungrabs the X server in a "stacked" manner.
+ * \param grab TRUE to grab, FALSE to ungrab.
+ * \return The new server-grab count (how many times we've stacked grabs).
+ *
+ * When the count goes from 0 to 1, we call \c XGrabServer().
+ * When it goes from 1 to 0, we call \c XUngrabServer().
+ */
+gint
+grab_server(gboolean grab)
 {
     static guint sgrabs = 0;
+
     if (grab) {
         if (sgrabs++ == 0) {
             XGrabServer(obt_display);
@@ -147,16 +245,23 @@ gint grab_server(gboolean grab)
             XFlush(obt_display);
         }
     }
-    return sgrabs;
+    return (gint)sgrabs;
 }
 
-void grab_startup(gboolean reconfig)
+/*!
+ * \brief Sets up the static mask_list[] with all combinations of lock masks, and
+ *        creates the global \c ObtIC \c ic.
+ *
+ * \param reconfig If TRUE, this is a reconfiguration rather than a cold start.
+ */
+void
+grab_startup(gboolean reconfig)
 {
     guint i = 0;
     guint num, caps, scroll;
 
-    num = obt_keyboard_modkey_to_modmask(OBT_KEYBOARD_MODKEY_NUMLOCK);
-    caps = obt_keyboard_modkey_to_modmask(OBT_KEYBOARD_MODKEY_CAPSLOCK);
+    num    = obt_keyboard_modkey_to_modmask(OBT_KEYBOARD_MODKEY_NUMLOCK);
+    caps   = obt_keyboard_modkey_to_modmask(OBT_KEYBOARD_MODKEY_CAPSLOCK);
     scroll = obt_keyboard_modkey_to_modmask(OBT_KEYBOARD_MODKEY_SCROLLLOCK);
 
     mask_list[i++] = 0;
@@ -169,75 +274,148 @@ void grab_startup(gboolean reconfig)
     mask_list[i++] = num | caps | scroll;
     g_assert(i == MASK_LIST_SIZE);
 
+    /* Create the keyboard input context for grabs. */
     ic = obt_keyboard_context_new(obt_root(ob_screen), grab_window());
 }
 
-void grab_shutdown(gboolean reconfig)
+/*!
+ * \brief Shuts down the grab system, unref'ing \c ic and ungrabbing pointer/keyboard/server.
+ *
+ * \param reconfig If TRUE, this is a reconfiguration rather than a full shutdown.
+ */
+void
+grab_shutdown(gboolean reconfig)
 {
     obt_keyboard_context_unref(ic);
     ic = NULL;
 
-    if (reconfig) return;
+    if (reconfig)
+        return;
 
-    while (ungrab_keyboard());
-    while (ungrab_pointer());
-    while (grab_server(FALSE));
+    /* Force ungrab everything repeatedly until counts go to 0. */
+    while (ungrab_keyboard()) ;
+    while (ungrab_pointer()) ;
+    while (grab_server(FALSE)) ;
 }
 
-void grab_button_full(guint button, guint state, Window win, guint mask,
-                      gint pointer_mode, ObCursor cur)
+/*!
+ * \brief Grabs a mouse button with certain modifiers on a window.
+ *
+ * \param button       The mouse button number (1=left,2=middle,3=right).
+ * \param state        The modifier state (e.g., Mod4Mask).
+ * \param win          The X Window to grab on.
+ * \param mask         Event mask (e.g., ButtonPressMask).
+ * \param pointer_mode Usually GrabModeAsync or GrabModeSync.
+ * \param cur          The \c ObCursor to show while pointer is in the grab window.
+ *
+ * Internally, it grabs the button with each possible lock mask combination (NumLock, CapsLock, etc.).
+ */
+void
+grab_button_full(guint button, guint state, Window win, guint mask,
+                 gint pointer_mode, ObCursor cur)
 {
     guint i;
 
-    /* can get BadAccess from these */
+    /* We can get BadAccess errors if the server won't let us grab. */
     obt_display_ignore_errors(TRUE);
-    for (i = 0; i < MASK_LIST_SIZE; ++i)
-        XGrabButton(obt_display, button, state | mask_list[i], win, False,
-                    mask, pointer_mode, GrabModeAsync, None, ob_cursor(cur));
+    for (i = 0; i < MASK_LIST_SIZE; ++i) {
+        XGrabButton(obt_display, button,
+                    state | mask_list[i],
+                    win, False,
+                    mask, pointer_mode, GrabModeAsync,
+                    None, ob_cursor(cur));
+    }
     obt_display_ignore_errors(FALSE);
-    if (obt_display_error_occured)
+
+    if (obt_display_error_occured) {
         ob_debug("Failed to grab button %d modifiers %d", button, state);
+    }
 }
 
-void ungrab_button(guint button, guint state, Window win)
+/*!
+ * \brief Ungrabs a mouse button on a window.
+ *
+ * \param button The mouse button number.
+ * \param state  The modifier state.
+ * \param win    The X Window from which to ungrab.
+ */
+void
+ungrab_button(guint button, guint state, Window win)
 {
     guint i;
-
-    for (i = 0; i < MASK_LIST_SIZE; ++i)
+    for (i = 0; i < MASK_LIST_SIZE; ++i) {
         XUngrabButton(obt_display, button, state | mask_list[i], win);
+    }
 }
 
-void grab_key(guint keycode, guint state, Window win, gint keyboard_mode)
+/*!
+ * \brief Grabs a key with certain modifiers on a window.
+ *
+ * \param keycode       The keycode (not keysym).
+ * \param state         The base modifiers (e.g., Mod4Mask).
+ * \param win           The X Window to grab on.
+ * \param keyboard_mode Usually GrabModeAsync or GrabModeSync.
+ *
+ * We grab the key with each possible lock mask combination.
+ */
+void
+grab_key(guint keycode, guint state, Window win, gint keyboard_mode)
 {
     guint i;
 
-    /* can get BadAccess' from these */
     obt_display_ignore_errors(TRUE);
-    for (i = 0; i < MASK_LIST_SIZE; ++i)
-        XGrabKey(obt_display, keycode, state | mask_list[i], win, FALSE,
-                 GrabModeAsync, keyboard_mode);
+    for (i = 0; i < MASK_LIST_SIZE; ++i) {
+        XGrabKey(obt_display,
+                 keycode,
+                 state | mask_list[i],
+                 win,
+                 FALSE,                /* owner_events */
+                 GrabModeAsync,        /* pointer_mode */
+                 keyboard_mode);       /* keyboard_mode */
+    }
     obt_display_ignore_errors(FALSE);
-    if (obt_display_error_occured)
+
+    if (obt_display_error_occured) {
         ob_debug("Failed to grab keycode %d modifiers %d", keycode, state);
+    }
 }
 
-void ungrab_all_keys(Window win)
+/*!
+ * \brief Ungrabs all keys on a window.
+ *
+ * \param win The window from which to ungrab keys.
+ */
+void
+ungrab_all_keys(Window win)
 {
     XUngrabKey(obt_display, AnyKey, AnyModifier, win);
 }
 
-void grab_key_passive_count(int change)
+/*!
+ * \brief Adjusts the \c passive_count by \p change, except if the keyboard is fully grabbed.
+ *
+ * \param change How much to add to \c passive_count.
+ *
+ * The idea is that if \c grab_on_keyboard() is active, we ignore \c passive_count changes.
+ */
+void
+grab_key_passive_count(int change)
 {
     if (grab_on_keyboard()) return;
     passive_count += change;
     if (passive_count < 0) passive_count = 0;
 }
 
-void ungrab_passive_key(void)
+/*!
+ * \brief Ungrabs the keyboard if we have a "passive" grab in effect.
+ *
+ * Cancels any passive grab indicated by \c passive_count, then resets it to 0.
+ */
+void
+ungrab_passive_key(void)
 {
-    /*ob_debug("ungrabbing %d passive grabs\n", passive_count);*/
+    /* ob_debug("ungrabbing %d passive grabs\n", passive_count); */
     if (passive_count) {
-        /* kill our passive grab */
         XUngrabKeyboard(obt_display, event_time());
         passive_count = 0;
     }

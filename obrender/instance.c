@@ -20,6 +20,9 @@
 #include "render.h"
 #include "instance.h"
 
+#include <cairo.h>
+#include <pango/pangocairo.h>
+
 static RrInstance *definst = NULL;
 
 static void RrTrueColorSetup (RrInstance *inst);
@@ -55,7 +58,7 @@ void print_refs(gint id)
 }
 #endif
 
-RrInstance* RrInstanceNew (Display *display, gint screen)
+RrInstance* RrInstanceNew(Display *display, gint screen)
 {
     definst = g_slice_new(RrInstance);
     definst->display = display;
@@ -64,7 +67,12 @@ RrInstance* RrInstanceNew (Display *display, gint screen)
     definst->depth = DefaultDepth(display, screen);
     definst->visual = DefaultVisual(display, screen);
     definst->colormap = DefaultColormap(display, screen);
-    definst->pango = pango_xft_get_context(display, screen);
+
+    // Replacing the deprecated pango_xft_get_context
+    // Use pango_cairo_create_context instead
+    cairo_t *cairo_context = cairo_create(NULL);  // Create an empty Cairo context
+    definst->pango = pango_cairo_create_context(cairo_context);
+    cairo_destroy(cairo_context);  // Destroy the temporary Cairo context
 
     definst->pseudo_colors = NULL;
 
@@ -83,7 +91,7 @@ RrInstance* RrInstanceNew (Display *display, gint screen)
         break;
     default:
         g_critical("Unsupported visual class");
-        g_free (definst);
+        g_free(definst);
         return definst = NULL;
     }
     return definst;

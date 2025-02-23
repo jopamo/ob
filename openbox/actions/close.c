@@ -3,17 +3,36 @@
 
 static gboolean run_func(ObActionsData *data, gpointer options);
 
-void action_close_startup(void)
+/*!
+ * \brief Registers the "Close" action, which closes the given client window.
+ */
+void
+action_close_startup(void)
 {
+    /*
+     * "Close" has no setup or free function,
+     * and run_func is the action executor.
+     */
     actions_register("Close",
-                     NULL, NULL,
+                     NULL,   /* setup_func not needed */
+                     NULL,   /* free_func not needed */
                      run_func);
 }
 
-/* Always return FALSE because its not interactive */
-static gboolean run_func(ObActionsData *data, gpointer options)
+/*!
+ * \brief Runs the "Close" action, closing the client window.
+ * \param data    Pointer to ObActionsData containing the client.
+ * \param options Unused.
+ * \return FALSE, indicating the action completes immediately (non-interactive).
+ */
+static gboolean
+run_func(ObActionsData *data, gpointer options)
 {
-    if (data->client) client_close(data->client);
+    (void)options;  /* Unused parameter */
 
-    return FALSE;
+    if (data->client) {
+        client_close(data->client);
+    }
+
+    return FALSE;  /* Non-interactive: completed */
 }

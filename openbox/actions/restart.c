@@ -42,6 +42,8 @@ static void free_func(gpointer options)
 /* Always return FALSE because its not interactive */
 static gboolean run_func(ObActionsData *data, gpointer options)
 {
+	UNUSED(data);
+
     Options *o = options;
 
     ob_restart_other(o->cmd);
