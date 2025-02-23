@@ -20,11 +20,11 @@
 #ifndef ob__keyboard_h
 #define ob__keyboard_h
 
-#include "keytree.h"
-#include "frame.h"
-
-#include <glib.h>
 #include <X11/Xlib.h>
+#include <glib.h>
+
+#include "frame.h"
+#include "keytree.h"
 
 struct _ObClient;
 struct _ObActionsAct;
@@ -43,7 +43,7 @@ extern KeyBindingTree *keyboard_firstnode;
  *
  * \param reconfig TRUE if this is a reconfiguration, FALSE for a fresh initialization.
  */
-void keyboard_startup(gboolean reconfig);
+void keyboard_startup( gboolean reconfig );
 
 /*!
  * \brief Shuts down the keyboard system.
@@ -52,14 +52,14 @@ void keyboard_startup(gboolean reconfig);
  *
  * \param reconfig TRUE if this is a reconfiguration, FALSE for a full shutdown.
  */
-void keyboard_shutdown(gboolean reconfig);
+void keyboard_shutdown( gboolean reconfig );
 
 /*!
  * \brief Rebinds all keys based on the current configuration.
  *
  * This function rebuilds the key binding tree and re-grabs all key bindings.
  */
-void keyboard_rebind(void);
+void keyboard_rebind( void );
 
 /*!
  * \brief Creates a chroot (nested key binding scope) from a list of keys.
@@ -68,7 +68,7 @@ void keyboard_rebind(void);
  *
  * \param keylist The list of keys that define the chroot.
  */
-void keyboard_chroot(GList *keylist);
+void keyboard_chroot( GList *keylist );
 
 /*!
  * \brief Binds a list of keys to an action.
@@ -79,14 +79,14 @@ void keyboard_chroot(GList *keylist);
  * \param action The action to associate with the key combination.
  * \return TRUE if the binding was successful, FALSE if there was an error (e.g., key conflict).
  */
-gboolean keyboard_bind(GList *keylist, struct _ObActionsAct *action);
+gboolean keyboard_bind( GList *keylist, struct _ObActionsAct *action );
 
 /*!
  * \brief Unbinds all currently configured key bindings.
  *
  * This function removes all existing key bindings from the key binding tree.
  */
-void keyboard_unbind_all(void);
+void keyboard_unbind_all( void );
 
 /*!
  * \brief Processes a keyboard event and triggers the appropriate action.
@@ -98,7 +98,7 @@ void keyboard_unbind_all(void);
  * \param e The X event representing the key press or release.
  * \return TRUE if the event triggered an action, FALSE otherwise.
  */
-gboolean keyboard_event(struct _ObClient *client, const XEvent *e);
+gboolean keyboard_event( struct _ObClient *client, const XEvent *e );
 
 /*!
  * \brief Resets the current key binding chain.
@@ -108,6 +108,6 @@ gboolean keyboard_event(struct _ObClient *client, const XEvent *e);
  *
  * \param break_chroots The number of chroots to break. -1 means to break them all.
  */
-void keyboard_reset_chains(gint break_chroots);
+void keyboard_reset_chains( gint break_chroots );
 
 #endif /* ob__keyboard_h */

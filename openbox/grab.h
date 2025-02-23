@@ -8,11 +8,11 @@
  *        and buttons with various modifiers.
  */
 
+#include <X11/Xlib.h>
+#include <glib.h>
+
 #include "misc.h"
 #include "obt/keyboard.h"
-
-#include <glib.h>
-#include <X11/Xlib.h>
 
 /*!
  * \brief Initializes the grab system.
@@ -22,7 +22,7 @@
  * Sets up data structures for keyboard lock masks, creates the global input
  * context (\c ObtIC) used when grabbing input, etc.
  */
-void grab_startup(gboolean reconfig);
+void grab_startup( gboolean reconfig );
 
 /*!
  * \brief Shuts down the grab system, ungrabbing pointer/keyboard/server if needed.
@@ -32,13 +32,13 @@ void grab_startup(gboolean reconfig);
  * On a full shutdown (\c reconfig = FALSE), repeatedly ungrabs everything
  * until counts go to zero. Also unrefs the global \c ObtIC.
  */
-void grab_shutdown(gboolean reconfig);
+void grab_shutdown( gboolean reconfig );
 
 /*!
  * \brief Retrieves the global input context (\c ObtIC) used for grabbed keyboard input.
  * \return A pointer to the \c ObtIC, or NULL if not yet initialized.
  */
-ObtIC *grab_input_context(void);
+ObtIC *grab_input_context( void );
 
 /*!
  * \brief Grabs or ungrabs the keyboard in a "stacked" manner.
@@ -50,7 +50,7 @@ ObtIC *grab_input_context(void);
  * immediately. If you call \c grab_keyboard_full(FALSE), it decrements and only
  * truly ungrabs when the count reaches zero.
  */
-gboolean grab_keyboard_full(gboolean grab);
+gboolean grab_keyboard_full( gboolean grab );
 
 /*!
  * \brief Grabs or ungrabs the pointer in a "stacked" manner.
@@ -67,8 +67,7 @@ gboolean grab_keyboard_full(gboolean grab);
  * pointer is already grabbed, subsequent calls to grab again just increment
  * and return TRUE. Ungrab only occurs when the count goes from 1 to 0.
  */
-gboolean grab_pointer_full(gboolean grab, gboolean owner_events,
-                           gboolean confine, ObCursor cur);
+gboolean grab_pointer_full( gboolean grab, gboolean owner_events, gboolean confine, ObCursor cur );
 
 /*!
  * \brief Grabs or ungrabs the X server (stacked).
@@ -78,7 +77,7 @@ gboolean grab_pointer_full(gboolean grab, gboolean owner_events,
  * When this count goes from 0 to 1, we call \c XGrabServer().
  * Going from 1 to 0 triggers \c XUngrabServer().
  */
-gint grab_server(gboolean grab);
+gint grab_server( gboolean grab );
 
 /*!
  * \brief Convenience macros for grabbing/ungrabbing the keyboard and pointer.
@@ -86,20 +85,20 @@ gint grab_server(gboolean grab);
  * These are stack-based: if you call \c grab_keyboard() multiple times,
  * you must call \c ungrab_keyboard() the same number of times to release.
  */
-#define grab_keyboard()         grab_keyboard_full(TRUE)
-#define ungrab_keyboard()       grab_keyboard_full(FALSE)
-#define grab_pointer(o,c,u)     grab_pointer_full(TRUE, (o), (c), (u))
-#define ungrab_pointer()        grab_pointer_full(FALSE, FALSE, FALSE, OB_CURSOR_NONE)
+#define grab_keyboard() grab_keyboard_full( TRUE )
+#define ungrab_keyboard() grab_keyboard_full( FALSE )
+#define grab_pointer( o, c, u ) grab_pointer_full( TRUE, ( o ), ( c ), ( u ) )
+#define ungrab_pointer() grab_pointer_full( FALSE, FALSE, FALSE, OB_CURSOR_NONE )
 
 /*!
  * \brief Checks if the keyboard is currently grabbed (kgrabs > 0).
  */
-gboolean grab_on_keyboard(void);
+gboolean grab_on_keyboard( void );
 
 /*!
  * \brief Checks if the pointer is currently grabbed (pgrabs > 0).
  */
-gboolean grab_on_pointer(void);
+gboolean grab_on_pointer( void );
 
 /*!
  * \brief Grabs a mouse button on a window, including all lock-mask combinations.
@@ -113,8 +112,7 @@ gboolean grab_on_pointer(void);
  * Internally grabs the button once for each combination of lock states (NumLock,
  * CapsLock, ScrollLock, etc.).
  */
-void grab_button_full(guint button, guint state, Window win, guint mask,
-                      gint pointer_mode, ObCursor cursor);
+void grab_button_full( guint button, guint state, Window win, guint mask, gint pointer_mode, ObCursor cursor );
 
 /*!
  * \brief Ungrabs a mouse button for all lock-mask combos.
@@ -122,7 +120,7 @@ void grab_button_full(guint button, guint state, Window win, guint mask,
  * \param state  The base modifier state.
  * \param win    The window to ungrab on.
  */
-void ungrab_button(guint button, guint state, Window win);
+void ungrab_button( guint button, guint state, Window win );
 
 /*!
  * \brief Grabs a key with various lock-mask combos.
@@ -131,12 +129,12 @@ void ungrab_button(guint button, guint state, Window win);
  * \param win           The X Window to grab on.
  * \param keyboard_mode \c GrabModeAsync or \c GrabModeSync for the keyboard.
  */
-void grab_key(guint keycode, guint state, Window win, gint keyboard_mode);
+void grab_key( guint keycode, guint state, Window win, gint keyboard_mode );
 
 /*!
  * \brief Ungrabs all keys on a given window, ignoring lock masks.
  */
-void ungrab_all_keys(Window win);
+void ungrab_all_keys( Window win );
 
 /*!
  * \brief Adjusts the "passive" grab counter by \p change, if the keyboard
@@ -145,13 +143,13 @@ void ungrab_all_keys(Window win);
  *
  * If \c grab_on_keyboard() is active, this function does nothing.
  */
-void grab_key_passive_count(int change);
+void grab_key_passive_count( int change );
 
 /*!
  * \brief If a "passive" keyboard grab is in effect, ungrab it now.
  *
  * Resets the internal \c passive_count to zero after ungrabbing.
  */
-void ungrab_passive_key(void);
+void ungrab_passive_key( void );
 
 #endif /* __grab_h */

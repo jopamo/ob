@@ -28,15 +28,15 @@
  * represents a keybinding and can have child nodes to represent key sequences.
  */
 typedef struct KeyBindingTree {
-    guint state;                /**< The modifier state of the keybinding */
-    guint key;                  /**< The key associated with the binding */
-    GList *keylist;             /**< List of key events that make up this binding */
-    GSList *actions;            /**< List of actions associated with this keybinding */
-    gboolean chroot;            /**< Whether this node is part of a chroot (overriding keybinding context) */
+  guint state;     /**< The modifier state of the keybinding */
+  guint key;       /**< The key associated with the binding */
+  GList *keylist;  /**< List of key events that make up this binding */
+  GSList *actions; /**< List of actions associated with this keybinding */
+  gboolean chroot; /**< Whether this node is part of a chroot (overriding keybinding context) */
 
-    struct KeyBindingTree *parent;        /**< The parent node in the tree */
-    struct KeyBindingTree *next_sibling;  /**< The next sibling node at the same level */
-    struct KeyBindingTree *first_child;   /**< The first child node, representing a chained sequence */
+  struct KeyBindingTree *parent;       /**< The parent node in the tree */
+  struct KeyBindingTree *next_sibling; /**< The next sibling node at the same level */
+  struct KeyBindingTree *first_child;  /**< The first child node, representing a chained sequence */
 } KeyBindingTree;
 
 /**
@@ -47,7 +47,7 @@ typedef struct KeyBindingTree {
  *
  * @param tree The root of the KeyBindingTree to be destroyed.
  */
-void tree_destroy(KeyBindingTree *tree);
+void tree_destroy( KeyBindingTree *tree );
 
 /**
  * @brief Build a KeyBindingTree from a list of key events.
@@ -59,7 +59,7 @@ void tree_destroy(KeyBindingTree *tree);
  *
  * @return A pointer to the root node of the created tree, or NULL if the list is empty.
  */
-KeyBindingTree *tree_build(GList *keylist);
+KeyBindingTree *tree_build( GList *keylist );
 
 /**
  * @brief Assimilate a new keybinding tree into the existing tree.
@@ -70,7 +70,7 @@ KeyBindingTree *tree_build(GList *keylist);
  *
  * @param node The KeyBindingTree node to be assimilated into the existing tree.
  */
-void tree_assimilate(KeyBindingTree *node);
+void tree_assimilate( KeyBindingTree *node );
 
 /**
  * @brief Find a matching node in the keybinding tree.
@@ -83,7 +83,7 @@ void tree_assimilate(KeyBindingTree *node);
  *
  * @return A pointer to the found node, or NULL if no matching node is found.
  */
-KeyBindingTree *tree_find(KeyBindingTree *search, gboolean *conflict);
+KeyBindingTree *tree_find( KeyBindingTree *search, gboolean *conflict );
 
 /**
  * @brief Mark a keybinding node as part of a chroot (temporary override).
@@ -96,6 +96,6 @@ KeyBindingTree *tree_find(KeyBindingTree *search, gboolean *conflict);
  *
  * @return TRUE if the chroot was successfully applied, FALSE otherwise.
  */
-gboolean tree_chroot(KeyBindingTree *tree, GList *keylist);
+gboolean tree_chroot( KeyBindingTree *tree, GList *keylist );
 
 #endif
