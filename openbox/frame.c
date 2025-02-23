@@ -357,6 +357,51 @@ frame_adjust_shape(ObFrame *self)
 #endif
 }
 
+void frame_round_corners(Window window)
+{
+    XWindowAttributes win_attr;
+    XGetWindowAttributes(obt_display, window, &win_attr);
+
+    // If this returns null, the window is invalid.
+    if(!XGetWindowAttributes(obt_display, window, &win_attr))
+        return;
+
+    int width = win_attr.border_width * 2 + win_attr.width;
+    int height = win_attr.border_width * 2 + win_attr.height;
+    int rad = config_theme_cornerradius;
+    int dia = 2 * rad;
+
+    // do not try to round if the window would be smaller than the corners
+    if(width < dia || height < dia)
+        return;
+
+    Pixmap mask = XCreatePixmap(obt_display, window, width, height, 1);
+    // if this returns null, the mask is not drawable
+    if(!mask)
+        return;
+
+    XGCValues xgcv;
+    GC shape_gc = XCreateGC(obt_display, mask, 0, &xgcv);
+    if(!shape_gc) {
+        XFreePixmap(obt_display, mask);
+        return;
+    }
+
+    XSetForeground(obt_display, shape_gc, 0);
+    XFillRectangle(obt_display, mask, shape_gc, 0, 0, width, height);
+    XSetForeground(obt_display, shape_gc, 1);
+    XFillArc(obt_display, mask, shape_gc, 0, 0, dia, dia, 0, 23040);
+    XFillArc(obt_display, mask, shape_gc, width-dia-1, 0, dia, dia, 0, 23040);
+    XFillArc(obt_display, mask, shape_gc, 0, height-dia-1, dia, dia, 0, 23040);
+    XFillArc(obt_display, mask, shape_gc, width-dia-1, height-dia-1, dia, dia,
+        0, 23040);
+    XFillRectangle(obt_display, mask, shape_gc, rad, 0, width-dia, height);
+    XFillRectangle(obt_display, mask, shape_gc, 0, rad, width, height-dia);
+    XShapeCombineMask(obt_display, window, ShapeBounding, 0-win_attr.border_width, 0-win_attr.border_width, mask, ShapeSet);
+    XFreePixmap(obt_display, mask);
+    XFreeGC(obt_display, shape_gc);
+}
+
 void frame_adjust_area(ObFrame *self, gboolean moved,
                        gboolean resized, gboolean fake)
 {
@@ -880,7 +925,6 @@ void frame_adjust_area(ObFrame *self, gboolean moved,
 
         if (resized) {
             self->need_render = TRUE;
-            framerender_frame(self);
             frame_adjust_shape(self);
         }
 
@@ -907,7 +951,9 @@ void frame_adjust_area(ObFrame *self, gboolean moved,
     {
         XResizeWindow(obt_display, self->label, self->label_width,
                       ob_rr_theme->label_height);
+	self->need_render = TRUE;
     }
+    framerender_frame(self);
 }
 
 static void frame_adjust_cursors(ObFrame *self)
@@ -981,6 +1027,8 @@ void frame_adjust_client_area(ObFrame *self)
     XMoveResizeWindow(obt_display, self->backfront, 0, 0,
                       self->client->area.width,
                       self->client->area.height);
+    self->need_render = TRUE;
+    framerender_frame(self);
 }
 
 void frame_adjust_state(ObFrame *self)
@@ -1238,7 +1286,7 @@ static void layout_title(ObFrame *self)
         }
 
         /* stop at the end of the string (or the label, which calls break) */
-        for (; *lc != '\0' && lc >= config_title_layout; lc+=i) {
+        for (; lc >= config_title_layout && *lc != '\0'; lc+=i) {
             if (*lc == 'L') {
                 if (i > 0) {
                     self->label_on = TRUE;
