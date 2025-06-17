@@ -21,11 +21,11 @@
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
 
-int main () {
-  Display   *display;
-  Window     main, grouptran, child, group;
-  XEvent     report;
-  XWMHints  *wmhints;
+int main() {
+  Display* display;
+  Window main, grouptran, child, group;
+  XEvent report;
+  XWMHints* wmhints;
 
   display = XOpenDisplay(NULL);
 
@@ -34,25 +34,21 @@ int main () {
     return 0;
   }
 
-  group = XCreateWindow(display, RootWindow(display, 0),
-                        0,0,1,1, 10, CopyFromParent, CopyFromParent,
-			 CopyFromParent, 0, 0);
+  group = XCreateWindow(display, RootWindow(display, 0), 0, 0, 1, 1, 10, CopyFromParent, CopyFromParent, CopyFromParent,
+                        0, 0);
 
-  main = XCreateWindow(display, RootWindow(display, 0),
-                      0,0,100,100, 10, CopyFromParent, CopyFromParent,
-			 CopyFromParent, 0, 0);
-  grouptran = XCreateWindow(display, RootWindow(display, 0),
-                            10,10,80,180, 10, CopyFromParent, CopyFromParent,
+  main = XCreateWindow(display, RootWindow(display, 0), 0, 0, 100, 100, 10, CopyFromParent, CopyFromParent,
+                       CopyFromParent, 0, 0);
+  grouptran = XCreateWindow(display, RootWindow(display, 0), 10, 10, 80, 180, 10, CopyFromParent, CopyFromParent,
                             CopyFromParent, 0, 0);
-  child = XCreateWindow(display, RootWindow(display, 0),
-                        20,20,60,60, 10, CopyFromParent, CopyFromParent,
+  child = XCreateWindow(display, RootWindow(display, 0), 20, 20, 60, 60, 10, CopyFromParent, CopyFromParent,
                         CopyFromParent, 0, 0);
 
-  XSetWindowBackground(display,main,WhitePixel(display,0));
-  XSetWindowBackground(display,grouptran,BlackPixel(display,0));
-  XSetWindowBackground(display,child,WhitePixel(display,0));
+  XSetWindowBackground(display, main, WhitePixel(display, 0));
+  XSetWindowBackground(display, grouptran, BlackPixel(display, 0));
+  XSetWindowBackground(display, child, WhitePixel(display, 0));
 
-  XSetTransientForHint(display, grouptran, RootWindow(display,0));
+  XSetTransientForHint(display, grouptran, RootWindow(display, 0));
   XSetTransientForHint(display, child, grouptran);
 
   wmhints = XAllocWMHints();

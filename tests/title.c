@@ -21,16 +21,17 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
-int main (int argc, char **argv) {
-  Display   *display;
-  Window     win;
-  XEvent     report;
-  int        x=10,y=10,h=100,w=400;
+int main(int argc, char** argv) {
+  Display* display;
+  Window win;
+  XEvent report;
+  int x = 10, y = 10, h = 100, w = 400;
   XSizeHints size;
   XTextProperty name;
-  Atom nameprop,nameenc;
+  Atom nameprop, nameenc;
 
-  if (argc < 2) return 1;
+  if (argc < 2)
+    return 1;
 
   display = XOpenDisplay(NULL);
 
@@ -40,24 +41,22 @@ int main (int argc, char **argv) {
   }
 
   if (argc > 2)
-    nameprop = XInternAtom(display,argv[2],False);
+    nameprop = XInternAtom(display, argv[2], False);
   else
-    nameprop = XInternAtom(display,"WM_NAME",False);
+    nameprop = XInternAtom(display, "WM_NAME", False);
   if (argc > 3)
-    nameenc = XInternAtom(display,argv[3],False);
+    nameenc = XInternAtom(display, argv[3], False);
   else
-    nameenc = XInternAtom(display,"STRING",False);
+    nameenc = XInternAtom(display, "STRING", False);
 
-  win = XCreateWindow(display, RootWindow(display, 0),
-		      x, y, w, h, 10, CopyFromParent, CopyFromParent,
-		      CopyFromParent, 0, NULL);
+  win = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 10, CopyFromParent, CopyFromParent, CopyFromParent,
+                      0, NULL);
 
-  XSetWindowBackground(display,win,WhitePixel(display,0));
+  XSetWindowBackground(display, win, WhitePixel(display, 0));
 
-//  XStringListToTextProperty(&argv[1], 1, &name);
-//  XSetWMName(display, win, &name);
-  XChangeProperty(display, win, nameprop, nameenc, 8,
-                  PropModeAppend, argv[1], strlen(argv[1]));
+  //  XStringListToTextProperty(&argv[1], 1, &name);
+  //  XSetWMName(display, win, &name);
+  XChangeProperty(display, win, nameprop, nameenc, 8, PropModeAppend, argv[1], strlen(argv[1]));
 
   XFlush(display);
   XMapWindow(display, win);
@@ -68,18 +67,17 @@ int main (int argc, char **argv) {
     XNextEvent(display, &report);
 
     switch (report.type) {
-    case Expose:
-      printf("exposed\n");
-      break;
-    case ConfigureNotify:
-      x = report.xconfigure.x;
-      y = report.xconfigure.y;
-      w = report.xconfigure.width;
-      h = report.xconfigure.height;
-      printf("confignotify %i,%i-%ix%i\n",x,y,w,h);
-      break;
+      case Expose:
+        printf("exposed\n");
+        break;
+      case ConfigureNotify:
+        x = report.xconfigure.x;
+        y = report.xconfigure.y;
+        w = report.xconfigure.width;
+        h = report.xconfigure.height;
+        printf("confignotify %i,%i-%ix%i\n", x, y, w, h);
+        break;
     }
-
   }
 
   return 1;

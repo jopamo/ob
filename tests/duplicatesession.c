@@ -21,11 +21,11 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
-int main (int argc, char **argv) {
-  Display   *display;
-  Window     win1, win2;
-  XEvent     report;
-  int        x=10,y=10,h=100,w=400;
+int main(int argc, char** argv) {
+  Display* display;
+  Window win1, win2;
+  XEvent report;
+  int x = 10, y = 10, h = 100, w = 400;
   XSizeHints size;
   XTextProperty name;
   Atom sm_id, enc;
@@ -37,23 +37,19 @@ int main (int argc, char **argv) {
     return 0;
   }
 
-  sm_id = XInternAtom(display,"SM_CLIENT_ID",False);
-  enc = XInternAtom(display,"STRING",False);
+  sm_id = XInternAtom(display, "SM_CLIENT_ID", False);
+  enc = XInternAtom(display, "STRING", False);
 
-  win1 = XCreateWindow(display, RootWindow(display, 0),
-                       x, y, w, h, 10, CopyFromParent, CopyFromParent,
-                       CopyFromParent, 0, NULL);
-  win2 = XCreateWindow(display, RootWindow(display, 0),
-                       x, y, w, h, 10, CopyFromParent, CopyFromParent,
-                       CopyFromParent, 0, NULL);
+  win1 = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 10, CopyFromParent, CopyFromParent, CopyFromParent,
+                       0, NULL);
+  win2 = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 10, CopyFromParent, CopyFromParent, CopyFromParent,
+                       0, NULL);
 
-  XSetWindowBackground(display,win1,WhitePixel(display,0));
-  XSetWindowBackground(display,win2,BlackPixel(display,0));
+  XSetWindowBackground(display, win1, WhitePixel(display, 0));
+  XSetWindowBackground(display, win2, BlackPixel(display, 0));
 
-  XChangeProperty(display, win1, sm_id, enc, 8,
-                  PropModeAppend, "abcdefg", strlen("abcdefg"));
-  XChangeProperty(display, win2, sm_id, enc, 8,
-                  PropModeAppend, "abcdefg", strlen("abcdefg"));
+  XChangeProperty(display, win1, sm_id, enc, 8, PropModeAppend, "abcdefg", strlen("abcdefg"));
+  XChangeProperty(display, win2, sm_id, enc, 8, PropModeAppend, "abcdefg", strlen("abcdefg"));
 
   XFlush(display);
   XMapWindow(display, win1);

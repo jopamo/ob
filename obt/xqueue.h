@@ -25,38 +25,38 @@
 G_BEGIN_DECLS
 
 typedef struct _ObtXQueueWindowType {
-    Window window;
-    int type;
+  Window window;
+  int type;
 } ObtXQueueWindowType;
 
 typedef struct _ObtXQueueWindowMessage {
-    Window window;
-    Atom message;
+  Window window;
+  Atom message;
 } ObtXQueueWindowMessage;
 
-typedef gboolean (*xqueue_match_func)(XEvent *e, gpointer data);
+typedef gboolean (*xqueue_match_func)(XEvent* e, gpointer data);
 
 /*! Returns TRUE if the event matches the window pointed to by @data */
-gboolean xqueue_match_window(XEvent *e, gpointer data);
+gboolean xqueue_match_window(XEvent* e, gpointer data);
 
 /*! Returns TRUE if the event matches the type contained in the value of @data */
-gboolean xqueue_match_type(XEvent *e, gpointer data);
+gboolean xqueue_match_type(XEvent* e, gpointer data);
 
 /*! Returns TRUE if the event matches the type and window in the
   ObtXQueueWindowType pointed to by @data */
-gboolean xqueue_match_window_type(XEvent *e, gpointer data);
+gboolean xqueue_match_window_type(XEvent* e, gpointer data);
 
 /*! Returns TRUE if a ClientMessage event matches the message and window in the
   ObtXQueueWindowMessage pointed to by @data */
-gboolean xqueue_match_window_message(XEvent *e, gpointer data);
+gboolean xqueue_match_window_message(XEvent* e, gpointer data);
 
 /*! Returns TRUE and passes the next event in the queue and removes it from
   the queue.  On error, returns FALSE */
-gboolean xqueue_next(XEvent *event_return);
+gboolean xqueue_next(XEvent* event_return);
 
 /*! Returns TRUE and passes the next event in the local queue and removes it
   from the queue.  If no event is in the local queue, it returns FALSE. */
-gboolean xqueue_next_local(XEvent *event_return);
+gboolean xqueue_next_local(XEvent* event_return);
 
 /*! Returns TRUE if there is anything in the local event queue, and FALSE
   otherwise. */
@@ -64,11 +64,11 @@ gboolean xqueue_pending_local(void);
 
 /*! Returns TRUE and passes the next event in the queue, or FALSE if there
   is an error */
-gboolean xqueue_peek(XEvent *event_return);
+gboolean xqueue_peek(XEvent* event_return);
 
 /*! Returns TRUE and passes the next event in the queue, if there is one,
   and returns FALSE otherwise. */
-gboolean xqueue_peek_local(XEvent *event_return);
+gboolean xqueue_peek_local(XEvent* event_return);
 
 /*! Returns TRUE if xqueue_match_func returns TRUE for some event in the
   current event queue or in the stream of events from the server,
@@ -84,10 +84,9 @@ gboolean xqueue_exists_local(xqueue_match_func match, gpointer data);
 /*! Returns TRUE if xqueue_match_func returns TRUE for some event in the
   current event queue, and passes the matching event while removing it
   from the queue. */
-gboolean xqueue_remove_local(XEvent *event_return,
-                             xqueue_match_func match, gpointer data);
+gboolean xqueue_remove_local(XEvent* event_return, xqueue_match_func match, gpointer data);
 
-typedef void (*ObtXQueueFunc)(const XEvent *ev, gpointer data);
+typedef void (*ObtXQueueFunc)(const XEvent* ev, gpointer data);
 
 /*! Begin listening for X events in the default GMainContext, and feed them
   to the registered callback functions, added with xqueue_add_callback(). */

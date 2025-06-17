@@ -21,13 +21,13 @@
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
 
-int main () {
-  Display   *display;
-  Window     win, twin;
-  XEvent     report;
-  Atom       atime, atimewin;
-  int        x=10,y=10,h=400,w=400;
-  Time       num;
+int main() {
+  Display* display;
+  Window win, twin;
+  XEvent report;
+  Atom atime, atimewin;
+  int x = 10, y = 10, h = 400, w = 400;
+  Time num;
 
   display = XOpenDisplay(NULL);
 
@@ -39,14 +39,12 @@ int main () {
   atime = XInternAtom(display, "_NET_WM_USER_TIME", True);
   atimewin = XInternAtom(display, "_NET_WM_USER_TIME_WINDOW", True);
 
-  win = XCreateWindow(display, RootWindow(display, 0),
-                      x, y, w, h, 10, CopyFromParent, CopyFromParent,
-                      CopyFromParent, 0, 0);
-  twin = XCreateWindow(display, RootWindow(display, 0),
-                       x, y, w/2, h/2, 10, CopyFromParent, CopyFromParent,
+  win = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 10, CopyFromParent, CopyFromParent, CopyFromParent,
+                      0, 0);
+  twin = XCreateWindow(display, RootWindow(display, 0), x, y, w / 2, h / 2, 10, CopyFromParent, CopyFromParent,
                        CopyFromParent, 0, 0);
 
-  XSetWindowBackground(display,win,WhitePixel(display,0));
+  XSetWindowBackground(display, win, WhitePixel(display, 0));
 
   XMapWindow(display, win);
   XFlush(display);
@@ -54,16 +52,14 @@ int main () {
   sleep(2);
 
   printf("Setting time window\n");
-  XChangeProperty(display, win, atimewin, XA_WINDOW, 32,
-                  PropModeReplace, (unsigned char*)&twin, 1);
+  XChangeProperty(display, win, atimewin, XA_WINDOW, 32, PropModeReplace, (unsigned char*)&twin, 1);
   XFlush(display);
 
   sleep(1);
 
   num = 100;
   printf("Setting time stamp on time window\n");
-  XChangeProperty(display, twin, atime, XA_CARDINAL, 32,
-                  PropModeReplace, (unsigned char*)&num, 1);
+  XChangeProperty(display, twin, atime, XA_CARDINAL, 32, PropModeReplace, (unsigned char*)&num, 1);
   XFlush(display);
 
   while (1) {

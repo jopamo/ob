@@ -28,17 +28,17 @@
 struct _ObClient;
 
 /*! The client which is currently focused */
-extern struct _ObClient *focus_client;
+extern struct _ObClient* focus_client;
 
 /*! The recent focus order on each desktop */
-extern GList *focus_order;
+extern GList* focus_order;
 
 void focus_startup(gboolean reconfig);
 void focus_shutdown(gboolean reconfig);
 
 /*! Specify which client is currently focused, this doesn't actually
   send focus anywhere, its called by the Focus event handlers */
-void focus_set_client(struct _ObClient *client);
+void focus_set_client(struct _ObClient* client);
 
 /*! Focus nothing, but let keyboard events be caught. */
 void focus_nothing(void);
@@ -50,26 +50,26 @@ struct _ObClient* focus_fallback(gboolean allow_refocus,
                                  gboolean focus_lost);
 
 /*! Add a new client into the focus order */
-void focus_order_add_new(struct _ObClient *c);
+void focus_order_add_new(struct _ObClient* c);
 
 /*! Remove a client from the focus order */
-void focus_order_remove(struct _ObClient *c);
+void focus_order_remove(struct _ObClient* c);
 
 /*! Move a client to the top of the focus order */
-void focus_order_to_top(struct _ObClient *c);
+void focus_order_to_top(struct _ObClient* c);
 
 /*! Move a client to where it would be if it was newly added to the focus order
  */
-void focus_order_like_new(struct _ObClient *c);
+void focus_order_like_new(struct _ObClient* c);
 
 /*! Move a client to the bottom of the focus order (keeps iconic windows at the
   very bottom always though). */
-void focus_order_to_bottom(struct _ObClient *c);
+void focus_order_to_bottom(struct _ObClient* c);
 
-struct _ObClient *focus_order_find_first(guint desktop);
+struct _ObClient* focus_order_find_first(guint desktop);
 
-gboolean focus_valid_target(struct _ObClient *ft,
-                            guint    desktop,
+gboolean focus_valid_target(struct _ObClient* ft,
+                            guint desktop,
                             gboolean helper_windows,
                             gboolean iconic_windows,
                             gboolean all_desktops,

@@ -36,11 +36,11 @@ void event_shutdown(gboolean reconfig);
 
 /*! Make as if the mouse just entered the client, use only when using focus
     follows mouse */
-void event_enter_client(struct _ObClient *client);
+void event_enter_client(struct _ObClient* client);
 
 /*! Make as if the mouse just left the client, use only when using focus
     follows mouse */
-void event_leave_client(struct _ObClient *client);
+void event_leave_client(struct _ObClient* client);
 
 /*! Make mouse focus not move at all from the stuff that happens between these
     two function calls. */

@@ -24,33 +24,28 @@
 #include <X11/Xlib.h>
 #include <glib.h>
 
-typedef struct _ObWindow         ObWindow;
+typedef struct _ObWindow ObWindow;
 typedef struct _ObInternalWindow ObInternalWindow;
 
 typedef enum {
-    OB_WINDOW_CLASS_MENUFRAME,
-    OB_WINDOW_CLASS_DOCK,
-    OB_WINDOW_CLASS_CLIENT,
-    OB_WINDOW_CLASS_INTERNAL,
-    OB_WINDOW_CLASS_PROMPT
+  OB_WINDOW_CLASS_MENUFRAME,
+  OB_WINDOW_CLASS_DOCK,
+  OB_WINDOW_CLASS_CLIENT,
+  OB_WINDOW_CLASS_INTERNAL,
+  OB_WINDOW_CLASS_PROMPT
 } ObWindowClass;
 
 /* In order to be an ObWindow, you need to make this struct the top of your
    struct */
 struct _ObWindow {
-    ObWindowClass type;
+  ObWindowClass type;
 };
 
-#define WINDOW_IS_MENUFRAME(win) \
-    (((ObWindow*)win)->type == OB_WINDOW_CLASS_MENUFRAME)
-#define WINDOW_IS_DOCK(win) \
-    (((ObWindow*)win)->type == OB_WINDOW_CLASS_DOCK)
-#define WINDOW_IS_CLIENT(win) \
-    (((ObWindow*)win)->type == OB_WINDOW_CLASS_CLIENT)
-#define WINDOW_IS_INTERNAL(win) \
-    (((ObWindow*)win)->type == OB_WINDOW_CLASS_INTERNAL)
-#define WINDOW_IS_PROMPT(win) \
-    (((ObWindow*)win)->type == OB_WINDOW_CLASS_PROMPT)
+#define WINDOW_IS_MENUFRAME(win) (((ObWindow*)win)->type == OB_WINDOW_CLASS_MENUFRAME)
+#define WINDOW_IS_DOCK(win) (((ObWindow*)win)->type == OB_WINDOW_CLASS_DOCK)
+#define WINDOW_IS_CLIENT(win) (((ObWindow*)win)->type == OB_WINDOW_CLASS_CLIENT)
+#define WINDOW_IS_INTERNAL(win) (((ObWindow*)win)->type == OB_WINDOW_CLASS_INTERNAL)
+#define WINDOW_IS_PROMPT(win) (((ObWindow*)win)->type == OB_WINDOW_CLASS_PROMPT)
 
 struct _ObMenu;
 struct _ObDock;
@@ -70,20 +65,20 @@ struct _ObPrompt;
 #define INTERNAL_AS_WINDOW(intern) ((ObWindow*)intern)
 #define PROMPT_AS_WINDOW(prompt) ((ObWindow*)prompt)
 
-void window_startup (gboolean reconfig);
+void window_startup(gboolean reconfig);
 void window_shutdown(gboolean reconfig);
 
-Window          window_top  (ObWindow *self);
-ObStackingLayer window_layer(ObWindow *self);
+Window window_top(ObWindow* self);
+ObStackingLayer window_layer(ObWindow* self);
 
-ObWindow* window_find  (Window xwin);
-void      window_add   (Window *xwin, ObWindow *win);
-void      window_remove(Window xwin);
+ObWindow* window_find(Window xwin);
+void window_add(Window* xwin, ObWindow* win);
+void window_remove(Window xwin);
 
 /* Internal openbox-owned windows like the alt-tab popup */
 struct _ObInternalWindow {
-    ObWindowClass type;
-    Window window;
+  ObWindowClass type;
+  Window window;
 };
 
 void window_manage_all(void);
