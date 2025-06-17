@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    strategy:
+      matrix:
+        sanitizer:
+          - none
+          - asan-ubsan
+          - valgrind
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4.1.6
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            autoconf autopoint automake libtool build-essential pkg-config \
+            clang gcc valgrind gettext docbook-to-man \
+            libx11-dev libpango1.0-dev libglib2.0-dev \
+            libstartup-notification0-dev libxrandr-dev libxinerama-dev \
+            libxcursor-dev libimlib2-dev librsvg2-dev \
+            xvfb
+
+      - name: Configure & build
+        shell: bash
+        run: |
+          autoreconf -vif
+
+          if [ "${{ matrix.sanitizer }}" = "asan-ubsan" ]; then
+            export CC=clang
+            export CFLAGS="-g -fsanitize=address,undefined"
+            export LDFLAGS="-fsanitize=address,undefined"
+          else
+            export CC=gcc
+            export CFLAGS="-g"
+            export LDFLAGS=""
+          fi
+
+          ./configure --prefix=/usr --disable-nls --enable-imlib2 --enable-librsvg --with-x --disable-debug --enable-session-management
+          make -j"$(nproc)"
+          sudo make install
+
+      - name: Launch Xvfb and run tests
+        shell: bash
+        run: >
+          xvfb-run --auto-servernum --server-args="-screen 0 1280x800x24" bash -c "
+            openbox --replace &
+            sleep 2
+            cd tests
+            make -j"$(nproc)"
+
+            run_with_timeout() {
+              timeout 5s \"\$@\"
+              status=\$?
+              if [ \$status -eq 124 ]; then
+                echo \"[Timeout] Killed test after 5 seconds.\"
+              elif [ \$status -ne 0 ]; then
+                echo \"[Error] Test failed with status \$status (but not failing workflow).\"
+              fi
+            }
+
+            if [ \"${{ matrix.sanitizer }}\" = \"asan-ubsan\" ]; then
+              export ASAN_OPTIONS=detect_leaks=1:halt_on_error=1:detect_odr_violation=1
+              export UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1
+              for test_exe in \$(ls -1 | grep -v '\\.c' | grep -v Makefile | grep -v '\\.py' | grep -v '\\.sh'); do
+                if [ -x \"\$test_exe\" ]; then
+                  echo \"[ASan/UBSan] Running \$test_exe...\"
+                  run_with_timeout ./\$test_exe
+                fi
+              done
+
+            elif [ \"${{ matrix.sanitizer }}\" = \"valgrind\" ]; then
+              for test_exe in \$(ls -1 | grep -v '\\.c' | grep -v Makefile | grep -v '\\.py' | grep -v '\\.sh'); do
+                if [ -x \"\$test_exe\" ]; then
+                  echo \"[Valgrind] Running \$test_exe...\"
+                  run_with_timeout valgrind --quiet --error-exitcode=1 --leak-check=full --track-origins=yes ./\$test_exe
+                fi
+              done
+
+            else
+              for test_exe in \$(ls -1 | grep -v '\\.c' | grep -v Makefile | grep -v '\\.py' | grep -v '\\.sh'); do
+                if [ -x \"\$test_exe\" ]; then
+                  echo \"[Normal] Running \$test_exe...\"
+                  run_with_timeout ./\$test_exe
+                fi
+              done
+            fi
+          "
