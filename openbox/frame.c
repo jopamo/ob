@@ -1513,12 +1513,12 @@ static void flash_done(gpointer data) {
 
 static gboolean flash_timeout(gpointer data) {
   ObFrame* self = data;
-  GTimeVal now;
+  GDateTime* now = g_date_time_new_now_local();
 
-  g_get_current_time(&now);
-  if (now.tv_sec > self->flash_end.tv_sec ||
-      (now.tv_sec == self->flash_end.tv_sec && now.tv_usec >= self->flash_end.tv_usec))
+  if (g_date_time_compare(now, self->flash_end) >= 0)
     self->flashing = FALSE;
+
+  g_date_time_unref(now);
 
   if (!self->flashing) {
     if (self->focused != self->flash_on)
@@ -1541,33 +1541,36 @@ void frame_flash_start(ObFrame* self) {
 
   if (!self->flashing)
     self->flash_timer = g_timeout_add_full(G_PRIORITY_DEFAULT, 600, flash_timeout, self, flash_done);
-  g_get_current_time(&self->flash_end);
-  g_time_val_add(&self->flash_end, G_USEC_PER_SEC * 5);
+
+  // Clean up previous end time if still set
+  if (self->flash_end)
+    g_date_time_unref(self->flash_end);
+
+  // Set new end time: 5 seconds from now
+  self->flash_end = g_date_time_add_seconds(g_date_time_new_now_local(), 5);
 
   self->flashing = TRUE;
 }
 
 void frame_flash_stop(ObFrame* self) {
   self->flashing = FALSE;
+  if (self->flash_end) {
+    g_date_time_unref(self->flash_end);
+    self->flash_end = NULL;
+  }
 }
 
-static gulong frame_animate_iconify_time_left(ObFrame* self, const GTimeVal* now) {
-  glong sec, usec;
-  sec = self->iconify_animation_end.tv_sec - now->tv_sec;
-  usec = self->iconify_animation_end.tv_usec - now->tv_usec;
-  if (usec < 0) {
-    usec += G_USEC_PER_SEC;
-    sec--;
-  }
-  /* no negative values */
-  return MAX(sec * G_USEC_PER_SEC + usec, 0);
+static gulong frame_animate_iconify_time_left(ObFrame* self, GDateTime* now) {
+  gint64 usec_left = g_date_time_difference(self->iconify_animation_end, now);
+  // g_date_time_difference returns microseconds (can be negative!)
+  return usec_left > 0 ? (gulong)usec_left : 0;
 }
 
 static gboolean frame_animate_iconify(gpointer p) {
   ObFrame* self = p;
   gint x, y, w, h;
   gint iconx, icony, iconw;
-  GTimeVal now;
+  GDateTime* now;
   gulong time;
   gboolean iconifying;
 
@@ -1589,8 +1592,9 @@ static gboolean frame_animate_iconify(gpointer p) {
   iconifying = self->iconify_animation_going > 0;
 
   /* how far do we have left to go ? */
-  g_get_current_time(&now);
-  time = frame_animate_iconify_time_left(self, &now);
+  now = g_date_time_new_now_local();
+  time = frame_animate_iconify_time_left(self, now);
+  g_date_time_unref(now);
 
   if ((time > 0 && iconifying) || (time == 0 && !iconifying)) {
     /* start where the frame is supposed to be */
@@ -1662,51 +1666,59 @@ void frame_end_iconify_animation(gpointer data) {
 }
 
 void frame_begin_iconify_animation(ObFrame* self, gboolean iconifying) {
-  gulong time;
+  gulong time = FRAME_ANIMATE_ICONIFY_TIME;  // in microseconds
   gboolean new_anim = FALSE;
   gboolean set_end = TRUE;
-  GTimeVal now;
+  GDateTime* now = g_date_time_new_now_local();
 
-  /* if there is no titlebar, just don't animate for now
-     XXX it would be nice tho.. */
-  if (!(self->decorations & OB_FRAME_DECOR_TITLEBAR))
+  // If there is no titlebar, just don't animate for now
+  if (!(self->decorations & OB_FRAME_DECOR_TITLEBAR)) {
+    g_date_time_unref(now);
     return;
+  }
 
-  /* get the current time */
-  g_get_current_time(&now);
-
-  /* get how long until the end */
-  time = FRAME_ANIMATE_ICONIFY_TIME;
   if (self->iconify_animation_going) {
     if (!!iconifying != (self->iconify_animation_going > 0)) {
-      /* animation was already going on in the opposite direction */
-      time = time - frame_animate_iconify_time_left(self, &now);
+      // Animation was already going in the opposite direction
+      gulong left = frame_animate_iconify_time_left(self, now);
+      if (left < time)
+        time = time - left;
+      else
+        time = 0;
     }
-    else
-      /* animation was already going in the same direction */
+    else {
+      // Animation was already going in the same direction
       set_end = FALSE;
+    }
   }
-  else
+  else {
     new_anim = TRUE;
+  }
+
   self->iconify_animation_going = iconifying ? 1 : -1;
 
-  /* set the ending time */
   if (set_end) {
-    self->iconify_animation_end.tv_sec = now.tv_sec;
-    self->iconify_animation_end.tv_usec = now.tv_usec;
-    g_time_val_add(&self->iconify_animation_end, time);
+    // Clean up any previous timer
+    if (self->iconify_animation_end)
+      g_date_time_unref(self->iconify_animation_end);
+
+    // Add the new interval to the current time (seconds as double)
+    self->iconify_animation_end = g_date_time_add_seconds(now, time / (double)G_USEC_PER_SEC);
   }
+
+  g_date_time_unref(now);
 
   if (new_anim) {
     if (self->iconify_animation_timer)
       g_source_remove(self->iconify_animation_timer);
+
     self->iconify_animation_timer = g_timeout_add_full(G_PRIORITY_DEFAULT, FRAME_ANIMATE_ICONIFY_STEP_TIME,
                                                        frame_animate_iconify, self, frame_end_iconify_animation);
 
-    /* do the first step */
+    // do the first step
     frame_animate_iconify(self);
 
-    /* show it during the animation even if it is not "visible" */
+    // show it during the animation even if it is not "visible"
     if (!self->visible)
       XMapWindow(obt_display, self->window);
   }
