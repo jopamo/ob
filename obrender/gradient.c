@@ -445,7 +445,7 @@ static void gradient_solid(RrAppearance* l, gint w, gint h) {
       if (!bigslope##x[i]) {                        \
         /* Y (color) is dependant on X */           \
         error##x[i] += cdelta##x[i];                \
-        if ((error##x[i] << 1) >= len##x) {         \
+        if ((error##x[i] * 2) >= len##x) {         \
           color##x[i] += INCREMENT(x, i);           \
           error##x[i] -= len##x;                    \
         }                                           \
@@ -455,7 +455,7 @@ static void gradient_solid(RrAppearance* l, gint w, gint h) {
         while (1) {                                 \
           color##x[i] += INCREMENT(x, i);           \
           error##x[i] += len##x;                    \
-          if ((error##x[i] << 1) >= cdelta##x[i]) { \
+          if ((error##x[i] * 2) >= cdelta##x[i]) { \
             error##x[i] -= cdelta##x[i];            \
             break;                                  \
           }                                         \
