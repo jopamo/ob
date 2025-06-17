@@ -20,12 +20,12 @@
 #include <unistd.h>
 #include <X11/Xlib.h>
 
-int main () {
-  Display   *display;
-  Window     win;
-  XEvent     report;
-  XEvent     msg;
-  int        x=10,y=10,h=2000,w=2000;
+int main() {
+  Display* display;
+  Window win;
+  XEvent report;
+  XEvent msg;
+  int x = 10, y = 10, h = 2000, w = 2000;
 
   display = XOpenDisplay(NULL);
 
@@ -34,11 +34,10 @@ int main () {
     return 0;
   }
 
-  win = XCreateWindow(display, RootWindow(display, 0),
-		      x, y, w, h, 10, CopyFromParent, CopyFromParent,
-		      CopyFromParent, 0, NULL);
+  win = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 10, CopyFromParent, CopyFromParent, CopyFromParent,
+                      0, NULL);
 
-  XSetWindowBackground(display,win,WhitePixel(display,0));
+  XSetWindowBackground(display, win, WhitePixel(display, 0));
 
   XMapWindow(display, win);
   XFlush(display);
@@ -50,18 +49,17 @@ int main () {
     XNextEvent(display, &report);
 
     switch (report.type) {
-    case Expose:
-      printf("exposed\n");
-      break;
-    case ConfigureNotify:
-      x = report.xconfigure.x;
-      y = report.xconfigure.y;
-      w = report.xconfigure.width;
-      h = report.xconfigure.height;
-      printf("confignotify %i,%i-%ix%i\n",x,y,w,h);
-      break;
+      case Expose:
+        printf("exposed\n");
+        break;
+      case ConfigureNotify:
+        x = report.xconfigure.x;
+        y = report.xconfigure.y;
+        w = report.xconfigure.width;
+        h = report.xconfigure.height;
+        printf("confignotify %i,%i-%ix%i\n", x, y, w, h);
+        break;
     }
-
   }
 
   return 1;

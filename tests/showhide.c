@@ -21,12 +21,12 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
-int main () {
-  Display   *display;
-  Window     win;
-  XEvent     report;
-  XEvent     msg;
-  int        x=50,y=50,h=100,w=400;
+int main() {
+  Display* display;
+  Window win;
+  XEvent report;
+  XEvent msg;
+  int x = 50, y = 50, h = 100, w = 400;
 
   display = XOpenDisplay(NULL);
 
@@ -36,18 +36,17 @@ int main () {
   }
 
   while (1) {
-      win = XCreateWindow(display, RootWindow(display, 0),
-                          x, y, w, h, 10, CopyFromParent, CopyFromParent,
-                          CopyFromParent, 0, NULL);
-      XSetWindowBackground(display,win,WhitePixel(display,0));
-      XMapWindow(display, win);
-      XFlush(display);
-      usleep(1000);
-      XDestroyWindow(display, win);
-      XSync(display, False);
+    win = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 10, CopyFromParent, CopyFromParent, CopyFromParent,
+                        0, NULL);
+    XSetWindowBackground(display, win, WhitePixel(display, 0));
+    XMapWindow(display, win);
+    XFlush(display);
+    usleep(1000);
+    XDestroyWindow(display, win);
+    XSync(display, False);
 
-      break;
-      sleep(2);
+    break;
+    sleep(2);
   }
 
   return 1;

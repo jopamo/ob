@@ -21,12 +21,12 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
-int main () {
-  Display   *display;
-  Window     win;
-  XEvent     report;
-  XEvent     msg;
-  int        x=50,y=50,h=100,w=400;
+int main() {
+  Display* display;
+  Window win;
+  XEvent report;
+  XEvent msg;
+  int x = 50, y = 50, h = 100, w = 400;
 
   display = XOpenDisplay(NULL);
 
@@ -35,10 +35,9 @@ int main () {
     return 0;
   }
 
-  win = XCreateWindow(display, RootWindow(display, 0),
-                      x, y, w, h, 10, CopyFromParent, CopyFromParent,
-                      CopyFromParent, 0, NULL);
-  XSetWindowBackground(display,win,WhitePixel(display,0));
+  win = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 10, CopyFromParent, CopyFromParent, CopyFromParent,
+                      0, NULL);
+  XSetWindowBackground(display, win, WhitePixel(display, 0));
 
   XMapWindow(display, win);
   XFlush(display);
@@ -50,7 +49,7 @@ int main () {
   msg.xunmap.window = win;
   msg.xunmap.from_configure = False;
   XSendEvent(display, RootWindow(display, DefaultScreen(display)), False,
-             SubstructureRedirectMask|SubstructureNotifyMask, &msg);
+             SubstructureRedirectMask | SubstructureNotifyMask, &msg);
   usleep(10000);
 
   XUnmapWindow(display, win);

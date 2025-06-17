@@ -29,30 +29,35 @@
 struct _ObClient;
 
 /*! The client which appears focused during a focus cycle operation */
-extern struct _ObClient *focus_cycle_target;
+extern struct _ObClient* focus_cycle_target;
 
 void focus_cycle_startup(gboolean reconfig);
 void focus_cycle_shutdown(gboolean reconfig);
 
 /*! Cycle focus amongst windows. */
-struct _ObClient* focus_cycle(gboolean forward, gboolean all_desktops,
+struct _ObClient* focus_cycle(gboolean forward,
+                              gboolean all_desktops,
                               gboolean nonhilite_windows,
-                              gboolean dock_windows, gboolean desktop_windows,
-                              gboolean linear, gboolean showbar,
+                              gboolean dock_windows,
+                              gboolean desktop_windows,
+                              gboolean linear,
+                              gboolean showbar,
                               ObFocusCyclePopupMode mode,
-                              gboolean done, gboolean cancel);
+                              gboolean done,
+                              gboolean cancel);
 struct _ObClient* focus_directional_cycle(ObDirection dir,
                                           gboolean dock_windows,
                                           gboolean desktop_windows,
                                           gboolean interactive,
                                           gboolean showbar,
                                           gboolean dialog,
-                                          gboolean done, gboolean cancel);
+                                          gboolean done,
+                                          gboolean cancel);
 
 /*! Set @redraw to FALSE if there are more clients to be added/removed first */
-void focus_cycle_addremove(struct _ObClient *ifclient, gboolean redraw);
+void focus_cycle_addremove(struct _ObClient* ifclient, gboolean redraw);
 void focus_cycle_reorder();
 
-gboolean focus_cycle_valid(struct _ObClient *client);
+gboolean focus_cycle_valid(struct _ObClient* client);
 
 #endif

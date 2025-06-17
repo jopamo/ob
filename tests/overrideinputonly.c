@@ -19,15 +19,15 @@
 #include <stdio.h>
 #include <X11/Xlib.h>
 
-int main (int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   XSetWindowAttributes xswa;
-  unsigned long        xswamask;
-  Display   *display;
-  Window     win;
-  XEvent     report;
-  int        i,x=0,y=0,h=1,w=1;
+  unsigned long xswamask;
+  Display* display;
+  Window win;
+  XEvent report;
+  int i, x = 0, y = 0, h = 1, w = 1;
 
-  for (i=0; i < argc; i++) {
+  for (i = 0; i < argc; i++) {
     if (!strcmp(argv[i], "-g") || !strcmp(argv[i], "-geometry")) {
       XParseGeometry(argv[++i], &x, &y, &w, &h);
     }
@@ -43,9 +43,7 @@ int main (int argc, char *argv[]) {
   xswa.override_redirect = True;
   xswamask = CWOverrideRedirect;
 
-  win = XCreateWindow(display, RootWindow(display, 0),
-		      x, y, w, h, 0, 0, InputOnly,
-		      CopyFromParent, xswamask, &xswa);
+  win = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 0, 0, InputOnly, CopyFromParent, xswamask, &xswa);
 
   XMapWindow(display, win);
   XFlush(display);

@@ -21,11 +21,11 @@
 #include <X11/Xutil.h>
 #include <X11/cursorfont.h>
 
-int main () {
-  Display   *display;
-  Window     win, child;
-  XEvent     report;
-  int        x=10,y=10,h=100,w=400,b=10;
+int main() {
+  Display* display;
+  Window win, child;
+  XEvent report;
+  int x = 10, y = 10, h = 100, w = 400, b = 10;
   XSetWindowAttributes a;
 
   display = XOpenDisplay(NULL);
@@ -35,14 +35,11 @@ int main () {
     return 0;
   }
 
-  win = XCreateWindow(display, RootWindow(display, 0),
-		      x, y, w, h, b, CopyFromParent, CopyFromParent,
-		      CopyFromParent, 0, NULL);
+  win = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, b, CopyFromParent, CopyFromParent, CopyFromParent, 0,
+                      NULL);
 
-  a.cursor = XCreateFontCursor(display, XC_watch); 
-  child = XCreateWindow(display, win,
-                        x+w/8, y+h/8, 3*w/4, 3*h/4, 0,
-                        CopyFromParent, InputOnly,
+  a.cursor = XCreateFontCursor(display, XC_watch);
+  child = XCreateWindow(display, win, x + w / 8, y + h / 8, 3 * w / 4, 3 * h / 4, 0, CopyFromParent, InputOnly,
                         CopyFromParent, CWCursor, &a);
 
   XMapWindow(display, child);

@@ -21,11 +21,11 @@
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
 
-int main () {
-  Display   *display;
-  Window     one, two, group;
-  XEvent     report;
-  XWMHints  *wmhints;
+int main() {
+  Display* display;
+  Window one, two, group;
+  XEvent report;
+  XWMHints* wmhints;
 
   display = XOpenDisplay(NULL);
 
@@ -34,22 +34,19 @@ int main () {
     return 0;
   }
 
-  group = XCreateWindow(display, RootWindow(display, 0),
-                        0,0,1,1, 10, CopyFromParent, CopyFromParent,
-			 CopyFromParent, 0, 0);
+  group = XCreateWindow(display, RootWindow(display, 0), 0, 0, 1, 1, 10, CopyFromParent, CopyFromParent, CopyFromParent,
+                        0, 0);
 
-  one = XCreateWindow(display, RootWindow(display, 0),
-                      0,0,100,100, 10, CopyFromParent, CopyFromParent,
-			 CopyFromParent, 0, 0);
-  two = XCreateWindow(display, RootWindow(display, 0),
-                      0,0,100,100, 10, CopyFromParent, CopyFromParent,
+  one = XCreateWindow(display, RootWindow(display, 0), 0, 0, 100, 100, 10, CopyFromParent, CopyFromParent,
+                      CopyFromParent, 0, 0);
+  two = XCreateWindow(display, RootWindow(display, 0), 0, 0, 100, 100, 10, CopyFromParent, CopyFromParent,
                       CopyFromParent, 0, 0);
 
-  XSetWindowBackground(display,one,WhitePixel(display,0));
-  XSetWindowBackground(display,two,BlackPixel(display,0));
+  XSetWindowBackground(display, one, WhitePixel(display, 0));
+  XSetWindowBackground(display, two, BlackPixel(display, 0));
 
-  XSetTransientForHint(display, one, RootWindow(display,0));
-  XSetTransientForHint(display, two, RootWindow(display,0));
+  XSetTransientForHint(display, one, RootWindow(display, 0));
+  XSetTransientForHint(display, two, RootWindow(display, 0));
 
   wmhints = XAllocWMHints();
 

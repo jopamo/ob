@@ -21,10 +21,10 @@
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
 
-int main () {
-  Display   *display;
-  Window     one, two;
-  XEvent     report;
+int main() {
+  Display* display;
+  Window one, two;
+  XEvent report;
 
   display = XOpenDisplay(NULL);
 
@@ -33,15 +33,13 @@ int main () {
     return 0;
   }
 
-  one = XCreateWindow(display, RootWindow(display, 0),
-                      0,0,200,200, 10, CopyFromParent, CopyFromParent,
-			 CopyFromParent, 0, 0);
-  two = XCreateWindow(display, RootWindow(display, 0),
-                      0,0,150,150, 10, CopyFromParent, CopyFromParent,
+  one = XCreateWindow(display, RootWindow(display, 0), 0, 0, 200, 200, 10, CopyFromParent, CopyFromParent,
+                      CopyFromParent, 0, 0);
+  two = XCreateWindow(display, RootWindow(display, 0), 0, 0, 150, 150, 10, CopyFromParent, CopyFromParent,
                       CopyFromParent, 0, 0);
 
-  XSetWindowBackground(display,one,WhitePixel(display,0));
-  XSetWindowBackground(display,two,BlackPixel(display,0));
+  XSetWindowBackground(display, one, WhitePixel(display, 0));
+  XSetWindowBackground(display, two, BlackPixel(display, 0));
 
   XSetTransientForHint(display, two, one);
 

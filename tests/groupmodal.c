@@ -21,12 +21,12 @@
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
 
-int main () {
-  Display   *display;
-  Window     one, two, group;
-  XEvent     report;
-  XWMHints  *wmhints;
-  Atom       state, modal;
+int main() {
+  Display* display;
+  Window one, two, group;
+  XEvent report;
+  XWMHints* wmhints;
+  Atom state, modal;
 
   display = XOpenDisplay(NULL);
 
@@ -38,23 +38,19 @@ int main () {
   state = XInternAtom(display, "_NET_WM_STATE", True);
   modal = XInternAtom(display, "_NET_WM_STATE_MODAL", True);
 
-  group = XCreateWindow(display, RootWindow(display, 0),
-                        0,0,1,1, 10, CopyFromParent, CopyFromParent,
-			 CopyFromParent, 0, 0);
+  group = XCreateWindow(display, RootWindow(display, 0), 0, 0, 1, 1, 10, CopyFromParent, CopyFromParent, CopyFromParent,
+                        0, 0);
 
-  one = XCreateWindow(display, RootWindow(display, 0),
-                      0,0,300,300, 10, CopyFromParent, CopyFromParent,
-			 CopyFromParent, 0, 0);
-  two = XCreateWindow(display, RootWindow(display, 0),
-                      0,0,100,100, 10, CopyFromParent, CopyFromParent,
+  one = XCreateWindow(display, RootWindow(display, 0), 0, 0, 300, 300, 10, CopyFromParent, CopyFromParent,
+                      CopyFromParent, 0, 0);
+  two = XCreateWindow(display, RootWindow(display, 0), 0, 0, 100, 100, 10, CopyFromParent, CopyFromParent,
                       CopyFromParent, 0, 0);
 
-  XSetWindowBackground(display,one,WhitePixel(display,0));
-  XSetWindowBackground(display,two,BlackPixel(display,0));
+  XSetWindowBackground(display, one, WhitePixel(display, 0));
+  XSetWindowBackground(display, two, BlackPixel(display, 0));
 
-  XSetTransientForHint(display, two, RootWindow(display,0));
-  XChangeProperty(display, two, state, XA_ATOM, 32,
-                  PropModeReplace, (unsigned char*)&modal, 1);
+  XSetTransientForHint(display, two, RootWindow(display, 0));
+  XChangeProperty(display, two, state, XA_ATOM, 32, PropModeReplace, (unsigned char*)&modal, 1);
 
   wmhints = XAllocWMHints();
 

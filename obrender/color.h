@@ -27,25 +27,25 @@
 #include <glib.h>
 
 struct _RrColor {
-    const RrInstance *inst;
+  const RrInstance* inst;
 
-    gint r;
-    gint g;
-    gint b;
-    gulong pixel;
-    GC gc;
+  gint r;
+  gint g;
+  gint b;
+  gulong pixel;
+  GC gc;
 
-    gint key;
-    gint refcount;
+  gint key;
+  gint refcount;
 
 #ifdef DEBUG
-    gint id;
+  gint id;
 #endif
 };
 
-void RrColorAllocateGC(RrColor *in);
-XColor *RrPickColor(const RrInstance *inst, gint r, gint g, gint b);
-void RrReduceDepth(const RrInstance *inst, RrPixel32 *data, XImage *im);
-void RrIncreaseDepth(const RrInstance *inst, RrPixel32 *data, XImage *im);
+void RrColorAllocateGC(RrColor* in);
+XColor* RrPickColor(const RrInstance* inst, gint r, gint g, gint b);
+void RrReduceDepth(const RrInstance* inst, RrPixel32* data, XImage* im);
+void RrIncreaseDepth(const RrInstance* inst, RrPixel32* data, XImage* im);
 
 #endif /* __color_h */

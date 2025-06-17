@@ -21,13 +21,13 @@
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
 
-int main () {
-  Display   *display;
-  Window     win;
-  XEvent     report;
-  Atom       state, skip;
+int main() {
+  Display* display;
+  Window win;
+  XEvent report;
+  Atom state, skip;
   XClassHint classhint;
-  int        x=10,y=10,h=400,w=400;
+  int x = 10, y = 10, h = 400, w = 400;
 
   display = XOpenDisplay(NULL);
 
@@ -39,14 +39,12 @@ int main () {
   state = XInternAtom(display, "_NET_WM_STATE", True);
   skip = XInternAtom(display, "_NET_WM_STATE_SKIP_TASKBAR", True);
 
-  win = XCreateWindow(display, RootWindow(display, 0),
-                      x, y, w, h, 10, CopyFromParent, CopyFromParent,
-			 CopyFromParent, 0, 0);
+  win = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 10, CopyFromParent, CopyFromParent, CopyFromParent,
+                      0, 0);
 
-  XSetWindowBackground(display,win,WhitePixel(display,0));
+  XSetWindowBackground(display, win, WhitePixel(display, 0));
 
-  XChangeProperty(display, win, state, XA_ATOM, 32,
-		  PropModeReplace, (unsigned char*)&skip, 1);
+  XChangeProperty(display, win, state, XA_ATOM, 32, PropModeReplace, (unsigned char*)&skip, 1);
 
   classhint.res_name = "test";
   classhint.res_class = "Test";

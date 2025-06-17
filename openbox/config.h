@@ -33,39 +33,38 @@
 
 typedef struct _ObAppSettings ObAppSettings;
 
-struct _ObAppSettings
-{
-    GPatternSpec *class;
-    GPatternSpec *name;
-    GPatternSpec *role;
-    GPatternSpec *group_class;
-    GPatternSpec *group_name;
-    GPatternSpec *title;
-    ObClientType  type;
+struct _ObAppSettings {
+  GPatternSpec* class;
+  GPatternSpec* name;
+  GPatternSpec* role;
+  GPatternSpec* group_class;
+  GPatternSpec* group_name;
+  GPatternSpec* title;
+  ObClientType type;
 
-    GravityPoint position;
-    gboolean pos_given;
-    gboolean pos_force;
+  GravityPoint position;
+  gboolean pos_given;
+  gboolean pos_force;
 
-    gint width_num;
-    gint width_denom;
-    gint height_num;
-    gint height_denom;
+  gint width_num;
+  gint width_denom;
+  gint height_num;
+  gint height_denom;
 
-    guint desktop;
-    gint shade;
-    gint decor;
-    gint focus;
-    ObPlaceMonitor monitor_type;
-    gint monitor;
-    gint iconic;
-    gint skip_pager;
-    gint skip_taskbar;
-    gint max_horz;
-    gint max_vert;
-    gint fullscreen;
+  guint desktop;
+  gint shade;
+  gint decor;
+  gint focus;
+  ObPlaceMonitor monitor_type;
+  gint monitor;
+  gint iconic;
+  gint skip_pager;
+  gint skip_taskbar;
+  gint max_horz;
+  gint max_vert;
+  gint fullscreen;
 
-    gint layer;
+  gint layer;
 };
 
 /*! Should new windows be focused */
@@ -73,7 +72,7 @@ extern gboolean config_focus_new;
 /*! Focus windows when the mouse enters them */
 extern gboolean config_focus_follow;
 /*! Timeout for focusing windows on focus follows mouse, in milliseconds */
-extern guint    config_focus_delay;
+extern guint config_focus_delay;
 /*! If windows should automatically be raised when they are focused in
  focus follows mouse */
 extern gboolean config_focus_raise;
@@ -142,36 +141,36 @@ extern guint config_dock_app_move_button;
 extern guint config_dock_app_move_modifiers;
 
 /*! The name of the theme */
-extern gchar *config_theme;
+extern gchar* config_theme;
 
 /*! Show the one-pixel border after toggleDecor */
 extern gboolean config_theme_keepborder;
 /*! Titlebar button layout */
-extern gchar *config_title_layout;
+extern gchar* config_title_layout;
 /*! Animate windows iconifying and restoring */
 extern gboolean config_animate_iconify;
 /*! Size of icons in focus switching dialogs */
 extern guint config_theme_window_list_icon_size;
 
 /*! The font for the active window's title */
-extern RrFont *config_font_activewindow;
+extern RrFont* config_font_activewindow;
 /*! The font for inactive windows' titles */
-extern RrFont *config_font_inactivewindow;
+extern RrFont* config_font_inactivewindow;
 /*! The font for menu titles */
-extern RrFont *config_font_menutitle;
+extern RrFont* config_font_menutitle;
 /*! The font for menu items */
-extern RrFont *config_font_menuitem;
+extern RrFont* config_font_menuitem;
 /*! The font for on-screen-displays/popups' active text */
-extern RrFont *config_font_activeosd;
+extern RrFont* config_font_activeosd;
 /*! The font for on-screen-displays/popups' inactive text */
-extern RrFont *config_font_inactiveosd;
+extern RrFont* config_font_inactiveosd;
 
 /*! The number of desktops */
 extern guint config_desktops_num;
 /*! Desktop to start on, put 5 to start in the center of a 3x3 grid */
 extern guint config_screen_firstdesk;
 /*! Names for the desktops */
-extern GSList *config_desktops_names;
+extern GSList* config_desktops_names;
 /*! Amount of time to show the desktop switch dialog */
 extern guint config_desktop_popup_time;
 
@@ -200,35 +199,34 @@ extern gint config_resist_win;
 extern gint config_resist_edge;
 
 /*! Delay for hiding menu when opening in milliseconds */
-extern guint    config_menu_hide_delay;
+extern guint config_menu_hide_delay;
 /*! Center menus vertically about the parent entry */
 extern gboolean config_menu_middle;
 /*! Delay before opening a submenu in milliseconds */
-extern guint    config_submenu_show_delay;
+extern guint config_submenu_show_delay;
 /*! Delay before closing a submenu in milliseconds */
-extern guint    config_submenu_hide_delay;
+extern guint config_submenu_hide_delay;
 /*! Show manage desktops in client_list_menu */
 extern gboolean config_menu_manage_desktops;
 /*! Load & show icons in user-defined menus */
 extern gboolean config_menu_show_icons;
 /*! User-specified menu files */
-extern GSList *config_menu_files;
+extern GSList* config_menu_files;
 /*! Per app settings */
-extern GSList *config_per_app_settings;
+extern GSList* config_per_app_settings;
 
-void config_startup(ObtXmlInst *i);
+void config_startup(ObtXmlInst* i);
 void config_shutdown(void);
 
 /*! Create an ObAppSettings structure with the default values */
 ObAppSettings* config_create_app_settings(void);
 /*! Copies any settings in src to dest, if they are their default value in
   src. */
-void config_app_settings_copy_non_defaults(const ObAppSettings *src,
-                                           ObAppSettings *dest);
+void config_app_settings_copy_non_defaults(const ObAppSettings* src, ObAppSettings* dest);
 /*! Parses an x geometry style position, with some extensions like ratios
   and percentages */
-void config_parse_gravity_coord(xmlNodePtr node, GravityCoord *c);
+void config_parse_gravity_coord(xmlNodePtr node, GravityCoord* c);
 /*! Parses a rational number or percentage into num and denom */
-void config_parse_relative_number(gchar *s, gint *num, gint *denom);
+void config_parse_relative_number(gchar* s, gint* num, gint* denom);
 
 #endif

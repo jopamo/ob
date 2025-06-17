@@ -27,9 +27,9 @@ struct _ObClient;
 #define DESKTOP_ALL (0xffffffff)
 
 typedef enum {
-    SCREEN_SHOW_DESKTOP_NO,
-    SCREEN_SHOW_DESKTOP_UNTIL_WINDOW,
-    SCREEN_SHOW_DESKTOP_UNTIL_TOGGLE
+  SCREEN_SHOW_DESKTOP_NO,
+  SCREEN_SHOW_DESKTOP_UNTIL_WINDOW,
+  SCREEN_SHOW_DESKTOP_UNTIL_TOGGLE
 } ObScreenShowDestopMode;
 
 /*! The number of available desktops */
@@ -48,15 +48,15 @@ extern Window screen_support_win;
 extern Time screen_desktop_user_time;
 
 typedef struct ObDesktopLayout {
-    ObOrientation orientation;
-    ObCorner start_corner;
-    guint rows;
-    guint columns;
+  ObOrientation orientation;
+  ObCorner start_corner;
+  guint rows;
+  guint columns;
 } ObDesktopLayout;
 extern ObDesktopLayout screen_desktop_layout;
 
 /*! An array of gchar*'s which are desktop names in UTF-8 format */
-extern gchar **screen_desktop_names;
+extern gchar** screen_desktop_names;
 
 /*! Take over the screen, set the basic hints on it claming it as ours */
 gboolean screen_annex(void);
@@ -78,8 +78,7 @@ void screen_add_desktop(gboolean current);
 /*! Remove a desktop, either at the end or the current desktop */
 void screen_remove_desktop(gboolean current);
 
-guint screen_find_desktop(guint from, ObDirection dir,
-                          gboolean wrap, gboolean linear);
+guint screen_find_desktop(guint from, ObDirection dir, gboolean wrap, gboolean linear);
 
 /*! Show the desktop popup/notification
   @permanent If TRUE, the popup will stay on the screen until you call
@@ -96,8 +95,7 @@ void screen_hide_desktop_popup(void);
          show is FALSE (restoring from show-desktop mode), and the rest are
          iconified.
 */
-void screen_show_desktop(ObScreenShowDestopMode show_mode,
-                         struct _ObClient *show_only);
+void screen_show_desktop(ObScreenShowDestopMode show_mode, struct _ObClient* show_only);
 
 /*! Returns true if showing desktop mode is enabled. */
 gboolean screen_showing_desktop();
@@ -110,7 +108,7 @@ void screen_update_desktop_names(void);
 
 /*! Installs or uninstalls a colormap for a client. If client is NULL, then
   it handles the root colormap. */
-void screen_install_colormap(struct _ObClient *client, gboolean install);
+void screen_install_colormap(struct _ObClient* client, gboolean install);
 
 void screen_update_areas(void);
 
@@ -143,22 +141,22 @@ const Rect* screen_physical_area_primary(gboolean fixed);
 /* doesn't include struts which the search area is already outside of when
    'search' is not NULL */
 #define SCREEN_AREA_ALL_MONITORS ((unsigned)-1)
-#define SCREEN_AREA_ONE_MONITOR  ((unsigned)-2)
+#define SCREEN_AREA_ONE_MONITOR ((unsigned)-2)
 
 /*! @param head is the number of the head or one of SCREEN_AREA_ALL_MONITORS,
            SCREEN_AREA_ONE_MONITOR
     @param search NULL or the whole monitor(s)
     @return A Rect allocated with g_slice_new()
  */
-Rect* screen_area(guint desktop, guint head, Rect *search);
+Rect* screen_area(guint desktop, guint head, Rect* search);
 
-gboolean screen_physical_area_monitor_contains(guint head, Rect *search);
+gboolean screen_physical_area_monitor_contains(guint head, Rect* search);
 
 /*! Determines which physical monitor a rectangle is on by calculating the
     area of the part of the rectable on each monitor.  The number of the
     monitor containing the greatest area of the rectangle is returned.
 */
-guint screen_find_monitor(const Rect *search);
+guint screen_find_monitor(const Rect* search);
 
 /*! Finds the monitor which contains the point @x, @y */
 guint screen_find_monitor_point(guint x, guint y);
@@ -169,7 +167,7 @@ void screen_set_root_cursor(void);
 
 /*! Gives back the pointer's position in x and y. Returns TRUE if the pointer
   is on this screen and FALSE if it is on another screen. */
-gboolean screen_pointer_pos(gint *x, gint *y);
+gboolean screen_pointer_pos(gint* x, gint* y);
 
 /*! Returns the monitor which contains the pointer device */
 guint screen_monitor_pointer(void);
@@ -185,6 +183,10 @@ gboolean screen_compare_desktops(guint a, guint b);
 /*! Resolve a gravity point into absolute coordinates.
  * width and height are the size of the object being placed, used for
  * aligning to right/bottom edges of the area. */
-void screen_apply_gravity_point(gint *x, gint *y, gint width, gint height,
-                                const GravityPoint *position, const Rect *area);
+void screen_apply_gravity_point(gint* x,
+                                gint* y,
+                                gint width,
+                                gint height,
+                                const GravityPoint* position,
+                                const Rect* area);
 #endif

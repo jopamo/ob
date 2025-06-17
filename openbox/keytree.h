@@ -22,24 +22,24 @@
 #include <glib.h>
 
 typedef struct KeyBindingTree {
-    guint state;
-    guint key;
-    GList *keylist;
-    GSList *actions; /* list of Action pointers */
-    gboolean chroot;
+  guint state;
+  guint key;
+  GList* keylist;
+  GSList* actions; /* list of Action pointers */
+  gboolean chroot;
 
-    /* the level up in the tree */
-    struct KeyBindingTree *parent;
-    /* the next binding in the tree at the same level */
-    struct KeyBindingTree *next_sibling;
-    /* the first child of this binding (next binding in a chained sequence).*/
-    struct KeyBindingTree *first_child;
+  /* the level up in the tree */
+  struct KeyBindingTree* parent;
+  /* the next binding in the tree at the same level */
+  struct KeyBindingTree* next_sibling;
+  /* the first child of this binding (next binding in a chained sequence).*/
+  struct KeyBindingTree* first_child;
 } KeyBindingTree;
 
-void tree_destroy(KeyBindingTree *tree);
-KeyBindingTree *tree_build(GList *keylist);
-void tree_assimilate(KeyBindingTree *node);
-KeyBindingTree *tree_find(KeyBindingTree *search, gboolean *conflict);
-gboolean tree_chroot(KeyBindingTree *tree, GList *keylist);
+void tree_destroy(KeyBindingTree* tree);
+KeyBindingTree* tree_build(GList* keylist);
+void tree_assimilate(KeyBindingTree* node);
+KeyBindingTree* tree_find(KeyBindingTree* search, gboolean* conflict);
+gboolean tree_chroot(KeyBindingTree* tree, GList* keylist);
 
 #endif

@@ -22,11 +22,7 @@
 #include "render.h"
 #include "geom.h"
 
-void RrImageDrawImage(RrPixel32 *target, RrTextureImage *img,
-                      gint target_w, gint target_h,
-                      RrRect *area);
-void RrImageDrawRGBA(RrPixel32 *target, RrTextureRGBA *rgba,
-                     gint target_w, gint target_h,
-                     RrRect *area);
+void RrImageDrawImage(RrPixel32* target, RrTextureImage* img, gint target_w, gint target_h, RrRect* area);
+void RrImageDrawRGBA(RrPixel32* target, RrTextureRGBA* rgba, gint target_w, gint target_h, RrRect* area);
 
 #endif

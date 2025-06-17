@@ -21,14 +21,14 @@
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 
-int main () {
-  Display   *display;
-  Window     win;
-  XEvent     report;
-  Atom       _net_strut;
-  XEvent     msg;
-  int        x=10,y=10,h=100,w=400;
-  int        s[4];
+int main() {
+  Display* display;
+  Window win;
+  XEvent report;
+  Atom _net_strut;
+  XEvent msg;
+  int x = 10, y = 10, h = 100, w = 400;
+  int s[4];
 
   display = XOpenDisplay(NULL);
 
@@ -39,20 +39,21 @@ int main () {
 
   _net_strut = XInternAtom(display, "_NET_WM_STRUT", False);
 
-  win = XCreateWindow(display, RootWindow(display, 0),
-		      x, y, w, h, 10, CopyFromParent, CopyFromParent,
-		      CopyFromParent, 0, NULL);
+  win = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 10, CopyFromParent, CopyFromParent, CopyFromParent,
+                      0, NULL);
 
-  XSetWindowBackground(display,win,WhitePixel(display,0));
+  XSetWindowBackground(display, win, WhitePixel(display, 0));
 
   XMapWindow(display, win);
   XFlush(display);
   sleep(2);
 
   printf("top\n");
-  s[0] = 0; s[1] = 0; s[2] = 20; s[3] = 0;
-  XChangeProperty(display, win, _net_strut, XA_CARDINAL, 32,
-                  PropModeReplace, (unsigned char*) s, 4);
+  s[0] = 0;
+  s[1] = 0;
+  s[2] = 20;
+  s[3] = 0;
+  XChangeProperty(display, win, _net_strut, XA_CARDINAL, 32, PropModeReplace, (unsigned char*)s, 4);
   XFlush(display);
   sleep(2);
 
@@ -66,18 +67,17 @@ int main () {
     XNextEvent(display, &report);
 
     switch (report.type) {
-    case Expose:
-      printf("exposed\n");
-      break;
-    case ConfigureNotify:
-      x = report.xconfigure.x;
-      y = report.xconfigure.y;
-      w = report.xconfigure.width;
-      h = report.xconfigure.height;
-      printf("confignotify %i,%i-%ix%i\n",x,y,w,h);
-      break;
+      case Expose:
+        printf("exposed\n");
+        break;
+      case ConfigureNotify:
+        x = report.xconfigure.x;
+        y = report.xconfigure.y;
+        w = report.xconfigure.width;
+        h = report.xconfigure.height;
+        printf("confignotify %i,%i-%ix%i\n", x, y, w, h);
+        break;
     }
-
   }
 
   return 1;
