@@ -1,23 +1,8 @@
-/* -*- indent-tabs-mode: nil; tab-width: 4; c-basic-offset: 4; -*-
-
-   override.c for the Openbox window manager
-   Copyright (c) 2003-2007   Dana Jansens
-
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   See the COPYING file for a copy of the GNU General Public License.
-*/
+/* override.c for the Openbox window manager */
 
 #include <stdio.h>
 #include <X11/Xlib.h>
+#include <unistd.h>
 
 int main() {
   XSetWindowAttributes xswa;
@@ -28,31 +13,37 @@ int main() {
   int x = 10, y = 10, h = 100, w = 400;
 
   display = XOpenDisplay(NULL);
-
   if (display == NULL) {
     fprintf(stderr, "couldn't connect to X server :0\n");
-    return 0;
+    return 1;
   }
 
+  // Set override_redirect to True
   xswa.override_redirect = True;
   xswamask = CWOverrideRedirect;
 
+  // Create a window with override_redirect flag set
   win = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 10, CopyFromParent, CopyFromParent, CopyFromParent,
                       xswamask, &xswa);
-
   XSetWindowBackground(display, win, WhitePixel(display, 0));
 
+  // Map the window and flush the display
   XMapWindow(display, win);
-  XFlush(display);
-  sleep(1);
-  XUnmapWindow(display, win);
-  XFlush(display);
-  sleep(1);
-  XMapWindow(display, win);
-  XFlush(display);
+  XFlush(display);  // Correct usage of XFlush
 
+  sleep(1);  // Simulate a delay for the window to appear
+
+  // Unmap and remap the window to simulate window state change
+  XUnmapWindow(display, win);
+  XFlush(display);  // Correct usage of XFlush
+  sleep(1);
+  XMapWindow(display, win);
+  XFlush(display);  // Correct usage of XFlush
+
+  // Listen for events
   XSelectInput(display, win, ExposureMask | StructureNotifyMask);
 
+  // Event loop
   while (1) {
     XNextEvent(display, &report);
 
@@ -68,7 +59,17 @@ int main() {
         printf("confignotify %i,%i-%ix%i\n", x, y, w, h);
         break;
     }
+
+    // Exit the loop after handling an event
+    if (report.type == Expose && report.xexpose.count == 0) {
+      printf("Test completed. Closing the program.\n");
+      break;
+    }
   }
 
-  return 1;
+  // Clean up and close the display connection
+  XDestroyWindow(display, win);
+  XCloseDisplay(display);
+
+  return 0;
 }

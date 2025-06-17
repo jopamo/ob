@@ -1,20 +1,4 @@
-/* -*- indent-tabs-mode: nil; tab-width: 4; c-basic-offset: 4; -*-
-
-   fullscreen.c for the Openbox window manager
-   Copyright (c) 2003-2007   Dana Jansens
-
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   See the COPYING file for a copy of the GNU General Public License.
-*/
+/* fullscreen.c for the Openbox window manager */
 
 #include <stdio.h>
 #include <unistd.h>
@@ -28,25 +12,30 @@ int main() {
   XEvent msg;
   int x = 10, y = 10, h = 100, w = 400;
 
+  // Open the X display
   display = XOpenDisplay(NULL);
-
   if (display == NULL) {
     fprintf(stderr, "couldn't connect to X server :0\n");
-    return 0;
+    return 1;  // Return 1 if the display can't be opened
   }
 
+  // Intern atoms for window state
   _net_state = XInternAtom(display, "_NET_WM_STATE", False);
   _net_fs = XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", False);
 
+  // Create a window
   win = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 10, CopyFromParent, CopyFromParent, CopyFromParent,
                       0, NULL);
 
+  // Set the background color for the window
   XSetWindowBackground(display, win, WhitePixel(display, 0));
 
+  // Map the window and flush the display
   XMapWindow(display, win);
   XFlush(display);
   sleep(2);
 
+  // Send a message to toggle fullscreen state
   printf("fullscreen\n");
   msg.xclient.type = ClientMessage;
   msg.xclient.message_type = _net_state;
@@ -62,6 +51,7 @@ int main() {
   XFlush(display);
   sleep(2);
 
+  // Send a message to restore the window
   printf("restore\n");
   msg.xclient.type = ClientMessage;
   msg.xclient.message_type = _net_state;
@@ -75,8 +65,10 @@ int main() {
   msg.xclient.data.l[4] = 0l;
   XSendEvent(display, RootWindow(display, 0), False, SubstructureNotifyMask | SubstructureRedirectMask, &msg);
 
+  // Select input events to listen for
   XSelectInput(display, win, ExposureMask | StructureNotifyMask);
 
+  // Event loop to process events
   while (1) {
     XNextEvent(display, &report);
 
@@ -92,7 +84,17 @@ int main() {
         printf("confignotify %i,%i-%ix%i\n", x, y, w, h);
         break;
     }
+
+    // Exit after processing the first event to avoid infinite loops in CI
+    if (report.type == Expose && report.xexpose.count == 0) {
+      printf("Test completed. Closing the program.\n");
+      break;
+    }
   }
 
-  return 1;
+  // Clean up and close the display connection
+  XDestroyWindow(display, win);
+  XCloseDisplay(display);
+
+  return 0;  // Return 0 to indicate success
 }

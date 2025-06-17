@@ -1,25 +1,10 @@
-/* -*- indent-tabs-mode: nil; tab-width: 4; c-basic-offset: 4; -*-
-
-   extentsrequest.c for the Openbox window manager
-   Copyright (c) 2003-2007   Dana Jansens
-
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   See the COPYING file for a copy of the GNU General Public License.
-*/
+/* extentsrequest.c for the Openbox window manager */
 
 #include <stdio.h>
 #include <unistd.h>
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
+#include <stdlib.h>
 
 void request(Display* display, Atom _request, Atom _extents, Window win) {
   XEvent msg;
@@ -50,11 +35,28 @@ void reply(Display* display, Atom _extents) {
       unsigned long* prop_return;
       XGetWindowProperty(display, report.xproperty.window, _extents, 0, 4, False, XA_CARDINAL, &ret_type, &ret_format,
                          &ret_items, &ret_bytesleft, (unsigned char**)&prop_return);
-      if (ret_type == XA_CARDINAL && ret_format == 32 && ret_items == 4)
-        printf("  got new extents %d, %d, %d, %d\n", prop_return[0], prop_return[1], prop_return[2], prop_return[3]);
+      if (ret_type == XA_CARDINAL && ret_format == 32 && ret_items == 4) {
+        printf("  got new extents %lu, %lu, %lu, %lu\n", prop_return[0], prop_return[1], prop_return[2],
+               prop_return[3]);
+      }
       break;
     }
   }
+}
+
+void test_request(Display* display,
+                  Window win,
+                  Atom _request,
+                  Atom _extents,
+                  Atom _type,
+                  Atom _state,
+                  Atom state_value,
+                  const char* state_name) {
+  printf("requesting for type %s\n", state_name);
+  XChangeProperty(display, win, _type, XA_ATOM, 32, PropModeReplace, (unsigned char*)&_type, 1);
+  XChangeProperty(display, win, _state, XA_ATOM, 32, PropModeReplace, (unsigned char*)&state_value, 1);
+  request(display, _request, _extents, win);
+  reply(display, _extents);
 }
 
 int main() {
@@ -68,7 +70,7 @@ int main() {
 
   if (display == NULL) {
     fprintf(stderr, "couldn't connect to X server :0\n");
-    return 0;
+    return 1;
   }
 
   _type = XInternAtom(display, "_NET_WM_WINDOW_TYPE", False);
@@ -85,33 +87,13 @@ int main() {
                       0, NULL);
   XSelectInput(display, win, PropertyChangeMask);
 
-  printf("requesting for type normal\n");
-  XChangeProperty(display, win, _type, XA_ATOM, 32, PropModeReplace, (unsigned char*)&_normal, 1);
-  request(display, _request, _extents, win);
-  reply(display, _extents);
+  // Test all the states
+  test_request(display, win, _request, _extents, _normal, _state, _state_fs, "normal+fullscreen");
+  test_request(display, win, _request, _extents, _normal, _state, _state_mv, "normal+maximized_vert");
+  test_request(display, win, _request, _extents, _normal, _state, _state_mh, "normal+maximized_horz");
+  test_request(display, win, _request, _extents, _normal, _state, _desktop, "desktop");
 
-  printf("requesting for type normal+fullscreen\n");
-  XChangeProperty(display, win, _type, XA_ATOM, 32, PropModeReplace, (unsigned char*)&_normal, 1);
-  XChangeProperty(display, win, _state, XA_ATOM, 32, PropModeReplace, (unsigned char*)&_state_fs, 1);
-  request(display, _request, _extents, win);
-  reply(display, _extents);
+  XCloseDisplay(display);  // Close the display properly
 
-  printf("requesting for type normal+maxv\n");
-  XChangeProperty(display, win, _type, XA_ATOM, 32, PropModeReplace, (unsigned char*)&_normal, 1);
-  XChangeProperty(display, win, _state, XA_ATOM, 32, PropModeReplace, (unsigned char*)&_state_mv, 1);
-  request(display, _request, _extents, win);
-  reply(display, _extents);
-
-  printf("requesting for type normal+maxh\n");
-  XChangeProperty(display, win, _type, XA_ATOM, 32, PropModeReplace, (unsigned char*)&_normal, 1);
-  XChangeProperty(display, win, _state, XA_ATOM, 32, PropModeReplace, (unsigned char*)&_state_mh, 1);
-  request(display, _request, _extents, win);
-  reply(display, _extents);
-
-  printf("requesting for type desktop\n");
-  XChangeProperty(display, win, _type, XA_ATOM, 32, PropModeReplace, (unsigned char*)&_desktop, 1);
-  request(display, _request, _extents, win);
-  reply(display, _extents);
-
-  return 1;
+  return 0;
 }

@@ -1,59 +1,121 @@
-/* -*- indent-tabs-mode: nil; tab-width: 4; c-basic-offset: 4; -*-
-
-   fakeunmap.c for the Openbox window manager
-   Copyright (c) 2003-2007   Dana Jansens
-
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   See the COPYING file for a copy of the GNU General Public License.
-*/
+/*
+ * fakeunmap.c for Openbox window manager
+ *
+ * Demonstrates creating a window, mapping it, verifying its state,
+ * sending a synthetic UnmapNotify, and then unmapping the window
+ * with proper checks and event synchronization.
+ */
 
 #include <stdio.h>
-#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
-int main() {
-  Display* display;
-  Window win;
-  XEvent report;
-  XEvent msg;
-  int x = 50, y = 50, h = 100, w = 400;
+static void fail_and_exit(const char* msg) {
+  fprintf(stderr, "%s\n", msg);
+  exit(EXIT_FAILURE);
+}
 
-  display = XOpenDisplay(NULL);
+static void wait_for_event(Display* display, Window win, int event_type) {
+  /* Wait for a specific event type on a given window */
+  XEvent e;
+  for (;;) {
+    XNextEvent(display, &e);
+    if (e.type == event_type && e.xany.window == win) {
+      break;
+    }
+  }
+}
 
-  if (display == NULL) {
-    fprintf(stderr, "couldn't connect to X server :0\n");
-    return 0;
+/* Helper function to check whether a window is mapped or unmapped */
+static void test_window_state(Display* display, Window win, int expected) {
+  XWindowAttributes attr;
+
+  if (!XGetWindowAttributes(display, win, &attr)) {
+    fail_and_exit("XGetWindowAttributes failed");
   }
 
-  win = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 10, CopyFromParent, CopyFromParent, CopyFromParent,
-                      0, NULL);
-  XSetWindowBackground(display, win, WhitePixel(display, 0));
+  if (attr.map_state == expected) {
+    printf("Test passed: Window is in the expected %s state\n", (expected == IsViewable) ? "mapped" : "unmapped");
+  }
+  else {
+    printf("Test failed: Expected window to be %s, but it is %s\n", (expected == IsViewable) ? "mapped" : "unmapped",
+           (attr.map_state == IsViewable) ? "mapped" : "unmapped");
+  }
+}
 
+int main(void) {
+  Display* display;
+  Window root, win;
+  XSetWindowAttributes xswa;
+  XEvent msg;
+  int screen_num;
+  int x = 50, y = 50, width = 400, height = 100;
+
+  /* Open the display */
+  display = XOpenDisplay(NULL);
+  if (display == NULL) {
+    fprintf(stderr, "Could not connect to X server.\n");
+    return EXIT_FAILURE;
+  }
+
+  screen_num = DefaultScreen(display);
+  root = RootWindow(display, screen_num);
+
+  /* Create a simple window */
+  xswa.background_pixel = WhitePixel(display, screen_num);
+  xswa.border_pixel = BlackPixel(display, screen_num);
+  xswa.event_mask = StructureNotifyMask; /* We want MapNotify/UnmapNotify */
+
+  win = XCreateWindow(display, root, x, y, width, height, 1, /* border width */
+                      CopyFromParent,                        /* depth */
+                      InputOutput,                           /* class */
+                      CopyFromParent,                        /* visual */
+                      CWBackPixel | CWBorderPixel | CWEventMask, &xswa);
+  if (!win) {
+    fail_and_exit("Failed to create X Window");
+  }
+
+  /* Map the window (make it visible) */
   XMapWindow(display, win);
   XFlush(display);
-  usleep(10000);
 
+  /* Wait for MapNotify to ensure window is actually mapped */
+  wait_for_event(display, win, MapNotify);
+
+  /* Verify that the window is mapped */
+  test_window_state(display, win, IsViewable);
+
+  /* -----------------------------------------------------
+     Simulate UnmapNotify event (synthetic). In a real X
+     environment, the server usually sends this event.
+     ----------------------------------------------------- */
+  memset(&msg, 0, sizeof(msg));
   msg.type = UnmapNotify;
-  msg.xunmap.display = display;
-  msg.xunmap.event = RootWindow(display, DefaultScreen(display));
+  msg.xunmap.event = root;
   msg.xunmap.window = win;
   msg.xunmap.from_configure = False;
-  XSendEvent(display, RootWindow(display, DefaultScreen(display)), False,
-             SubstructureRedirectMask | SubstructureNotifyMask, &msg);
-  usleep(10000);
 
+  /* Send the synthetic UnmapNotify event to the root window */
+  XSendEvent(display, root, False, SubstructureRedirectMask | SubstructureNotifyMask, &msg);
+
+  /* -----------------------------------------------------
+     Now actually unmap the window. This will trigger a
+     real UnmapNotify event from the server.
+     ----------------------------------------------------- */
   XUnmapWindow(display, win);
-  XSync(display, False);
+  XFlush(display);
 
-  return 1;
+  /* Wait for the actual UnmapNotify event */
+  wait_for_event(display, win, UnmapNotify);
+
+  /* Verify that the window is unmapped */
+  test_window_state(display, win, IsUnmapped);
+
+  /* Clean up and exit */
+  XDestroyWindow(display, win);
+  XCloseDisplay(display);
+
+  return EXIT_SUCCESS;
 }

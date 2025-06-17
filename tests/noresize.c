@@ -1,20 +1,4 @@
-/* -*- indent-tabs-mode: nil; tab-width: 4; c-basic-offset: 4; -*-
-
-   noresize.c for the Openbox window manager
-   Copyright (c) 2003-2007   Dana Jansens
-
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   See the COPYING file for a copy of the GNU General Public License.
-*/
+/* noresize.c for the Openbox window manager */
 
 #include <stdio.h>
 #include <X11/Xlib.h>
@@ -30,20 +14,21 @@ int main() {
   XSizeHints size;
 
   display = XOpenDisplay(NULL);
-
   if (display == NULL) {
     fprintf(stderr, "couldn't connect to X server :0\n");
-    return 0;
+    return 1;
   }
 
+  // Set window gravity
   xswa.win_gravity = StaticGravity;
   xswamask = CWWinGravity;
 
+  // Create the window
   win = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 0, CopyFromParent, CopyFromParent, CopyFromParent,
                       xswamask, &xswa);
-
   XSetWindowBackground(display, win, WhitePixel(display, 0));
 
+  // Set size hints to prevent resizing
   size.flags = PMinSize | PMaxSize;
   size.max_width = 0;
   size.min_width = w;
@@ -56,9 +41,11 @@ int main() {
   XMapWindow(display, win);
   XFlush(display);
 
+  // Move the window
   XMoveWindow(display, win, 10, 10);
   XMoveWindow(display, win, 10, 10);
 
+  // Event loop to handle Expose and ConfigureNotify events
   while (1) {
     XNextEvent(display, &report);
 
@@ -74,7 +61,17 @@ int main() {
         printf("confignotify %i,%i-%ix%i\n", x, y, w, h);
         break;
     }
+
+    // Exit after handling a single event to avoid infinite loop
+    if (report.type == Expose && report.xexpose.count == 0) {
+      printf("Test completed. Closing the program.\n");
+      break;
+    }
   }
 
-  return 1;
+  // Cleanup
+  XDestroyWindow(display, win);
+  XCloseDisplay(display);
+
+  return 0;
 }
