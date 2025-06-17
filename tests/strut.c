@@ -1,54 +1,14 @@
-/* -*- indent-tabs-mode: nil; tab-width: 4; c-basic-offset: 4; -*-
-
-   strut.c for the Openbox window manager
-   Copyright (c) 2003-2007   Dana Jansens
-
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   See the COPYING file for a copy of the GNU General Public License.
-*/
+/* strut.c for Openbox window manager */
 
 #include <stdio.h>
 #include <unistd.h>
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 
-int main() {
-  Display* display;
-  Window win;
-  XEvent report;
-  Atom _net_strut;
-  XEvent msg;
-  int x = 10, y = 10, h = 100, w = 400;
+void test_strut_property(Display* display, Window win, Atom _net_strut) {
   int s[4];
 
-  display = XOpenDisplay(NULL);
-
-  if (display == NULL) {
-    fprintf(stderr, "couldn't connect to X server :0\n");
-    return 0;
-  }
-
-  _net_strut = XInternAtom(display, "_NET_WM_STRUT", False);
-
-  win = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 10, CopyFromParent, CopyFromParent, CopyFromParent,
-                      0, NULL);
-
-  XSetWindowBackground(display, win, WhitePixel(display, 0));
-
-  XMapWindow(display, win);
-  XFlush(display);
-  sleep(2);
-
-  printf("top\n");
+  // Set top strut
   s[0] = 0;
   s[1] = 0;
   s[2] = 20;
@@ -57,28 +17,66 @@ int main() {
   XFlush(display);
   sleep(2);
 
-  printf("none\n");
+  // Remove strut
   XDeleteProperty(display, win, _net_strut);
   XFlush(display);
+  sleep(2);
+}
 
-  XSelectInput(display, win, ExposureMask | StructureNotifyMask);
-
+void handle_events(Display* display, Window win) {
+  XEvent report;
   while (1) {
     XNextEvent(display, &report);
 
     switch (report.type) {
       case Expose:
-        printf("exposed\n");
+        printf("Window exposed\n");
         break;
       case ConfigureNotify:
-        x = report.xconfigure.x;
-        y = report.xconfigure.y;
-        w = report.xconfigure.width;
-        h = report.xconfigure.height;
-        printf("confignotify %i,%i-%ix%i\n", x, y, w, h);
+        printf("Window configuration changed: position (%i, %i), size (%ix%i)\n", report.xconfigure.x,
+               report.xconfigure.y, report.xconfigure.width, report.xconfigure.height);
         break;
     }
+
+    if (report.type == Expose && report.xexpose.count == 0) {
+      printf("All events processed. Closing the program.\n");
+      return;
+    }
+  }
+}
+
+int main() {
+  Display* display;
+  Window win;
+  Atom _net_strut;
+  int x = 10, y = 10, h = 100, w = 400;
+
+  // Connect to X server
+  display = XOpenDisplay(NULL);
+  if (display == NULL) {
+    fprintf(stderr, "couldn't connect to X server :0\n");
+    return 1;
   }
 
-  return 1;
+  _net_strut = XInternAtom(display, "_NET_WM_STRUT", False);
+
+  // Create window
+  win = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 10, CopyFromParent, CopyFromParent, CopyFromParent,
+                      0, NULL);
+  XSetWindowBackground(display, win, WhitePixel(display, 0));
+  XMapWindow(display, win);
+  XFlush(display);
+
+  // Test strut property
+  test_strut_property(display, win, _net_strut);
+
+  // Listen for events
+  XSelectInput(display, win, ExposureMask | StructureNotifyMask);
+  handle_events(display, win);
+
+  // Clean up
+  XDestroyWindow(display, win);
+  XCloseDisplay(display);
+
+  return 0;
 }

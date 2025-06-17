@@ -1,22 +1,7 @@
-/* -*- indent-tabs-mode: nil; tab-width: 4; c-basic-offset: 4; -*-
-
-   fallback.c for the Openbox window manager
-   Copyright (c) 2003-2007   Dana Jansens
-
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   See the COPYING file for a copy of the GNU General Public License.
-*/
+// fallback.c for the Openbox window manager
 
 #include <stdio.h>
+#include <unistd.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
@@ -30,7 +15,7 @@ int main() {
 
   if (display == NULL) {
     fprintf(stderr, "couldn't connect to X server :0\n");
-    return 0;
+    return 1;  // Return failure if unable to connect to the display
   }
 
   one = XCreateWindow(display, RootWindow(display, 0), 0, 0, 200, 200, 10, CopyFromParent, CopyFromParent,
@@ -38,25 +23,45 @@ int main() {
   two = XCreateWindow(display, RootWindow(display, 0), 0, 0, 150, 150, 10, CopyFromParent, CopyFromParent,
                       CopyFromParent, 0, 0);
 
+  if (!one || !two) {
+    fprintf(stderr, "Failed to create windows\n");
+    return 1;  // Return failure if windows are not created
+  }
+
   XSetWindowBackground(display, one, WhitePixel(display, 0));
   XSetWindowBackground(display, two, BlackPixel(display, 0));
 
   XSetTransientForHint(display, two, one);
 
+  // Map the first window and check the event
   XMapWindow(display, one);
   XFlush(display);
-  usleep(1000);
+  XNextEvent(display, &report);
+  if (report.type != MapNotify) {
+    fprintf(stderr, "Failed to map the first window correctly\n");
+    return 1;
+  }
 
+  // Map the second window and check the event
   XMapWindow(display, two);
   XFlush(display);
-  usleep(1000);
+  XNextEvent(display, &report);
+  if (report.type != MapNotify) {
+    fprintf(stderr, "Failed to map the second window correctly\n");
+    return 1;
+  }
 
+  // Destroy the second window
   XDestroyWindow(display, two);
   XFlush(display);
   usleep(1000);
 
+  // Destroy the first window
   XDestroyWindow(display, one);
-  XSync(display, False);
+  XSync(display, False);  // Ensure all events are processed before exit
 
-  return 1;
+  // Check for proper closure
+  XCloseDisplay(display);  // Close the display connection
+
+  return 0;
 }
