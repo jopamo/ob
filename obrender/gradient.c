@@ -435,33 +435,33 @@ static void gradient_solid(RrAppearance* l, gint w, gint h) {
 
 #define INCREMENT(x, i) (inc##x[i])
 
-#define NEXT(x)                                     \
-  {                                                 \
-    register gint i;                                \
-    for (i = 2; i >= 0; --i) {                      \
-      if (!cdelta##x[i])                            \
-        continue;                                   \
-                                                    \
-      if (!bigslope##x[i]) {                        \
-        /* Y (color) is dependant on X */           \
-        error##x[i] += cdelta##x[i];                \
+#define NEXT(x)                                    \
+  {                                                \
+    register gint i;                               \
+    for (i = 2; i >= 0; --i) {                     \
+      if (!cdelta##x[i])                           \
+        continue;                                  \
+                                                   \
+      if (!bigslope##x[i]) {                       \
+        /* Y (color) is dependant on X */          \
+        error##x[i] += cdelta##x[i];               \
         if ((error##x[i] * 2) >= len##x) {         \
-          color##x[i] += INCREMENT(x, i);           \
-          error##x[i] -= len##x;                    \
-        }                                           \
-      }                                             \
-      else {                                        \
-        /* X is dependant on Y (color) */           \
-        while (1) {                                 \
-          color##x[i] += INCREMENT(x, i);           \
-          error##x[i] += len##x;                    \
+          color##x[i] += INCREMENT(x, i);          \
+          error##x[i] -= len##x;                   \
+        }                                          \
+      }                                            \
+      else {                                       \
+        /* X is dependant on Y (color) */          \
+        while (1) {                                \
+          color##x[i] += INCREMENT(x, i);          \
+          error##x[i] += len##x;                   \
           if ((error##x[i] * 2) >= cdelta##x[i]) { \
-            error##x[i] -= cdelta##x[i];            \
-            break;                                  \
-          }                                         \
-        }                                           \
-      }                                             \
-    }                                               \
+            error##x[i] -= cdelta##x[i];           \
+            break;                                 \
+          }                                        \
+        }                                          \
+      }                                            \
+    }                                              \
   }
 
 static void gradient_splitvertical(RrAppearance* a, gint w, gint h) {
