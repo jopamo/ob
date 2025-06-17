@@ -455,7 +455,14 @@ void DestroyImlibLoader(ImlibLoader* loader) {
   if (!loader)
     return;
 
-  imlib_free_image();
+  if (loader->img) {
+    // Only set the context and free if the image still exists
+    if (imlib_context_get_image() != loader->img)
+      imlib_context_set_image(loader->img);
+    imlib_free_image();
+    loader->img = NULL;  // Defensive: avoid accidental reuse
+  }
+
   g_slice_free(ImlibLoader, loader);
 }
 
@@ -480,93 +487,120 @@ ImlibLoader* LoadWithImlib(gchar* path, RrPixel32** pixel_data, gint* width, gin
 #endif /* USE_IMLIB2 */
 
 #if defined(USE_LIBRSVG)
-typedef struct _RsvgLoader RsvgLoader;
+#include <gio/gio.h>
 
-struct _RsvgLoader {
+typedef struct _RsvgLoader {
   RsvgHandle* handle;
   cairo_surface_t* surface;
   RrPixel32* pixel_data;
-};
+} RsvgLoader;
 
-void DestroyRsvgLoader(RsvgLoader* loader) {
+static void DestroyRsvgLoader(RsvgLoader* loader) {
   if (!loader)
     return;
 
-  if (loader->pixel_data)
-    g_free(loader->pixel_data);
+  g_clear_pointer(&loader->pixel_data, g_free);
   if (loader->surface)
     cairo_surface_destroy(loader->surface);
-  if (loader->handle)
-    g_object_unref(loader->handle);
+  g_clear_object(&loader->handle);
   g_slice_free(RsvgLoader, loader);
 }
 
-RsvgLoader* LoadWithRsvg(gchar* path, RrPixel32** pixel_data, gint* width, gint* height) {
+/* Return NULL on *any* failure; caller must call DestroyRsvgLoader() */
+static RsvgLoader* LoadWithRsvg(gchar* path, RrPixel32** pixel_data, gint* width, gint* height) {
+  g_return_val_if_fail(path && pixel_data && width && height, NULL);
+
   RsvgLoader* loader = g_slice_new0(RsvgLoader);
+  GError* error = NULL;
 
-  if (!(loader->handle = rsvg_handle_new_from_file(path, NULL))) {
+  /* --- Open the file stream ------------------------------------------------ */
+  GFile* file = g_file_new_for_path(path);
+  GInputStream* stream = G_INPUT_STREAM(g_file_read(file, NULL, &error));
+  g_object_unref(file);
+
+  if (!stream) {
+    g_warning("RSVG: cannot read “%s”: %s", path, error->message);
+    g_clear_error(&error);
     DestroyRsvgLoader(loader);
     return NULL;
   }
 
-  if (!rsvg_handle_close(loader->handle, NULL)) {
+  /* --- Build an RsvgHandle ------------------------------------------------- */
+  loader->handle = rsvg_handle_new_from_stream_sync(stream, NULL, RSVG_HANDLE_FLAGS_NONE, NULL, &error);
+  g_object_unref(stream);
+
+  if (!loader->handle) {
+    g_warning("RSVG: cannot create handle for “%s”: %s", path, error ? error->message : "unknown error");
+    g_clear_error(&error);
     DestroyRsvgLoader(loader);
     return NULL;
   }
 
-  RsvgDimensionData dimension_data;
-  rsvg_handle_get_dimensions(loader->handle, &dimension_data);
-  *width = dimension_data.width;
-  *height = dimension_data.height;
+  /* --- Obtain the intrinsic size (might be unset) -------------------------- */
+  gdouble svg_w = 0, svg_h = 0;
+  if (!rsvg_handle_get_intrinsic_size_in_pixels(loader->handle, &svg_w, &svg_h) || svg_w <= 0.0 || svg_h <= 0.0) {
+    g_warning("RSVG: “%s” has no intrinsic size; skipping", path);
+    DestroyRsvgLoader(loader);
+    return NULL;
+  }
+  *width = (gint)svg_w;
+  *height = (gint)svg_h;
 
+  /* Guard against over‑large bitmaps that could OOM or overflow */
+  if ((guint64)*width * (guint64)*height > 32 * 1024 * 1024) { /* 32 Mpx */
+    g_warning("RSVG: “%s” size %dx%d is too big; skipping", path, *width, *height);
+    DestroyRsvgLoader(loader);
+    return NULL;
+  }
+
+  /* --- Render into an ARGB32 Cairo surface --------------------------------- */
   loader->surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, *width, *height);
-
-  cairo_t* context = cairo_create(loader->surface);
-  gboolean success = rsvg_handle_render_cairo(loader->handle, context);
-  cairo_destroy(context);
-
-  if (!success) {
+  if (cairo_surface_status(loader->surface) != CAIRO_STATUS_SUCCESS) {
+    g_warning("RSVG: cannot create surface for “%s”", path);
     DestroyRsvgLoader(loader);
     return NULL;
   }
 
-  loader->pixel_data = g_new(guint32, *width * *height);
+  cairo_t* cr = cairo_create(loader->surface);
+  if (!rsvg_handle_render_document(loader->handle, cr, NULL, &error)) {
+    g_warning("RSVG: render failed for “%s”: %s", path, error ? error->message : "unknown error");
+    g_clear_error(&error);
+    cairo_destroy(cr);
+    DestroyRsvgLoader(loader);
+    return NULL;
+  }
+  cairo_destroy(cr);
 
-  /*
-    Cairo has its data in ARGB with premultiplied alpha, but RrPixel32
-    non-premultipled, so convert that. Also, RrPixel32 doesn't allow
-    strides not equal to the width of the image.
-  */
+  cairo_surface_flush(loader->surface);
 
-  /* Verify that RrPixel32 has the same ordering as cairo. */
-  g_assert(RrDefaultAlphaOffset == 24);
-  g_assert(RrDefaultRedOffset == 16);
-  g_assert(RrDefaultGreenOffset == 8);
-  g_assert(RrDefaultBlueOffset == 0);
-
+  /* --- Copy pixels, converting from premultiplied ARGB to straight RGBA ---- */
+  loader->pixel_data = g_new(RrPixel32, (gsize)*width * *height);
   guint32* out_row = loader->pixel_data;
-
   guint32* in_row = (guint32*)cairo_image_surface_get_data(loader->surface);
-  gint in_stride = cairo_image_surface_get_stride(loader->surface);
+  gint in_stride = cairo_image_surface_get_stride(loader->surface) / 4;
 
-  gint y;
-  for (y = 0; y < *height; ++y) {
-    gint x;
-    for (x = 0; x < *width; ++x) {
-      guchar a = in_row[x] >> 24;
-      guchar r = (in_row[x] >> 16) & 0xff;
-      guchar g = (in_row[x] >> 8) & 0xff;
-      guchar b = in_row[x] & 0xff;
-      out_row[x] = ((r * 256 / (a + 1)) << RrDefaultRedOffset) + ((g * 256 / (a + 1)) << RrDefaultGreenOffset) +
-                   ((b * 256 / (a + 1)) << RrDefaultBlueOffset) + (a << RrDefaultAlphaOffset);
+  for (gint y = 0; y < *height; ++y) {
+    for (gint x = 0; x < *width; ++x) {
+      guint32 src = in_row[x];
+      guint8 a = src >> 24;
+      guint8 r = (src >> 16) & 0xff;
+      guint8 g = (src >> 8) & 0xff;
+      guint8 b = src & 0xff;
+
+      if (a != 0) { /* un‑premultiply */
+        r = (guint8)MIN(255, (guint)r * 255 / a);
+        g = (guint8)MIN(255, (guint)g * 255 / a);
+        b = (guint8)MIN(255, (guint)b * 255 / a);
+      }
+      out_row[x] = (a << RrDefaultAlphaOffset) | (r << RrDefaultRedOffset) | (g << RrDefaultGreenOffset) |
+                   (b << RrDefaultBlueOffset);
     }
-    in_row += in_stride / 4;
+    in_row += in_stride;
     out_row += *width;
   }
 
   *pixel_data = loader->pixel_data;
-
-  return loader;
+  return loader; /* success */
 }
 #endif /* USE_LIBRSVG */
 
