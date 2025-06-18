@@ -1,3 +1,6 @@
+DESKTOP_ENV="OPENBOX"
+
 picom --backend egl --no-fading-destroyed-argb --shadow --shadow-radius 20 --fading --fade-delta 1 --xrender-sync-fence --corner-radius 15 --vsync -b
 lxqt-panel &
 hsetroot -solid '#000000' &
+conky --daemonize
