@@ -1,198 +1,224 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+"""
+openbox-xdg-autostart
+Runs programs defined by the XDG autostart specification.
 
-# openbox-xdg-autostart runs things based on the XDG autostart specification
-# Copyright (C) 2008       Dana Jansens
-#
-# XDG autostart specification can be found here:
-# http://standards.freedesktop.org/autostart-spec/
-#
-#
-#
-# LICENSE:
-#   This program is free software; you can redistribute it and/or modify
-#   it under the terms of the GNU General Public License as published by
-#   the Free Software Foundation; either version 2 of the License, or
-#   (at your option) any later version.
-#
-#   This program is distributed in the hope that it will be useful,
-#   but WITHOUT ANY WARRANTY; without even the implied warranty of
-#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#   GNU General Public License for more details.
+Originally written 2008-01-28 by Dana Jansens for Openbox.
+Updated for Python 3.13+ (prints, error handling, style) 2025-06-17.
 
-ME="openbox-xdg-autostart"
-VERSION="1.1"
+Licence: GPL-2.0-or-later
+"""
 
-import os, glob, sys
+from __future__ import annotations
+
+import glob
+import os
+import subprocess
+import sys
+from pathlib import Path
+from typing import List, Sequence
+
 try:
     from xdg import BaseDirectory
     from xdg.DesktopEntry import DesktopEntry
     from xdg.Exceptions import ParsingError
-except ImportError:
-    print
-    print >>sys.stderr, "ERROR:", ME, "requires PyXDG to be installed"
-    print
+except ImportError as exc:  # pragma: no cover
+    sys.stderr.write(
+        "ERROR: openbox-xdg-autostart requires the PyXDG package "
+        "(python-xdg / pyxdg) to be installed\n"
+    )
     sys.exit(1)
 
-def main(argv=sys.argv):
-    if "--help" in argv[1:]:
-        show_help()
-        return 0
-    if "--version" in argv[1:]:
-        show_version()
-        return 0
+ME = "openbox-xdg-autostart"
+VERSION = "1.2"
 
-    # get the autostart directories
-    autodirs = BaseDirectory.load_config_paths("autostart")
 
-    # find all the autostart files
-    files = []
-    for dir in autodirs:
-        for path in glob.glob(os.path.join(dir, '*.desktop')):
-            try:
-                autofile = AutostartFile(path)
-            except ParsingError:
-                print "Invalid .desktop file: " + path
-            else:
-                if not autofile in files:
-                    files.append(autofile)
+# ────────────────────────────── helpers ──────────────────────────────
 
-    list = False
-    if "--list" in argv[1:]:
-        list = True
-        argv.remove("--list")
 
-    # run them !
-    environments = argv[1:]
-    for autofile in files:
-        if list: autofile.display(environments)
-        else: autofile.run(environments)
+def _is_exec_file(path: str | os.PathLike[str]) -> bool:
+    """Return True if *path* exists and is executable."""
+    return os.access(path, os.X_OK)
+
+
+def _find_in_path(filename: str, search_path: str, match) -> str | None:
+    """Locate *filename* in *search_path* using *match* as the test."""
+    if not filename:
+        return None
+
+    if os.path.isabs(filename):
+        return filename if match(filename) else None
+
+    for directory in search_path.split(os.pathsep):
+        if directory:
+            candidate = os.path.join(directory, filename)
+            if match(candidate):
+                return candidate
+    return None
+
+
+def _alert(msg: str, *, info: bool = False) -> None:
+    """Pretty-print diagnostic information."""
+    prefix = "\t " if info else "\t*"
+    print(f"{prefix} {msg}")
+
+
+# ────────────────────────────── core class ───────────────────────────
+
 
 class AutostartFile:
-    def __init__(self, path):
-        self.path = path
-        self.filename = os.path.basename(path)
-        self.dirname = os.path.dirname(path)
-        self.de = DesktopEntry(path)
+    """A single *.desktop* autostart file."""
 
-    def __eq__(self, other):
-        return self.filename == other.filename
+    def __init__(self, path: str | os.PathLike[str]) -> None:
+        self.path = str(path)
+        self.filename = os.path.basename(self.path)
+        self.de = DesktopEntry(self.path)
 
-    def __str__(self):
-        return self.path + " : " + self.de.getName()
+    # Make files with the same base-name compare equal
+    def __eq__(self, other) -> bool:  # type: ignore[override]
+        return isinstance(other, AutostartFile) and self.filename == other.filename
 
-    def _isexecfile(self, path):
-        return os.access(path, os.X_OK)
+    # For `print(autofile)`
+    def __str__(self) -> str:  # pragma: no cover
+        return f"{self.path} : {self.de.getName()}"
 
-    def _findFile(self, path, search, match_func):
-        # check empty path
-        if not path: return None
-        # check absolute path
-        if path[0] == '/':
-            if match_func(path): return path
-            else: return None
-        else:
-            # check relative path
-            for dirname in search.split(os.pathsep):
-                if dirname != "":
-                    candidate = os.path.join(dirname, path)
-                    if (match_func(candidate)): return candidate
+    # ───── filtering helpers ─────
 
-    def _alert(self, str, info=False):
-        if info:
-            print "\t ", str
-        else:
-            print "\t*", str
-
-    def _showInEnvironment(self, envs, verbose=False):
+    def _show_in_environment(self, envs: Sequence[str], *, verbose: bool = False) -> bool:
+        """Return True if this entry should be shown/run for *envs*."""
         default = not self.de.getOnlyShowIn()
-        noshow = False
-        force = False
-        for i in self.de.getOnlyShowIn():
-            if i in envs: force = True
-        for i in self.de.getNotShowIn():
-            if i in envs: noshow = True
+        noshow = any(env in self.de.getNotShowIn() for env in envs)
+        force = any(env in self.de.getOnlyShowIn() for env in envs)
 
         if verbose:
             if not default and not force:
-                s = ""
-                for i in self.de.getOnlyShowIn():
-                    if s: s += ", "
-                    s += i
-                self._alert("Excluded by: OnlyShowIn (" + s + ")")
+                _alert(
+                    f"Excluded by: OnlyShowIn ({', '.join(self.de.getOnlyShowIn())})"
+                )
             if default and noshow and not force:
-                s = ""
-                for i in self.de.getNotShowIn():
-                    if s: s += ", "
-                    s += i
-                self._alert("Excluded by: NotShowIn (" + s + ")")
+                _alert(
+                    f"Excluded by: NotShowIn ({', '.join(self.de.getNotShowIn())})"
+                )
         return (default and not noshow) or force
 
-    def _shouldRun(self, envs, verbose=False):
+    def _should_run(self, envs: Sequence[str], *, verbose: bool = False) -> bool:
+        """Return True if the entry passes all filters."""
         if not self.de.getExec():
-            if verbose: self._alert("Excluded by: Missing Exec field")
+            if verbose:
+                _alert("Excluded by: Missing Exec field")
             return False
+
         if self.de.getHidden():
-            if verbose: self._alert("Excluded by: Hidden")
+            if verbose:
+                _alert("Excluded by: Hidden")
             return False
-        if self.de.getTryExec():
-            if not self._findFile(self.de.getTryExec(), os.getenv("PATH"),
-                                  self._isexecfile):
-                if verbose: self._alert("Excluded by: TryExec (" +
-                                        self.de.getTryExec() + ")")
+
+        if tryexec := self.de.getTryExec():
+            if not _find_in_path(tryexec, os.getenv("PATH", ""), _is_exec_file):
+                if verbose:
+                    _alert(f"Excluded by: TryExec ({tryexec})")
                 return False
-        if not self._showInEnvironment(envs, verbose):
-            return False
-        return True
 
-    def display(self, envs):
-        if self._shouldRun(envs):
-            print "[*] " + self.de.getName()
+        return self._show_in_environment(envs, verbose=verbose)
+
+    # ───── public actions ─────
+
+    def display(self, envs: Sequence[str]) -> None:
+        """Print diagnostic info about whether this entry would run."""
+        mark = "[*]" if self._should_run(envs) else "[ ]"
+        print(f"{mark} {self.de.getName()}")
+        _alert(f"File: {self.path}", info=True)
+        if (exec_cmd := self.de.getExec()) is not None:
+            _alert(f"Executes: {exec_cmd}", info=True)
+        self._should_run(envs, verbose=True)
+        print()  # blank line
+
+    def run(self, envs: Sequence[str]) -> None:
+        """Spawn the autostart entry if it passes all filters."""
+        if not self._should_run(envs):
+            return
+
+        exec_cmd = self.de.getExec()
+        if exec_cmd is None:
+            return
+
+        # Change working directory if Path= is set
+        cwd = Path.cwd()
+        try:
+            if (path := self.de.getPath()) is not None:
+                os.chdir(path)
+
+            # Use sh -c "exec <command>" so .desktop Exec lines are interpreted
+            subprocess.Popen(
+                ["/bin/sh", "-c", f"exec {exec_cmd}"],
+                close_fds=True,
+            )
+        finally:
+            os.chdir(cwd)  # always return
+
+
+# ────────────────────────────── CLI ──────────────────────────────────
+
+
+def show_help() -> None:
+    """Print command-line usage."""
+    print(
+        f"""Usage: {ME} [OPTION]... [ENVIRONMENT]...
+
+Run programs specified by XDG autostart .desktop files.
+
+Options
+  --list        List which files would be run and the reason for exclusions
+  --help        Show this help and exit
+  --version     Show version information and exit
+
+If no ENVIRONMENT is given, only files not limited to specific environments
+are executed.  Valid environments include: GNOME, KDE, ROX, XFCE, Old.
+"""
+    )
+
+
+def show_version() -> None:  # pragma: no cover
+    print(f"{ME} {VERSION}\nCopyright (c) 2008 Dana Jansens")
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Program entry-point.  Returns exit status."""
+    if argv is None:
+        argv = sys.argv
+
+    if "--help" in argv:
+        show_help()
+        return 0
+    if "--version" in argv:
+        show_version()
+        return 0
+
+    list_mode = "--list" in argv
+    envs: List[str] = [arg for arg in argv[1:] if not arg.startswith("--")]
+
+    # Gather autostart files
+    autostart_dirs = BaseDirectory.load_config_paths("autostart")
+    files: List[AutostartFile] = []
+    for directory in autostart_dirs:
+        for path in glob.glob(os.path.join(directory, "*.desktop")):
+            try:
+                autostart_file = AutostartFile(path)
+            except ParsingError:
+                print(f"Invalid .desktop file: {path}", file=sys.stderr)
+                continue
+            if autostart_file not in files:
+                files.append(autostart_file)
+
+    # Act
+    for autostart_file in files:
+        if list_mode:
+            autostart_file.display(envs)
         else:
-            print "[ ] " + self.de.getName()
-        self._alert("File: " + self.path, info=True)
-        if self.de.getExec():
-            self._alert("Executes: " + self.de.getExec(), info=True)
-        self._shouldRun(envs, True)
-        print
+            autostart_file.run(envs)
 
-    def run(self, envs):
-        here = os.getcwd()
-        if self.de.getPath():
-            os.chdir(self.de.getPath())
-        if self._shouldRun(envs):
-            args = ["/bin/sh", "-c", "exec " + self.de.getExec()]
-            os.spawnv(os.P_NOWAIT, args[0], args);
-        os.chdir(here)
+    return 0
 
-def show_help():
-    print "Usage:", ME, "[OPTION]... [ENVIRONMENT]..."
-    print
-    print "This tool will run xdg autostart .desktop files"
-    print
-    print "OPTIONS"
-    print "  --list        Show a list of the files which would be run"
-    print "                Files which would be run are marked with an asterix"
-    print "                symbol [*].  For files which would not be run,"
-    print "                information is given for why they are excluded"
-    print "  --help        Show this help and exit"
-    print "  --version     Show version and copyright information"
-    print
-    print "ENVIRONMENT specifies a list of environments for which to run autostart"
-    print "applications.  If none are specified, only applications which do not "
-    print "limit themselves to certain environments will be run."
-    print
-    print "ENVIRONMENT can be one or more of:"
-    print "  GNOME         Gnome Desktop"
-    print "  KDE           KDE Desktop"
-    print "  ROX           ROX Desktop"
-    print "  XFCE          XFCE Desktop"
-    print "  Old           Legacy systems"
-    print
 
-def show_version():
-    print ME, VERSION
-    print "Copyright (c) 2008        Dana Jansens"
-    print
-
-if __name__ == "__main__":
-        sys.exit(main())
+if __name__ == "__main__":  # pragma: no cover
+    sys.exit(main())
