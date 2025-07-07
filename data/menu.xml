@@ -76,12 +76,21 @@
 				<execute>1term</execute>
 			</action>
 		</item>
+		<item label="libreoffice-bin" icon="/usr/share/icons/hicolor/scalable/apps/libreoffice-main.svg">
+			<action name="Execute">
+				<execute>libreoffice-bin</execute>
+			</action>
+		</item>
 		<item label="1t" icon="/usr/share/icons/hicolor/256x256/apps/1t.png">
 			<action name="Execute">
 				<execute>1t</execute>
 			</action>
 		</item>
-
+		<item label="st" icon="/usr/share/icons/hicolor/256x256/apps/1term.png">
+			<action name="Execute">
+				<execute>st</execute>
+			</action>
+		</item>
 		<separator/>
 
 		<menu id="preferences" label="Preferences">
