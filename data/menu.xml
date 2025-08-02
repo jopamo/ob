@@ -73,7 +73,7 @@
 		</item>
 		<item label="1term" icon="/usr/share/icons/hicolor/256x256/apps/1term.png">
 			<action name="Execute">
-				<execute>1term</execute>
+				<execute>env __NV_PRIME_RENDER_OFFLOAD=0 1term</execute>
 			</action>
 		</item>
 		<item label="libreoffice-bin" icon="/usr/share/icons/hicolor/scalable/apps/libreoffice-main.svg">
