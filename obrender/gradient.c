@@ -186,70 +186,36 @@ static void create_bevel_colors(RrAppearance* l) {
   l->surface.bevel_dark = RrColorNew(l->inst, r, g, b);
 }
 
-/*! Repeat the first pixel over the entire block of memory
-  @param start The block of memory. start[0] will be copied
-         to the rest of the block.
-  @param w The width of the block of memory (including the already-set first
-           element
-*/
 static inline void repeat_pixel(RrPixel32* start, gint w) {
-  register gint x;
-  RrPixel32* dest;
+  if (w <= 1)
+    return; /* nothing to do or 1 pixel wide */
 
-  dest = start + 1;
-
-  /* for really small things, just copy ourselves */
+  /* copy the first pixel into the next 3 so we have 4 identical pixels to double from */
+  RrPixel32* dest = start + 1;
   if (w < 8) {
-    for (x = w - 1; x > 0; --x)
+    for (gint x = w - 1; x > 0; --x)
       *(dest++) = *start;
+    return;
   }
 
-  /* for >= 8, then use O(log n) memcpy's... */
-  else {
-    gchar* cdest;
-    gint lenbytes;
+  for (gint x = 3; x > 0; --x)
+    *(dest++) = *start;
 
-    /* copy the first 3 * 32 bits (3 words) ourselves - then we have
-       3 + the original 1 = 4 words to make copies of at a time
+  /* exponentially copy non-overlapping chunks until row is filled */
+  char* cdest = (char*)dest;               /* byte-wise pointer math */
+  size_t lenbytes = 4 * sizeof(RrPixel32); /* current chunk to copy from start */
+  size_t remaining = (size_t)(w - 4) * sizeof(RrPixel32);
 
-       this is faster than doing memcpy for 1 or 2 words at a time
-    */
-    for (x = 3; x > 0; --x)
-      *(dest++) = *start;
-
-    /* cdest is a pointer to the pixel data that is typed char* so that
-       adding 1 to its position moves it only one byte
-
-       lenbytes is the amount of bytes that we will be copying each
-       iteration.  this doubles each time through the loop.
-
-       x is the number of bytes left to copy into.  lenbytes will alwaysa
-       be bounded by x
-
-       this loop will run O(log n) times (n is the number of bytes we
-       need to copy into), since the size of the copy is doubled each
-       iteration.  it seems that gcc does some nice optimizations to make
-       this memcpy very fast on hardware with support for vector operations
-       such as mmx or see.  here is an idea of the kind of speed up we are
-       getting by doing this (splitvertical3 switches from doing
-       "*(data++) = color" n times to doing this memcpy thing log n times:
-
-       %   cumulative   self              self     total
-       time   seconds   seconds    calls  ms/call  ms/call  name
-       49.44      0.88     0.88     1063     0.83     0.83  splitvertical1
-       47.19      1.72     0.84     1063     0.79     0.79  splitvertical2
-        2.81      1.77     0.05     1063     0.05     0.05  splitvertical3
-    */
-    cdest = (gchar*)dest;
-    lenbytes = 4 * sizeof(RrPixel32);
-    for (x = (w - 4) * sizeof(RrPixel32); x > 0;) {
-      memcpy(cdest, start, lenbytes);
-      x -= lenbytes;
-      cdest += lenbytes;
-      lenbytes <<= 1;
-      if (lenbytes > x)
-        lenbytes = x;
-    }
+  while (remaining > 0) {
+    size_t copied = lenbytes;
+    if (copied > remaining)
+      copied = remaining;
+    memcpy(cdest, start, copied); /* safe because source and dest do not overlap */
+    cdest += copied;
+    remaining -= copied;
+    lenbytes <<= 1;
+    if (lenbytes > remaining)
+      lenbytes = remaining;
   }
 }
 
