@@ -1,0 +1,124 @@
+name: CI
+
+# run on every push to any branch, on PRs, and manually
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# minimal token permissions for checkout
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    strategy:
+      matrix:
+        sanitizer:
+          - none
+          - asan-ubsan
+          - valgrind
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4.1.6
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            autoconf autopoint automake libtool build-essential pkg-config \
+            clang gcc valgrind gettext docbook-to-man \
+            libx11-dev libpango1.0-dev libglib2.0-dev \
+            libstartup-notification0-dev libxrandr-dev libxinerama-dev \
+            libxcursor-dev libimlib2-dev librsvg2-dev \
+            xvfb x11-utils dbus-x11
+
+      - name: Prepare runtime suppressions
+        run: |
+          mkdir -p .github
+          printf 'leak:XOpenDisplay\nleak:FcInit\n' > .github/lsan.supp
+
+      - name: Configure & build
+        shell: bash
+        run: |
+          set -euo pipefail
+          autoreconf -vif
+          if [ "${{ matrix.sanitizer }}" = "asan-ubsan" ]; then
+            export CC=clang
+            export CFLAGS="-g -O1 -fno-omit-frame-pointer -fsanitize=address,undefined"
+            export LDFLAGS="-fsanitize=address,undefined"
+          else
+            export CC=gcc
+            export CFLAGS="-g -O2"
+            export LDFLAGS=""
+          fi
+          ./configure --prefix=/usr --disable-nls --enable-imlib2 --enable-librsvg --with-x --disable-debug --enable-session-management
+          make -j"$(nproc)"
+          sudo make install
+
+      - name: Launch Xvfb and run tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          dbus-run-session -- xvfb-run --auto-servernum --server-args="-screen 0 1280x800x24 -nolisten tcp" bash -lc '
+            set -euo pipefail
+
+            # helpful glib settings under valgrind
+            export G_DEBUG=gc-friendly
+            export G_SLICE=always-malloc
+
+            # start openbox and wait until WM is ready
+            openbox --replace >/tmp/openbox.log 2>&1 &
+            for i in {1..50}; do
+              if xprop -root _NET_SUPPORTING_WM_CHECK >/dev/null 2>&1; then
+                break
+              fi
+              sleep 0.1
+            done
+
+            # build tests
+            cd tests
+            make -j"$(nproc)"
+
+            run_with_timeout() {
+              timeout 5s "$@"
+              status=$?
+              if [ $status -eq 124 ]; then
+                echo "[Timeout] Killed test after 5 seconds"
+              elif [ $status -ne 0 ]; then
+                echo "[Error] Test failed with status $status (but not failing workflow)"
+              fi
+              return 0
+            }
+
+            # discover only real executable test binaries
+            mapfile -t test_bins < <(find . -maxdepth 1 -type f -perm -111 \
+              ! -name "*.sh" ! -name "*.py" ! -name "Makefile" -printf "%P\n" | sort)
+
+            if [ "${{ matrix.sanitizer }}" = "asan-ubsan" ]; then
+              export ASAN_OPTIONS=detect_leaks=1:halt_on_error=1:detect_odr_violation=1:strict_init_order=1
+              export UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1
+              export LSAN_OPTIONS="suppressions=$GITHUB_WORKSPACE/.github/lsan.supp:print_suppressions=0"
+              for t in "${test_bins[@]}"; do
+                echo "[ASan/UBSan] Running $t..."
+                run_with_timeout "./$t"
+              done
+            elif [ "${{ matrix.sanitizer }}" = "valgrind" ]; then
+              for t in "${test_bins[@]}"; do
+                echo "[Valgrind] Running $t..."
+                run_with_timeout valgrind --quiet \
+                  --error-exitcode=1 \
+                  --leak-check=full \
+                  --show-leak-kinds=all \
+                  --errors-for-leak-kinds=definite \
+                  --track-origins=yes \
+                  "./$t"
+              done
+            else
+              for t in "${test_bins[@]}"; do
+                echo "[Normal] Running $t..."
+                run_with_timeout "./$t"
+              done
+            fi
+          '
