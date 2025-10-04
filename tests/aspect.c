@@ -1,97 +1,99 @@
 /* aspect.c for Openbox window manager */
 
 #include <stdio.h>
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <time.h>
+#include <stdint.h>
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
 
-#define TOLERANCE 10  // Tolerance for position check
+#define TOLERANCE 10  // tolerance for position check
 
-// Function to test the window position and size
-void test_window(Display* display, Window win, int expected_x, int expected_y, int expected_w, int expected_h) {
+// helper to check window position and size
+static void test_window(Display* dpy, Window win, int exp_x, int exp_y, int exp_w, int exp_h) {
   XWindowAttributes attr;
-  XGetWindowAttributes(display, win, &attr);
+  XGetWindowAttributes(dpy, win, &attr);
 
-  // Allow small tolerance for position check
-  if (abs(attr.x - expected_x) <= TOLERANCE && abs(attr.y - expected_y) <= TOLERANCE && attr.width == expected_w &&
-      attr.height == expected_h) {
-    printf("Test passed: Window position and size are correct\n");
+  if (abs(attr.x - exp_x) <= TOLERANCE && abs(attr.y - exp_y) <= TOLERANCE && attr.width == exp_w &&
+      attr.height == exp_h) {
+    printf("ok: pos (%d,%d) size %dx%d\n", attr.x, attr.y, attr.width, attr.height);
   }
   else {
-    printf("Test failed: Expected position (%d, %d) and size (%dx%d), but got position (%d, %d) and size (%dx%d)\n",
-           expected_x, expected_y, expected_w, expected_h, attr.x, attr.y, attr.width, attr.height);
+    printf("fail: expected (%d,%d) %dx%d, got (%d,%d) %dx%d\n", exp_x, exp_y, exp_w, exp_h, attr.x, attr.y, attr.width,
+           attr.height);
   }
 }
 
-int main() {
-  // Initialize X11 display and window
-  Display* display;
-  Window win;
-  XEvent report;
-  int x = 10, y = 10, w = 400, h = 100;
-  XSizeHints size;
+// predicate for XIfEvent to wait for ConfigureNotify on our window
+static Bool is_configure_for_window(Display* dpy, XEvent* ev, XPointer arg) {
+  Window win = (Window)(uintptr_t)arg;
+  return ev->type == ConfigureNotify && ev->xconfigure.window == win;
+}
 
-  // Connect to the X server
-  display = XOpenDisplay(NULL);
-  if (display == NULL) {
-    fprintf(stderr, "couldn't connect to X server :0\n");
+// predicate for XIfEvent to wait for MapNotify on our window
+static Bool is_map_for_window(Display* dpy, XEvent* ev, XPointer arg) {
+  Window win = (Window)(uintptr_t)arg;
+  return ev->type == MapNotify && ev->xmap.window == win;
+}
+
+int main(void) {
+  // init X11 display and create a simple window
+  Display* dpy = XOpenDisplay(NULL);
+  if (!dpy) {
+    fprintf(stderr, "couldn't connect to X server\n");
     return 1;
   }
 
-  // Set window attributes
+  int screen = DefaultScreen(dpy);
+  int x = 10, y = 10, w = 400, h = 100;
+
   XSetWindowAttributes xswa;
-  xswa.win_gravity = StaticGravity;
-  unsigned long xswamask = CWWinGravity;
+  xswa.win_gravity = StaticGravity;  // keep server side position logic predictable
 
-  // Create a window
-  win = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 10, CopyFromParent, CopyFromParent, CopyFromParent,
-                      xswamask, &xswa);
-  XSetWindowBackground(display, win, WhitePixel(display, 0));
+  Window win = XCreateWindow(dpy, RootWindow(dpy, screen), x, y, w, h, 0, CopyFromParent, InputOutput, CopyFromParent,
+                             CWWinGravity, &xswa);
 
-  // Set aspect ratio hints
+  XSetWindowBackground(dpy, win, WhitePixel(dpy, screen));
+
+  // set strict aspect ratio 3:3 so WMs don't resize unexpectedly
+  XSizeHints size;
   size.flags = PAspect;
   size.min_aspect.x = 3;
   size.min_aspect.y = 3;
   size.max_aspect.x = 3;
   size.max_aspect.y = 3;
-  XSetWMNormalHints(display, win, &size);
+  XSetWMNormalHints(dpy, win, &size);
 
-  // Map the window
-  XMapWindow(display, win);
-  XFlush(display);
+  // select events we care about
+  XSelectInput(dpy, win, ExposureMask | StructureNotifyMask);
 
-  // Wait for the MapNotify event (window fully mapped)
-  XSelectInput(display, win, ExposureMask | StructureNotifyMask | MapNotify);
-  XNextEvent(display, &report);  // Wait for MapNotify event
+  // map and wait until actually mapped
+  XMapWindow(dpy, win);
+  XEvent ev;
+  XIfEvent(dpy, &ev, is_map_for_window, (XPointer)(uintptr_t)win);
 
-  if (report.type == MapNotify) {
-    // After the window is mapped, explicitly set position to (0, 0)
-    XMoveWindow(display, win, 0, 0);
-    XFlush(display);
-    test_window(display, win, 0, 0, w, h);  // Test with expected position and size
+  // place at 0,0 then wait for the ConfigureNotify that reflects the move
+  XMoveWindow(dpy, win, 0, 0);
+  XIfEvent(dpy, &ev, is_configure_for_window, (XPointer)(uintptr_t)win);
+  test_window(dpy, win, 0, 0, w, h);
+
+  // do a few random moves and validate after each ConfigureNotify
+  srand((unsigned)time(NULL));
+  for (int i = 0; i < 3; ++i) {
+    int rx = rand() % 500;
+    int ry = rand() % 500;
+    XMoveWindow(dpy, win, rx, ry);
+    XIfEvent(dpy, &ev, is_configure_for_window, (XPointer)(uintptr_t)win);
+    printf("confignotify %d,%d-%ix%i\n", ev.xconfigure.x, ev.xconfigure.y, ev.xconfigure.width, ev.xconfigure.height);
+    test_window(dpy, win, rx, ry, w, h);
+    usleep(200000);
   }
 
-  // Simulate some events (e.g., ConfigureNotify)
-  for (int i = 0; i < 3; i++) {
-    // Simulate a ConfigureNotify event with a random position
-    report.type = ConfigureNotify;
-    report.xconfigure.x = rand() % 500;
-    report.xconfigure.y = rand() % 500;
-    report.xconfigure.width = w;
-    report.xconfigure.height = h;
-    XNextEvent(display, &report);  // Handle the event
-    printf("confignotify %i,%i-%ix%i\n", report.xconfigure.x, report.xconfigure.y, report.xconfigure.width,
-           report.xconfigure.height);
+  // clean up client resources and quiesce the connection
+  XDestroyWindow(dpy, win);
+  XSync(dpy, True);
+  XCloseDisplay(dpy);
 
-    // Check window attributes after resize
-    test_window(display, win, report.xconfigure.x, report.xconfigure.y, w, h);
-    usleep(500000);  // Sleep for 0.5 seconds to simulate time between events
-  }
-
-  // Clean up
-  XDestroyWindow(display, win);
-  XCloseDisplay(display);
-
-  return 0;  // Success
+  return 0;
 }
