@@ -1,22 +1,4 @@
-/* -*- indent-tabs-mode: nil; tab-width: 4; c-basic-offset: 4; -*-
-
-   render.c for the Openbox window manager
-   Copyright (c) 2006        Mikael Magnusson
-   Copyright (c) 2003-2007   Dana Jansens
-   Copyright (c) 2003        Derek Foreman
-
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   See the COPYING file for a copy of the GNU General Public License.
-*/
+/* render.c for the Openbox window manager */
 
 #include "render.h"
 #include "gradient.h"
@@ -47,7 +29,7 @@ Pixmap RrPaintPixmap(RrAppearance* a, gint w, gint h) {
     return None;
 
   if (a->surface.parentx < 0 || a->surface.parenty < 0) {
-    /* ob_debug("Invalid parent co-ordinates\n"); */
+    /* ob_debug("Invalid parent co-ordinates\n") */
     return None;
   }
 
@@ -72,7 +54,7 @@ Pixmap RrPaintPixmap(RrAppearance* a, gint w, gint h) {
 
   if (resized) {
     g_free(a->surface.pixel_data);
-    a->surface.pixel_data = g_new(RrPixel32, w * h);
+    a->surface.pixel_data = g_new(RrPixel32, (gsize)w * (gsize)h);
   }
 
   RrRender(a, w, h);
@@ -204,11 +186,11 @@ void RrAppearanceAddTextures(RrAppearance* a, gint numtex) {
 }
 
 void RrAppearanceClearTextures(RrAppearance* a) {
-  memset(a->texture, 0, a->textures * sizeof(RrTexture));
+  memset(a->texture, 0, (gsize)a->textures * sizeof(RrTexture));
 }
 
 /* deep copy of orig, means reset ref to 1 on copy
- * and copy each thing memwise. */
+ * and copy each thing memwise */
 RrAppearance* RrAppearanceCopy(RrAppearance* orig) {
   RrSurface *spo, *spc;
   RrAppearance* copy = g_slice_new(RrAppearance);
@@ -271,7 +253,7 @@ RrAppearance* RrAppearanceCopy(RrAppearance* orig) {
   spc->pixel_data = NULL;
 
   copy->textures = orig->textures;
-  copy->texture = g_memdup(orig->texture, orig->textures * sizeof(RrTexture));
+  copy->texture = (RrTexture*)g_memdup2(orig->texture, (gsize)orig->textures * sizeof(RrTexture));
   copy->pixmap = None;
   copy->xftdraw = NULL;
   copy->w = copy->h = 0;
@@ -314,9 +296,8 @@ static void pixel_data_to_pixmap(RrAppearance* l, gint x, gint y, gint w, gint h
   out = l->pixmap;
 
   /* this malloc is a complete waste of time on normal 32bpp
-     as reduce_depth just sets im->data = data and returns
-  */
-  scratch = g_new(RrPixel32, im->width * im->height);
+     as reduce_depth just sets im->data = data and returns */
+  scratch = g_new(RrPixel32, (gsize)im->width * (gsize)im->height);
   im->data = (gchar*)scratch;
   RrReduceDepth(l->inst, in, im);
   XPutImage(RrDisplay(l->inst), out, DefaultGC(RrDisplay(l->inst), RrScreen(l->inst)), im, 0, 0, x, y, w, h);
@@ -375,7 +356,7 @@ gint RrMinWidth(RrAppearance* a) {
         g_slice_free(RrSize, m);
         break;
       case RR_TEXTURE_RGBA:
-        w += MAX(w, a->texture[i].data.rgba.width);
+        w = MAX(w, a->texture[i].data.rgba.width);
         break;
       case RR_TEXTURE_IMAGE:
         /* images resize so they don't contribute anything to the min */
@@ -417,14 +398,15 @@ gint RrMinHeight(RrAppearance* a) {
           m = RrFontMeasureString(a->texture[i].data.text.font, a->texture[i].data.text.string,
                                   a->texture[i].data.text.shadow_offset_x, a->texture[i].data.text.shadow_offset_y,
                                   a->texture[i].data.text.flow, a->texture[i].data.text.maxwidth);
-          h += MAX(h, m->height);
+          h = MAX(h, m->height);
           g_slice_free(RrSize, m);
         }
-        else
-          h += MAX(h, RrFontHeight(a->texture[i].data.text.font, a->texture[i].data.text.shadow_offset_y));
+        else {
+          h = MAX(h, RrFontHeight(a->texture[i].data.text.font, a->texture[i].data.text.shadow_offset_y));
+        }
         break;
       case RR_TEXTURE_RGBA:
-        h += MAX(h, a->texture[i].data.rgba.height);
+        h = MAX(h, a->texture[i].data.rgba.height);
         break;
       case RR_TEXTURE_IMAGE:
         /* images resize so they don't contribute anything to the min */
@@ -483,7 +465,7 @@ gboolean RrPixmapToRGBA(const RrInstance* inst, Pixmap pmap, Pixmap mask, gint* 
   if ((xi->bits_per_pixel == 1) && (xi->bitmap_bit_order != LSBFirst))
     reverse_bits(xi->data, xi->bytes_per_line * xi->height);
 
-  *data = g_new(RrPixel32, pw * ph);
+  *data = g_new(RrPixel32, (gsize)pw * (gsize)ph);
   RrIncreaseDepth(inst, *data, xi);
 
   if (mask) {
@@ -498,8 +480,8 @@ gboolean RrPixmapToRGBA(const RrInstance* inst, Pixmap pmap, Pixmap mask, gint* 
     }
   }
 
-  *w = pw;
-  *h = ph;
+  *w = (gint)pw;
+  *h = (gint)ph;
 
   XDestroyImage(xi);
   if (mask)

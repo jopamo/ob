@@ -63,14 +63,16 @@ static void RrImagePicInit(RrImagePic* pic, gint w, gint h, RrPixel32* data) {
     pic->sum += *(data++);
 }
 
-/*! Create a new RrImagePic from some picture data.
-  This makes a duplicate of the data.
-*/
 static RrImagePic* RrImagePicNew(gint w, gint h, RrPixel32* data) {
   RrImagePic* pic;
 
   pic = g_slice_new(RrImagePic);
-  RrImagePicInit(pic, w, h, g_memdup(data, w * h * sizeof(RrPixel32)));
+
+  /* compute size once */
+  gsize bytes = (gsize)w * (gsize)h * sizeof(RrPixel32);
+
+  /* use non-deprecated API only */
+  RrImagePicInit(pic, w, h, g_memdup2(data, bytes));
   return pic;
 }
 
