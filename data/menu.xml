@@ -21,6 +21,11 @@
 				<execute>google-chrome-unstable</execute>
 			</action>
 		</item>
+		<item label="chromium" icon="/usr/share/pixmaps/chromium.png">
+			<action name="Execute">
+				<execute>chromium</execute>
+			</action>
+		</item>
 		<item label="pcmanfm-qt" icon="/usr/share/icons/hicolor/scalable/apps/pcmanfm-qt.svg">
 			<action name="Execute">
 				<execute>pcmanfm-qt</execute>
