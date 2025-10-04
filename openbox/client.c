@@ -45,6 +45,8 @@
 #include "obt/xqueue.h"
 #include "obt/prop.h"
 
+#include <string.h>
+
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -856,8 +858,15 @@ static gboolean client_can_steal_focus(ObClient* self,
   return steal;
 }
 
-/*! Returns a new structure containing the per-app settings for this client.
-  The returned structure needs to be freed with g_free. */
+// match helper for precompiled GLib patterns
+static gboolean pattern_spec_match_pspec(const GPatternSpec* pspec, const char* value) {
+  if (!pspec || !value)
+    return FALSE;
+  return g_pattern_spec_match((GPatternSpec*)pspec, strlen(value), value, NULL);
+}
+
+/*! Returns a new structure containing the per-app settings for this client
+  The returned structure needs to be freed with g_free */
 static ObAppSettings* client_get_settings_state(ObClient* self) {
   ObAppSettings* settings;
   GSList* it;
@@ -871,27 +880,33 @@ static ObAppSettings* client_get_settings_state(ObClient* self) {
     g_assert(app->name != NULL || app->class != NULL || app->role != NULL || app->title != NULL ||
              app->group_name != NULL || app->group_class != NULL || (signed)app->type >= 0);
 
-    if (app->name && !g_pattern_match(app->name, strlen(self->name), self->name, NULL))
+    if (app->name && !pattern_spec_match_pspec(app->name, self->name))
       match = FALSE;
-    else if (app->group_name && !g_pattern_match(app->group_name, strlen(self->group_name), self->group_name, NULL))
+    else if (app->group_name && !pattern_spec_match_pspec(app->group_name, self->group_name))
       match = FALSE;
-    else if (app->class && !g_pattern_match(app->class, strlen(self->class), self->class, NULL))
+    else if (app->class && !pattern_spec_match_pspec(app->class, self->class))
       match = FALSE;
-    else if (app->group_class && !g_pattern_match(app->group_class, strlen(self->group_class), self->group_class, NULL))
+    else if (app->group_class && !pattern_spec_match_pspec(app->group_class, self->group_class))
       match = FALSE;
-    else if (app->role && !g_pattern_match(app->role, strlen(self->role), self->role, NULL))
+    else if (app->role && !pattern_spec_match_pspec(app->role, self->role))
       match = FALSE;
-    else if (app->title && !g_pattern_match(app->title, strlen(self->title), self->title, NULL))
+    else if (app->title && !pattern_spec_match_pspec(app->title, self->title))
       match = FALSE;
     else if ((signed)app->type >= 0 && app->type != self->type) {
       match = FALSE;
     }
 
     if (match) {
-      ob_debug("Window matching: %s", app->name);
+      const char* tag = app->name          ? "name"
+                        : app->group_name  ? "group_name"
+                        : app->class       ? "class"
+                        : app->group_class ? "group_class"
+                        : app->role        ? "role"
+                        : app->title       ? "title"
+                                           : "(unnamed)";
+      ob_debug("Window matching: %s", tag);
 
-      /* copy the settings to our struct, overriding the existing
-         settings if they are not defaults */
+      // copy the settings to our struct, overriding the existing defaults
       config_app_settings_copy_non_defaults(app, settings);
     }
   }
