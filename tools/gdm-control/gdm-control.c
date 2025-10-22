@@ -159,13 +159,23 @@ static gboolean gdm_connect() {
     gdm_disconnect();
     return FALSE;
   }
-
-  if (g_file_test(GDM_PROTOCOL_SOCKET_PATH1, G_FILE_TEST_EXISTS))
-    strcpy(addr.sun_path, GDM_PROTOCOL_SOCKET_PATH1);
-  else
-    strcpy(addr.sun_path, GDM_PROTOCOL_SOCKET_PATH2);
-
+  memset(&addr, 0, sizeof(addr));
   addr.sun_family = AF_UNIX;
+
+  if (g_file_test(GDM_PROTOCOL_SOCKET_PATH1, G_FILE_TEST_EXISTS)) {
+    if (!g_strlcpy(addr.sun_path, GDM_PROTOCOL_SOCKET_PATH1, sizeof(addr.sun_path))) {
+      g_warning("GDM socket path is empty");
+      gdm_disconnect();
+      return FALSE;
+    }
+  }
+  else {
+    if (!g_strlcpy(addr.sun_path, GDM_PROTOCOL_SOCKET_PATH2, sizeof(addr.sun_path))) {
+      g_warning("Fallback GDM socket path is empty");
+      gdm_disconnect();
+      return FALSE;
+    }
+  }
 
   if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
     g_warning("Failed to establish a connection with GDM: %s", g_strerror(errno));
