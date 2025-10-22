@@ -71,6 +71,7 @@ struct _ObClient {
   ObWindow obwin;
   Window window;
   gboolean managed;
+  GList* list_node;
 
   /*! If this client is managing an ObPrompt window, then this is set to the
     prompt */

@@ -69,6 +69,7 @@ typedef struct {
 } ClientCallback;
 
 GList* client_list = NULL;
+static GList* client_list_tail = NULL;
 
 static GSList* client_destroy_notifies = NULL;
 static RrImage* client_default_icon = NULL;
@@ -102,6 +103,8 @@ static GSList* client_search_all_top_parents_internal(ObClient* self, gboolean b
 static void client_call_notifies(ObClient* self, GSList* list);
 static void client_ping_event(ObClient* self, gboolean dead);
 static void client_prompt_kill(ObClient* self);
+static void client_list_link(ObClient* self);
+static void client_list_unlink(ObClient* self);
 static gboolean client_can_steal_focus(ObClient* self,
                                        gboolean allow_other_desktop,
                                        gboolean request_from_user,
@@ -170,25 +173,58 @@ void client_remove_destroy_notify_data(ObClientCallback func, gpointer data) {
   }
 }
 
-void client_set_list(void) {
-  Window *windows, *win_it;
-  GList* it;
-  guint size = g_list_length(client_list);
+static void client_list_link(ObClient* self) {
+  GList* node = g_list_alloc();
+  node->data = self;
+  node->next = NULL;
+  node->prev = client_list_tail;
 
-  /* create an array of the window ids */
-  if (size > 0) {
-    windows = g_new(Window, size);
-    win_it = windows;
-    for (it = client_list; it; it = g_list_next(it), ++win_it)
-      *win_it = ((ObClient*)it->data)->window;
-  }
+  if (client_list_tail)
+    client_list_tail->next = node;
   else
-    windows = NULL;
+    client_list = node;
 
-  OBT_PROP_SETA32(obt_root(ob_screen), NET_CLIENT_LIST, WINDOW, (gulong*)windows, size);
+  client_list_tail = node;
+  self->list_node = node;
+}
+
+static void client_list_unlink(ObClient* self) {
+  GList* node = self->list_node;
+
+  if (!node)
+    return;
+
+  if (node->prev)
+    node->prev->next = node->next;
+  else
+    client_list = node->next;
+
+  if (node->next)
+    node->next->prev = node->prev;
+  else
+    client_list_tail = node->prev;
+
+  g_list_free_1(node);
+  self->list_node = NULL;
+}
+
+void client_set_list(void) {
+  GArray* windows = NULL;
+  GList* it;
+
+  if (client_list) {
+    windows = g_array_new(FALSE, FALSE, sizeof(Window));
+    for (it = client_list; it; it = g_list_next(it)) {
+      Window win = ((ObClient*)it->data)->window;
+      g_array_append_val(windows, win);
+    }
+  }
+
+  OBT_PROP_SETA32(
+      obt_root(ob_screen), NET_CLIENT_LIST, WINDOW, windows ? (gulong*)windows->data : NULL, windows ? windows->len : 0);
 
   if (windows)
-    g_free(windows);
+    g_array_free(windows, TRUE);
 
   stacking_set_list();
 }
@@ -490,7 +526,7 @@ void client_manage(Window window, ObPrompt* prompt) {
     event_end_ignore_all_enters(ignore_start);
 
   /* add to client list/map */
-  client_list = g_list_append(client_list, self);
+  client_list_link(self);
   window_add(&self->window, CLIENT_AS_WINDOW(self));
 
   /* this has to happen after we're in the client_list */
@@ -585,7 +621,7 @@ void client_unmanage(ObClient* self) {
   prompt_unref(self->kill_prompt);
   self->kill_prompt = NULL;
 
-  client_list = g_list_remove(client_list, self);
+  client_list_unlink(self);
   stacking_remove(self);
   window_remove(self->window);
 
