@@ -88,6 +88,8 @@ static void event_handle_client(ObClient* c, XEvent* e);
 static gboolean event_handle_user_input(ObClient* client, XEvent* e);
 static gboolean is_enter_focus_event_ignored(gulong serial);
 static void event_ignore_enter_range(gulong start, gulong end);
+static void lookup_window_cached(Window win, ObWindow** out_obwin, ObDockApp** out_dockapp);
+static ObWindow* cached_window_find(Window win);
 
 static void focus_delay_dest(gpointer data);
 static void unfocus_delay_dest(gpointer data);
@@ -109,6 +111,12 @@ static gboolean focus_left_screen = FALSE;
 static gboolean waiting_for_focusin = FALSE;
 /*! A list of ObSerialRanges which are to be ignored for mouse enter events */
 static GSList* ignore_serials = NULL;
+
+static Window cached_lookup_window = None;
+static gulong cached_lookup_serial = 0;
+static ObWindow* cached_lookup_obwin = NULL;
+static ObDockApp* cached_lookup_dockapp = NULL;
+
 static guint focus_delay_timeout_id = 0;
 static ObClient* focus_delay_timeout_client = NULL;
 static guint unfocus_delay_timeout_id = 0;
@@ -333,7 +341,7 @@ static gboolean wanted_focusevent(XEvent* e, gboolean in_client_only) {
        but has disappeared.
     */
     if (in_client_only) {
-      ObWindow* w = window_find(e->xfocus.window);
+      ObWindow* w = cached_window_find(e->xfocus.window);
       if (!w || !WINDOW_IS_CLIENT(w))
         return FALSE;
     }
@@ -467,35 +475,37 @@ static void event_process(const XEvent* ec, gpointer data) {
   ee = *ec;
   e = &ee;
 
+  event_set_curtime(e);
+  event_curserial = e->xany.serial;
+
   window = event_get_window(e);
   if (window == obt_root(ob_screen))
     /* don't do any lookups, waste of cpu */;
-  else if ((obwin = window_find(window))) {
-    switch (obwin->type) {
-      case OB_WINDOW_CLASS_DOCK:
-        dock = WINDOW_AS_DOCK(obwin);
-        break;
-      case OB_WINDOW_CLASS_CLIENT:
-        client = WINDOW_AS_CLIENT(obwin);
-        /* events on clients can be events on prompt windows too */
-        prompt = client->prompt;
-        break;
-      case OB_WINDOW_CLASS_MENUFRAME:
-        menu = WINDOW_AS_MENUFRAME(obwin);
-        break;
-      case OB_WINDOW_CLASS_INTERNAL:
-        /* we don't do anything with events directly on these windows */
-        break;
-      case OB_WINDOW_CLASS_PROMPT:
-        prompt = WINDOW_AS_PROMPT(obwin);
-        break;
+  else {
+    lookup_window_cached(window, &obwin, &dockapp);
+    if (obwin) {
+      switch (obwin->type) {
+        case OB_WINDOW_CLASS_DOCK:
+          dock = WINDOW_AS_DOCK(obwin);
+          break;
+        case OB_WINDOW_CLASS_CLIENT:
+          client = WINDOW_AS_CLIENT(obwin);
+          /* events on clients can be events on prompt windows too */
+          prompt = client->prompt;
+          break;
+        case OB_WINDOW_CLASS_MENUFRAME:
+          menu = WINDOW_AS_MENUFRAME(obwin);
+          break;
+        case OB_WINDOW_CLASS_INTERNAL:
+          /* we don't do anything with events directly on these windows */
+          break;
+        case OB_WINDOW_CLASS_PROMPT:
+          prompt = WINDOW_AS_PROMPT(obwin);
+          break;
+      }
     }
   }
-  else
-    dockapp = dock_find_dockapp(window);
 
-  event_set_curtime(e);
-  event_curserial = e->xany.serial;
   event_hack_mods(e);
 
   /* deal with it in the kernel */
@@ -695,7 +705,7 @@ static void event_process(const XEvent* ec, gpointer data) {
         pressed == e->xbutton.button ||
         /* ...or it if it was physically on an openbox
            internal window... */
-        ((w = window_find(e->xbutton.subwindow)) && (WINDOW_IS_INTERNAL(w) || WINDOW_IS_DOCK(w))))
+        ((w = cached_window_find(e->xbutton.subwindow)) && (WINDOW_IS_INTERNAL(w) || WINDOW_IS_DOCK(w))))
     /* ...then process the event, otherwise ignore it */
     {
       used = event_handle_user_input(client, e);
@@ -723,6 +733,10 @@ static void event_process(const XEvent* ec, gpointer data) {
      the time, so clear it here until the next event is handled */
   event_curtime = event_sourcetime = CurrentTime;
   event_curserial = 0;
+  cached_lookup_window = None;
+  cached_lookup_serial = 0;
+  cached_lookup_obwin = NULL;
+  cached_lookup_dockapp = NULL;
 }
 
 static void event_handle_root(XEvent* e) {
@@ -1148,7 +1162,7 @@ static void event_handle_client(ObClient* client, XEvent* e) {
         /* get the sibling */
         if (e->xconfigurerequest.value_mask & CWSibling) {
           ObWindow* win;
-          win = window_find(e->xconfigurerequest.above);
+          win = cached_window_find(e->xconfigurerequest.above);
           if (win && WINDOW_IS_CLIENT(win) && WINDOW_AS_CLIENT(win) != client) {
             sibling = win;
           }
@@ -1481,7 +1495,7 @@ static void event_handle_client(ObClient* client, XEvent* e) {
         else {
           ObWindow* sibling = NULL;
           if (e->xclient.data.l[1]) {
-            ObWindow* win = window_find(e->xclient.data.l[1]);
+            ObWindow* win = cached_window_find(e->xclient.data.l[1]);
             if (WINDOW_IS_CLIENT(win) && WINDOW_AS_CLIENT(win) != client) {
               sibling = win;
             }
@@ -2051,6 +2065,32 @@ static void event_ignore_enter_range(gulong start, gulong end) {
 
   /* increment the serial so we don't ignore events we weren't meant to */
   OBT_PROP_ERASE(screen_support_win, MOTIF_WM_HINTS);
+}
+
+static void lookup_window_cached(Window win, ObWindow** out_obwin, ObDockApp** out_dockapp) {
+  if (cached_lookup_serial == event_curserial && cached_lookup_window == win) {
+    if (out_obwin)
+      *out_obwin = cached_lookup_obwin;
+    if (out_dockapp)
+      *out_dockapp = cached_lookup_dockapp;
+    return;
+  }
+
+  cached_lookup_window = win;
+  cached_lookup_serial = event_curserial;
+  cached_lookup_obwin = window_find(win);
+  cached_lookup_dockapp = cached_lookup_obwin ? NULL : dock_find_dockapp(win);
+
+  if (out_obwin)
+    *out_obwin = cached_lookup_obwin;
+  if (out_dockapp)
+    *out_dockapp = cached_lookup_dockapp;
+}
+
+static ObWindow* cached_window_find(Window win) {
+  ObWindow* obwin = NULL;
+  lookup_window_cached(win, &obwin, NULL);
+  return obwin;
 }
 
 void event_end_ignore_all_enters(gulong start) {
