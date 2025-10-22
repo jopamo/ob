@@ -141,6 +141,7 @@ struct _ObFrame {
   Window trrresize;
 
   Colormap colormap;
+  Visual* colormap_visual;
 
   gint icon_on;    /* if the window icon button is on */
   gint label_on;   /* if the window title is on */

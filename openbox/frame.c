@@ -52,6 +52,16 @@ static void free_theme_statics(ObFrame* self);
 static gboolean frame_animate_iconify(gpointer self);
 static void frame_adjust_cursors(ObFrame* self);
 
+typedef struct {
+  Colormap cmap;
+  guint refcount;
+} FrameColormapEntry;
+
+static GHashTable* frame_colormap_cache = NULL;
+
+static Colormap frame_colormap_acquire(Visual* visual);
+static void frame_colormap_release(Visual* visual, Colormap cmap);
+
 static Window createWindow(Window parent, Visual* visual, gulong mask, XSetWindowAttributes* attrib) {
   return XCreateWindow(obt_display, parent, 0, 0, 1, 1, 0, (visual ? 32 : RrDepth(ob_rr_inst)), InputOutput,
                        (visual ? visual : RrVisual(ob_rr_inst)), mask, attrib);
@@ -75,6 +85,46 @@ static Visual* check_32bit_client(ObClient* c) {
   return NULL;
 }
 
+static Colormap frame_colormap_acquire(Visual* visual) {
+  FrameColormapEntry* entry;
+
+  g_assert(visual != NULL);
+
+  if (!frame_colormap_cache)
+    frame_colormap_cache = g_hash_table_new(g_direct_hash, g_direct_equal);
+
+  entry = g_hash_table_lookup(frame_colormap_cache, visual);
+  if (!entry) {
+    entry = g_new0(FrameColormapEntry, 1);
+    entry->cmap = XCreateColormap(obt_display, obt_root(ob_screen), visual, AllocNone);
+    entry->refcount = 1;
+    g_hash_table_insert(frame_colormap_cache, visual, entry);
+  }
+  else
+    entry->refcount++;
+
+  return entry->cmap;
+}
+
+static void frame_colormap_release(Visual* visual, Colormap cmap) {
+  FrameColormapEntry* entry;
+
+  if (!visual || !cmap || !frame_colormap_cache)
+    return;
+
+  entry = g_hash_table_lookup(frame_colormap_cache, visual);
+  if (!entry || entry->cmap != cmap)
+    return;
+
+  g_assert(entry->refcount > 0);
+  entry->refcount--;
+  if (entry->refcount == 0) {
+    g_hash_table_remove(frame_colormap_cache, visual);
+    XFreeColormap(obt_display, entry->cmap);
+    g_free(entry);
+  }
+}
+
 ObFrame* frame_new(ObClient* client) {
   XSetWindowAttributes attrib;
   gulong mask;
@@ -93,7 +143,8 @@ ObFrame* frame_new(ObClient* client) {
     /* client has a 32-bit visual */
     mask = CWColormap | CWBackPixel | CWBorderPixel;
     /* create a colormap with the visual */
-    self->colormap = attrib.colormap = XCreateColormap(obt_display, obt_root(ob_screen), visual, AllocNone);
+    self->colormap_visual = visual;
+    self->colormap = attrib.colormap = frame_colormap_acquire(visual);
     attrib.background_pixel = BlackPixel(obt_display, ob_screen);
     attrib.border_pixel = BlackPixel(obt_display, ob_screen);
   }
@@ -204,7 +255,7 @@ void frame_free(ObFrame* self) {
 
   XDestroyWindow(obt_display, self->window);
   if (self->colormap)
-    XFreeColormap(obt_display, self->colormap);
+    frame_colormap_release(self->colormap_visual, self->colormap);
 
   g_slice_free(ObFrame, self);
 }
