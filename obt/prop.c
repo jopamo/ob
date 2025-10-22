@@ -322,8 +322,9 @@ static void* convert_text_property(XTextProperty* tprop, ObtPropTextType type, g
   const gboolean return_single = (max == 1);
   gboolean ok = FALSE;
   gchar** strlist = NULL;
-  gchar* single[1] = {NULL};
-  gchar** retlist = single; /* single is used when max == 1 */
+  gchar* single = NULL;
+  gchar** retlist = NULL;
+  gchar** storage = NULL;
   gint i, n_strs;
 
   /* Read each string in the text property and store a pointer to it in
@@ -338,11 +339,10 @@ static void* convert_text_property(XTextProperty* tprop, ObtPropTextType type, g
     if (ok) {
       if (max >= 0)
         n_strs = MIN(max, n_strs);
-      if (!return_single)
-        retlist = g_new0(gchar*, n_strs + 1);
-      if (retlist)
+      storage = return_single ? &single : (retlist = g_new0(gchar*, n_strs + 1));
+      if (storage)
         for (i = 0; i < n_strs; ++i)
-          retlist[i] = strlist[i];
+          storage[i] = strlist[i];
     }
   }
   else if (tprop->encoding == OBT_PROP_ATOM(UTF8_STRING) || tprop->encoding == OBT_PROP_ATOM(STRING)) {
@@ -365,20 +365,21 @@ static void* convert_text_property(XTextProperty* tprop, ObtPropTextType type, g
 
     if (max >= 0)
       n_strs = MIN(max, n_strs);
-    if (!return_single)
-      retlist = g_new0(gchar*, n_strs + 1);
-    if (retlist) {
+    storage = return_single ? &single : (retlist = g_new0(gchar*, n_strs + 1));
+    if (storage) {
       p = (gchar*)tprop->value;
       for (i = 0; i < n_strs; ++i) {
-        retlist[i] = p;
+        storage[i] = p;
         p += strlen(p) + 1; /* next string */
       }
     }
   }
 
-  if (!(ok && retlist)) {
+  if (!(ok && storage)) {
     if (strlist)
       XFreeStringList(strlist);
+    if (retlist)
+      g_free(retlist);
     return NULL;
   }
 
@@ -387,19 +388,19 @@ static void* convert_text_property(XTextProperty* tprop, ObtPropTextType type, g
     if (encoding == UTF8) {
       const gchar* end; /* the first byte past the valid data */
 
-      g_utf8_validate(retlist[i], -1, &end);
-      retlist[i] = g_strndup(retlist[i], end - retlist[i]);
+      g_utf8_validate(storage[i], -1, &end);
+      storage[i] = g_strndup(storage[i], end - storage[i]);
     }
     else if (encoding == LOCALE) {
       gsize nvalid; /* the number of valid bytes at the front of the
                        string */
       gchar* utf;   /* the string converted into utf8 */
 
-      utf = g_locale_to_utf8(retlist[i], -1, &nvalid, NULL, NULL);
+      utf = g_locale_to_utf8(storage[i], -1, &nvalid, NULL, NULL);
       if (!utf)
-        utf = g_locale_to_utf8(retlist[i], nvalid, NULL, NULL, NULL);
+        utf = g_locale_to_utf8(storage[i], nvalid, NULL, NULL, NULL);
       g_assert(utf);
-      retlist[i] = utf;
+      storage[i] = utf;
     }
     else {          /* encoding == LATIN1 */
       gsize nvalid; /* the number of valid bytes at the front of the
@@ -408,7 +409,7 @@ static void* convert_text_property(XTextProperty* tprop, ObtPropTextType type, g
       gchar* p;     /* iterator */
 
       /* look for invalid characters */
-      for (p = retlist[i], nvalid = 0; *p; ++p, ++nvalid) {
+      for (p = storage[i], nvalid = 0; *p; ++p, ++nvalid) {
         /* The only valid control characters are TAB(HT)=9 and
            NEWLINE(LF)=10.
            This is defined in ICCCM section 2:
@@ -433,18 +434,18 @@ static void* convert_text_property(XTextProperty* tprop, ObtPropTextType type, g
         }
       }
       /* look for invalid latin1 characters */
-      utf = g_convert(retlist[i], nvalid, "utf-8", "iso-8859-1", &nvalid, NULL, NULL);
+      utf = g_convert(storage[i], nvalid, "utf-8", "iso-8859-1", &nvalid, NULL, NULL);
       if (!utf)
-        utf = g_convert(retlist[i], nvalid, "utf-8", "iso-8859-1", NULL, NULL, NULL);
+        utf = g_convert(storage[i], nvalid, "utf-8", "iso-8859-1", NULL, NULL, NULL);
       g_assert(utf);
-      retlist[i] = utf;
+      storage[i] = utf;
     }
   }
 
   if (strlist)
     XFreeStringList(strlist);
   if (return_single)
-    return retlist[0];
+    return single;
   else
     return retlist;
 }
