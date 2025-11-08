@@ -141,11 +141,33 @@ if not session_opt.disabled()
 endif
 
 have_libsn = (not startup_opt.disabled()) and libsn_dep.found()
-have_xcursor = (not xcursor_opt.disabled()) and xcursor_dep.found()
+have_xcursor = false
+if not xcursor_opt.disabled()
+  have_xcursor = xcursor_dep.found()
+  if have_xcursor
+    have_xcursor = cc.has_header(
+      'X11/Xcursor/Xcursor.h',
+      dependencies: [x11_dep, xcursor_dep])
+  endif
+  if not have_xcursor and xcursor_opt.enabled()
+    error('Xcursor support requested but X11/Xcursor/Xcursor.h not found')
+  endif
+endif
 have_imlib = (not imlib_opt.disabled()) and imlib_dep.found()
 have_librsvg = (not librsvg_opt.disabled()) and librsvg_dep.found()
 have_xrandr = (not xrandr_opt.disabled()) and xrandr_dep.found()
-have_xinerama = (not xinerama_opt.disabled()) and xinerama_dep.found()
+have_xinerama = false
+if not xinerama_opt.disabled()
+  have_xinerama = xinerama_dep.found()
+  if have_xinerama
+    have_xinerama = cc.has_header(
+      'X11/extensions/Xinerama.h',
+      dependencies: [x11_dep, xinerama_dep])
+  endif
+  if not have_xinerama and xinerama_opt.enabled()
+    error('Xinerama support requested but X11/extensions/Xinerama.h not found')
+  endif
+endif
 
 # ---------------------------------------------------------------------------
 # Common compile helpers
