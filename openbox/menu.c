@@ -377,8 +377,8 @@ ObMenu* menu_new(const gchar* name, const gchar* title, gboolean allow_shortcut_
      more_menu->more_menu will always be NULL, since there is only 1 for
      each menu. */
   self->more_menu = g_slice_new0(ObMenu);
-  self->more_menu->name = _("More...");
-  self->more_menu->title = _("More...");
+  self->more_menu->name = g_strdup(_("More..."));
+  self->more_menu->title = g_strdup(_("More..."));
   self->more_menu->collate_key = "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff";
   self->more_menu->data = data;
   self->more_menu->shortcut = g_unichar_tolower(g_utf8_get_char("M"));
@@ -407,6 +407,8 @@ static void menu_destroy_hash_value(ObMenu* self) {
   g_free(self->title);
   g_free(self->collate_key);
   g_free(self->execute);
+  g_free(self->more_menu->name);
+  g_free(self->more_menu->title);
   g_slice_free(ObMenu, self->more_menu);
 
   g_slice_free(ObMenu, self);
