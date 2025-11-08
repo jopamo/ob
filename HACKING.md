@@ -32,6 +32,12 @@ When using coordinates or sizes of windows:
 * `Client.frame.area` — position and size of the entire frame.
   This is usually the value to use, unless you are inside `client.c` adjusting or using the size from the client’s perspective.
 
+### Event Loop Efficiency
+
+* Always integrate the X connection file descriptor into a `select()`/`poll()` (or GLib `GSource`) driven loop instead of calling `XPending`/`XNextEvent` in a busy cycle. The WM frequently has timers, pipes, and sockets in play; letting the kernel block until something is ready avoids needless wakeups.
+* Before painting, drain bursts of `Expose`/`ConfigureNotify` events for the same window. Old toolkits redraw once per discrete event, which causes visible flicker. Use `XCheckTypedWindowEvent`/`XCheckWindowEvent` (or the local xqueue helpers) to coalesce those events and repaint only once after the queue is empty.
+* Keep batching localized: drain only the event types that affect redraw state so that unrelated button/key events continue to be delivered with low latency.
+
 ---
 
 ## Authors and Contributors
