@@ -128,9 +128,9 @@ gint main(gint argc, gchar** argv) {
     g_message("Couldn't set messages locale category from environment.");
   if (!setlocale(LC_ALL, ""))
     g_message("Couldn't set locale from environment.");
-  bindtextdomain(PACKAGE_NAME, LOCALEDIR);
-  bind_textdomain_codeset(PACKAGE_NAME, "UTF-8");
-  textdomain(PACKAGE_NAME);
+  (void)bindtextdomain(PACKAGE_NAME, LOCALEDIR);
+  (void)bind_textdomain_codeset(PACKAGE_NAME, "UTF-8");
+  (void)textdomain(PACKAGE_NAME);
 
   if (chdir(g_get_home_dir()) == -1)
     g_message(_("Unable to change to home directory \"%s\": %s"), g_get_home_dir(), g_strerror(errno));
