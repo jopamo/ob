@@ -86,6 +86,9 @@ static void event_handle_dock(ObDock* s, XEvent* e);
 static void event_handle_dockapp(ObDockApp* app, XEvent* e);
 static void event_handle_client(ObClient* c, XEvent* e);
 static gboolean event_handle_user_input(ObClient* client, XEvent* e);
+static void event_coalesce(XEvent* e);
+static void event_coalesce_configurenotify(XEvent* e);
+static void event_coalesce_expose(XEvent* e);
 static gboolean is_enter_focus_event_ignored(gulong serial);
 static void event_ignore_enter_range(gulong start, gulong end);
 static void lookup_window_cached(Window win, ObWindow** out_obwin, ObDockApp** out_dockapp);
@@ -305,6 +308,70 @@ static void event_hack_mods(XEvent* e) {
   }
 }
 
+static void event_coalesce(XEvent* e) {
+  if (G_UNLIKELY(e == NULL))
+    return;
+
+  switch (e->type) {
+    case ConfigureNotify:
+      event_coalesce_configurenotify(e);
+      break;
+    case Expose:
+      event_coalesce_expose(e);
+      break;
+  }
+}
+
+static void event_coalesce_configurenotify(XEvent* e) {
+  ObtXQueueWindowType match;
+  XEvent next;
+
+  match.window = e->xconfigure.window;
+  match.type = ConfigureNotify;
+
+  while (xqueue_remove_local(&next, xqueue_match_window_type, &match))
+    *e = next;
+}
+
+static void event_coalesce_expose(XEvent* e) {
+  ObtXQueueWindowType match;
+  XEvent next;
+  gint x1, y1, x2, y2;
+  gint last_count;
+  gboolean merged = FALSE;
+
+  match.window = e->xexpose.window;
+  match.type = Expose;
+
+  x1 = e->xexpose.x;
+  y1 = e->xexpose.y;
+  x2 = e->xexpose.x + e->xexpose.width;
+  y2 = e->xexpose.y + e->xexpose.height;
+  last_count = e->xexpose.count;
+
+  while (xqueue_remove_local(&next, xqueue_match_window_type, &match)) {
+    gint nx1 = next.xexpose.x;
+    gint ny1 = next.xexpose.y;
+    gint nx2 = next.xexpose.x + next.xexpose.width;
+    gint ny2 = next.xexpose.y + next.xexpose.height;
+
+    x1 = MIN(x1, nx1);
+    y1 = MIN(y1, ny1);
+    x2 = MAX(x2, nx2);
+    y2 = MAX(y2, ny2);
+    last_count = next.xexpose.count;
+    merged = TRUE;
+  }
+
+  if (merged) {
+    e->xexpose.x = x1;
+    e->xexpose.y = y1;
+    e->xexpose.width = MAX(1, x2 - x1);
+    e->xexpose.height = MAX(1, y2 - y1);
+  }
+  e->xexpose.count = last_count;
+}
+
 static gboolean wanted_focusevent(XEvent* e, gboolean in_client_only) {
   gint mode = e->xfocus.mode;
   gint detail = e->xfocus.detail;
@@ -462,6 +529,7 @@ static void print_focusevent(XEvent* e) {
 
 static void event_process(const XEvent* ec, gpointer data) {
   XEvent ee, *e;
+  XEvent* mutable_event = (XEvent*)ec;
   Window window;
   ObClient* client = NULL;
   ObDock* dock = NULL;
@@ -471,8 +539,10 @@ static void event_process(const XEvent* ec, gpointer data) {
   ObPrompt* prompt = NULL;
   gboolean used;
 
+  event_coalesce(mutable_event);
+
   /* make a copy we can mangle */
-  ee = *ec;
+  ee = *mutable_event;
   e = &ee;
 
   event_set_curtime(e);
