@@ -347,12 +347,12 @@ struct x_source {
 };
 
 static GSourceFuncs x_source_funcs = {
-  .prepare = x_source_prepare,
-  .check = x_source_check,
-  .dispatch = event_read,
-  .finalize = NULL,
-  .closure_callback = NULL,
-  .closure_marshal = NULL,
+    .prepare = x_source_prepare,
+    .check = x_source_check,
+    .dispatch = event_read,
+    .finalize = NULL,
+    .closure_callback = NULL,
+    .closure_marshal = NULL,
 };
 
 void xqueue_listen(void) {

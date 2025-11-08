@@ -220,8 +220,8 @@ void client_set_list(void) {
     }
   }
 
-  OBT_PROP_SETA32(
-      obt_root(ob_screen), NET_CLIENT_LIST, WINDOW, windows ? (gulong*)windows->data : NULL, windows ? windows->len : 0);
+  OBT_PROP_SETA32(obt_root(ob_screen), NET_CLIENT_LIST, WINDOW, windows ? (gulong*)windows->data : NULL,
+                  windows ? windows->len : 0);
 
   if (windows)
     g_array_free(windows, TRUE);
