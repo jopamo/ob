@@ -46,8 +46,7 @@ ObPopup* popup_new(void) {
   self->text = XCreateWindow(obt_display, self->bg, 0, 0, 1, 1, 0, RrDepth(ob_rr_inst), InputOutput,
                              RrVisual(ob_rr_inst), 0, NULL);
 
-  XSetWindowBorderWidth(obt_display, self->bg, ob_rr_theme->obwidth);
-  XSetWindowBorder(obt_display, self->bg, RrColorPixel(ob_rr_theme->osd_border_color));
+  RrConfigureWindowBorder(ob_rr_theme->inst, self->bg, ob_rr_theme->obwidth, ob_rr_theme->osd_border_color);
 
   XMapWindow(obt_display, self->text);
 
