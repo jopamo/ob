@@ -59,8 +59,7 @@ void dock_startup(gboolean reconfig) {
   if (reconfig) {
     GList* it;
 
-    XSetWindowBorder(obt_display, dock->frame, RrColorPixel(ob_rr_theme->osd_border_color));
-    XSetWindowBorderWidth(obt_display, dock->frame, ob_rr_theme->obwidth);
+    RrConfigureWindowBorder(ob_rr_theme->inst, dock->frame, ob_rr_theme->obwidth, ob_rr_theme->osd_border_color);
 
     RrAppearanceFree(dock->a_frame);
     dock->a_frame = RrAppearanceCopy(ob_rr_theme->osd_bg);
@@ -90,8 +89,7 @@ void dock_startup(gboolean reconfig) {
   dock->frame = XCreateWindow(obt_display, obt_root(ob_screen), 0, 0, 1, 1, 0, RrDepth(ob_rr_inst), InputOutput,
                               RrVisual(ob_rr_inst), CWOverrideRedirect | CWEventMask | CWDontPropagate, &attrib);
   dock->a_frame = RrAppearanceCopy(ob_rr_theme->osd_bg);
-  XSetWindowBorder(obt_display, dock->frame, RrColorPixel(ob_rr_theme->osd_border_color));
-  XSetWindowBorderWidth(obt_display, dock->frame, ob_rr_theme->obwidth);
+  RrConfigureWindowBorder(ob_rr_theme->inst, dock->frame, ob_rr_theme->obwidth, ob_rr_theme->osd_border_color);
 
   /* Setting the window type so xcompmgr can tell what it is */
   OBT_PROP_SET32(dock->frame, NET_WM_WINDOW_TYPE, ATOM, OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_DOCK));
