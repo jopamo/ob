@@ -115,8 +115,7 @@ ObMenuFrame* menu_frame_new(ObMenu* menu, guint show_from, ObClient* client) {
   /* make it a popup menu type window */
   OBT_PROP_SET32(self->window, NET_WM_WINDOW_TYPE, ATOM, OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_POPUP_MENU));
 
-  XSetWindowBorderWidth(obt_display, self->window, ob_rr_theme->mbwidth);
-  XSetWindowBorder(obt_display, self->window, RrColorPixel(ob_rr_theme->menu_border_color));
+  RrConfigureWindowBorder(ob_rr_theme->inst, self->window, ob_rr_theme->mbwidth, ob_rr_theme->menu_border_color);
 
   self->a_items = RrAppearanceCopy(ob_rr_theme->a_menu);
 
@@ -645,8 +644,7 @@ void menu_frame_render(ObMenuFrame* self) {
 
     RECT_SET_POINT(e->area, 0, h + e->border);
     XMoveWindow(obt_display, e->window, e->area.x - e->border, e->area.y - e->border);
-    XSetWindowBorderWidth(obt_display, e->window, e->border);
-    XSetWindowBorder(obt_display, e->window, RrColorPixel(ob_rr_theme->menu_border_color));
+    RrConfigureWindowBorder(ob_rr_theme->inst, e->window, e->border, ob_rr_theme->menu_border_color);
 
     text_a = (e->entry->type == OB_MENU_ENTRY_TYPE_NORMAL && !e->entry->data.normal.enabled ?
                                                                                             /* disabled */
