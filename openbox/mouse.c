@@ -260,6 +260,7 @@ gboolean mouse_event(ObClient* client, XEvent* e) {
          way it is grabbed, so just fake one */
       if (!CLIENT_CONTEXT(context, client))
         break;
+      G_GNUC_FALLTHROUGH;
 
     case ButtonRelease:
       /* use where the press occured in the window */
