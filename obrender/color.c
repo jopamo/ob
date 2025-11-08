@@ -236,10 +236,12 @@ static void swap_byte_order(XImage* im) {
           t = c[2];
           c[2] = c[3];
           c[3] = t;
+          /* fall through */
         case 16:
           t = c[0];
           c[0] = c[1];
           c[1] = t;
+          break;
         case 8:
         case 1:
           break;
