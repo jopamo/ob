@@ -125,11 +125,14 @@ guint32 hashword(const guint32* key, gint length, guint32 initval) {
   {
     case 3:
       c += key[2];
+      /* fall through */
     case 2:
       b += key[1];
+      /* fall through */
     case 1:
       a += key[0];
       final(a, b, c);
+      /* fall through */
     case 0: /* case 0: nothing left to add */
       break;
   }
