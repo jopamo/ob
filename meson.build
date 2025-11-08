@@ -299,10 +299,7 @@ pkgconfig.generate(
 # ---------------------------------------------------------------------------
 install_data(
   [
-    'COMPLIANCE',
-    'README',
-    'AUTHORS',
-    'CHANGELOG',
+    'HACKING',
     'COPYING',
     'data/rc.xsd',
     'data/menu.xsd',
