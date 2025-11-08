@@ -86,30 +86,50 @@ static inline void grow(void) {
   }
 }
 
+static inline void queue_push(const XEvent* e) {
+  grow(); /* make sure there is room */
+
+  ++qnum;
+  qend = (qend + 1) % qsz; /* move the end */
+  q[qend] = *e;            /* stick the event at the end */
+}
+
 /* Grab all pending X events */
 static gboolean read_events(gboolean block) {
-  gint sth, n;
+  gboolean read_any = FALSE;
 
-  n = XEventsQueued(obt_display, QueuedAfterFlush) > 0;
-  sth = FALSE;
+  while (TRUE) {
+    gint pending = XPending(obt_display);
 
-  while ((block && !sth) || n > 0) {
-    XEvent e;
+    if (pending == 0) {
+      if (read_any || !block)
+        break;
 
-    if (XNextEvent(obt_display, &e) != Success)
-      return FALSE;
+      /* Block until we get at least one event. */
+      {
+        XEvent e;
+        if (XNextEvent(obt_display, &e) != Success)
+          return FALSE;
+        queue_push(&e);
+        read_any = TRUE;
+      }
+      continue;
+    }
 
-    grow(); /* make sure there is room */
+    do {
+      XEvent e;
+      if (XNextEvent(obt_display, &e) != Success)
+        return FALSE;
+      queue_push(&e);
+      read_any = TRUE;
+    } while (--pending > 0);
 
-    ++qnum;
-    qend = (qend + 1) % qsz; /* move the end */
-    q[qend] = e;             /* stick the event at the end */
-
-    --n;
-    sth = TRUE;
+    /* If the caller only needed what was already pending, stop now. */
+    if (!block)
+      break;
   }
 
-  return sth; /* return if we read anything */
+  return read_any; /* return if we read anything */
 }
 
 static void pop(const gulong p) {
