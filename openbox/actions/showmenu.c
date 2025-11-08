@@ -83,6 +83,9 @@ static gboolean run_func(ObActionsData* data, gpointer options) {
       {
           0,
       },
+      {
+          0,
+      },
   };
   gint monitor = -1;
 
