@@ -1,0 +1,65 @@
+test_sources = [
+  'aspect.c',
+  'big.c',
+  'borderchange.c',
+  'confignotify.c',
+  'confignotifymax.c',
+  'cursorio.c',
+  'duplicatesession.c',
+  'extentsrequest.c',
+  'fakeunmap.c',
+  'fallback.c',
+  'focusout.c',
+  'fullscreen.c',
+  'grav.c',
+  'groupmodal.c',
+  'grouptran.c',
+  'grouptran2.c',
+  'grouptrancircular.c',
+  'grouptrancircular2.c',
+  'iconifydelay.c',
+  'icons.c',
+  'mapiconic.c',
+  'mingrow.c',
+  'modal.c',
+  'modal2.c',
+  'modal3.c',
+  'noresize.c',
+  'oldfullscreen.c',
+  'override.c',
+  'overrideinputonly.c',
+  'positioned.c',
+  'resize.c',
+  'restack.c',
+  'showhide.c',
+  'skiptaskbar.c',
+  'skiptaskbar2.c',
+  'stackabove.c',
+  'stacking.c',
+  'strut.c',
+  'title.c',
+  'urgent.c',
+  'usertimewin.c',
+  'wmhints.c',
+]
+
+if have_xshape
+  test_sources += ['shape.c']
+endif
+
+test_deps = [x11_dep, xext_dep, glib_dep]
+test_targets = []
+foreach src : test_sources
+  name = '@0@-@1@'.format('test', src.split('.')[0])
+  exe = executable(
+    name,
+    src,
+    dependencies: test_deps,
+    install: false,
+    build_by_default: false)
+  test_targets += exe
+endforeach
+
+if test_targets.length() > 0
+  alias_target('x11-regression-tests', test_targets)
+endif

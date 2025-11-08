@@ -60,3 +60,5 @@ obt_unittests = executable(
   link_with: libobt,
   build_by_default: true,
   install: false)
+
+test('obt-unittests', obt_unittests)

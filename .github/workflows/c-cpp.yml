@@ -27,11 +27,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            autoconf autopoint automake libtool build-essential pkg-config \
-            clang gcc valgrind gettext docbook-to-man \
-            libx11-dev libpango1.0-dev libglib2.0-dev \
+            build-essential meson ninja-build pkg-config gettext docbook-to-man \
+            clang gcc valgrind \
+            libx11-dev libxext-dev libxrender-dev libpango1.0-dev libglib2.0-dev \
             libstartup-notification0-dev libxrandr-dev libxinerama-dev \
-            libxcursor-dev libimlib2-dev librsvg2-dev \
+            libxcursor-dev libimlib2-dev librsvg2-dev libxml2-dev \
             xvfb x11-utils dbus-x11
 
       - name: Prepare runtime suppressions
@@ -43,19 +43,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          autoreconf -vif
+          rm -rf build install-root
+          setup_args=()
           if [ "${{ matrix.sanitizer }}" = "asan-ubsan" ]; then
             export CC=clang
-            export CFLAGS="-g -O1 -fno-omit-frame-pointer -fsanitize=address,undefined"
-            export LDFLAGS="-fsanitize=address,undefined"
+            setup_args+=("-Db_sanitize=address,undefined" "-Db_lundef=false")
           else
             export CC=gcc
-            export CFLAGS="-g -O2"
-            export LDFLAGS=""
           fi
-          ./configure --prefix=/usr --disable-nls --enable-imlib2 --enable-librsvg --with-x --disable-debug --enable-session-management
-          make -j"$(nproc)"
-          sudo make install
+          meson setup build \
+            --prefix=/usr \
+            --sysconfdir=/etc \
+            --localstatedir=/var \
+            "${setup_args[@]}"
+          meson compile -C build
+          meson test -C build --print-errorlogs
+          meson compile -C build x11-regression-tests
+          meson install -C build --destdir="$PWD/install-root"
 
       - name: Launch Xvfb and run tests
         shell: bash
@@ -68,6 +72,19 @@ jobs:
             export G_DEBUG=gc-friendly
             export G_SLICE=always-malloc
 
+            export PATH="$GITHUB_WORKSPACE/install-root/usr/bin:$PATH"
+            export XDG_DATA_DIRS="$GITHUB_WORKSPACE/install-root/usr/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+            libdir_root="$GITHUB_WORKSPACE/install-root/usr/lib"
+            libdir_multi="$GITHUB_WORKSPACE/install-root/usr/lib/x86_64-linux-gnu"
+            ld_path="$libdir_root"
+            if [ -d "$libdir_multi" ]; then
+              ld_path="$libdir_multi:$ld_path"
+            fi
+            if [ -n "${LD_LIBRARY_PATH:-}" ]; then
+              ld_path="$ld_path:$LD_LIBRARY_PATH"
+            fi
+            export LD_LIBRARY_PATH="$ld_path"
+
             # start openbox and wait until WM is ready
             openbox --replace >/tmp/openbox.log 2>&1 &
             for i in {1..50}; do
@@ -77,9 +94,7 @@ jobs:
               sleep 0.1
             done
 
-            # build tests
-            cd tests
-            make -j"$(nproc)"
+            cd "$GITHUB_WORKSPACE/build/tests"
 
             run_with_timeout() {
               timeout 5s "$@"
@@ -94,7 +109,7 @@ jobs:
 
             # discover only real executable test binaries
             mapfile -t test_bins < <(find . -maxdepth 1 -type f -perm -111 \
-              ! -name "*.sh" ! -name "*.py" ! -name "Makefile" -printf "%P\n" | sort)
+              -name "test-*" -printf "%P\n" | sort)
 
             if [ "${{ matrix.sanitizer }}" = "asan-ubsan" ]; then
               export ASAN_OPTIONS=detect_leaks=1:halt_on_error=1:detect_odr_violation=1:strict_init_order=1

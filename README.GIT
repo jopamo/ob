@@ -1,62 +1,36 @@
 To build Openbox from git you need:
 
-A C Compiler (GNU GCC 3.2+ suggested)
--GNU Gettext 0.14.4
--GNU Autoconf 2.50+
--GNU Automake 1.11+
--GNU Libtool
--Xlib library/headers (devel package)
--Pkg-Config
--Glib 2.0+ library/headers (devel package) (http://www.gtk.org)
--libxml2 2.0+ library/headers (devel package)
--Pango 1.10+ library/headers (devel package)
--cvs or git or neither, depending on how gettext was installed*
+- Meson (0.64 or newer) and Ninja
+- A C compiler (GCC or Clang)
+- pkg-config
+- GNU Gettext for translations
+- X11 headers/libraries (x11, xext, xrender, xrandr, xinerama, xcursor, xsync)
+- GLib 2.0+, libxml2 2.0+, and Pango 1.10+
 
-Also you will probably want:
--Imlib2 library/headers (devel package)
--X Cursor library/headers (devel package)
--Startup Notification library/headers 0.8+ (devel package)
+Optional features use Imlib2, librsvg, libstartup-notification, Xcursor,
+XRandR, Xinerama, XShape, XSync, and X session-management (libSM/libICE).
+Install the corresponding -dev/-devel packages if you want those capabilities.
 
-We recommend the latest versions of all these packages.
+Do the following to build and install Openbox from git:
 
-*) for versions below 0.18.1 cvs is needed, above that, see autopoint --version
+% meson setup build --prefix=/usr
+% meson compile -C build
+% sudo meson install -C build
 
-Do the following to build and install Openbox in git:
+`meson setup` only needs to run once per build directory.  Afterward you can
+rebuild with `meson compile -C build`.  Run the unit tests with
+`meson test -C build`, and build the optional X11 regression helpers with
+`meson compile -C build x11-regression-tests`.
 
-% ./bootstrap
-% ./configure
-% make
-su to root and
-% make install
-or
-% sudo make install
-
-Don't try running it from the openbox/ directory without installing, it won't
-work. It needs to be installed before it is run.
-
-The following commands will be available: openbox-session,
-  openbox-gnome-session, openbox-kde-session, and openbox.
-
-See the man pages for details about them.  If you want to run Openbox on its
-  own, you probably want to run "openbox-session".
-
-
+The installed commands include openbox-session, openbox-gnome-session,
+openbox-kde-session, and openbox itself.  See the man pages for details.
 
 ----
-In Ubuntu, you want these packages:
+On Ubuntu/Debian based systems install at least:
 
-gcc
-gettext
-automake
-autoconf
-autopoint
-libtool
-libpango1.0-dev
-pkg-config
-libglib2.0-dev
-libxml2-dev
-libstartup-notification0-dev
-xorg-dev
-libimlib2-dev
+  sudo apt install build-essential meson ninja-build pkg-config gettext \
+    libpango1.0-dev libglib2.0-dev libxml2-dev libstartup-notification0-dev \
+    libx11-dev libxext-dev libxrandr-dev libxinerama-dev libxcursor-dev \
+    libimlib2-dev librsvg2-dev
 
 ----

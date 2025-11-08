@@ -10,11 +10,35 @@ help() {
   exit 1
 }
 
+MESON_SETUP_ARGS="--prefix=/usr --sysconfdir=/etc --libexecdir=/usr/lib/openbox --localstatedir=/var"
+MESON_SETUP_ARGS="$MESON_SETUP_ARGS --bindir=/usr/bin --libdir=/usr/lib --datadir=/usr/share"
+
 build_and_test() {
   style=$1
-  make >/dev/null 2>/dev/null || error "make failed ($style)"
-  ./obt/obt_unittests > /dev/null || error "unittest failed ($style)"
-  make distclean >/dev/null || error "make distclean failed"
+  shift
+  builddir="$TESTDIR/$style"
+  echo "Checking build configuration: $style"
+  rm -rf "$builddir"
+  meson setup "$builddir" $MESON_SETUP_ARGS "$@" >/dev/null || \
+    error "meson setup failed ($style)"
+  meson compile -C "$builddir" >/dev/null || \
+    error "meson compile failed ($style)"
+  meson test -C "$builddir" >/dev/null || \
+    error "meson test failed ($style)"
+  rm -rf "$builddir"
+}
+
+make_dist() {
+  distdir="$TESTDIR/dist"
+  rm -rf "$distdir"
+  meson setup "$distdir" $MESON_SETUP_ARGS >/dev/null || \
+    error "meson setup failed (dist)"
+  meson dist -C "$distdir" --formats gztar >/dev/null || \
+    error "meson dist failed"
+  TAR="$distdir/meson-dist/openbox-$VERSION.tar.gz"
+  test -e "$TAR" || error "meson dist did not create expected tarball"
+  cp "$TAR" "$SRCDIR/" || error "failed to copy tarball to source tree"
+  TAR="$SRCDIR/openbox-$VERSION.tar.gz"
 }
 
 REV="$1"
@@ -46,100 +70,36 @@ git clean -f -x -d -q
 
 #### TEST ALL OPTIONAL COMPILATION FLAGS ####
 
-# check that it builds
-echo Bootstrapping
-./bootstrap >/dev/null 2>/dev/null || "bootstrap failed"
-
-echo Check compile with debug and all options enabled
 CFLAGS="-Werror -isystem /usr/lib/glib-2.0" \
-./configure -C --enable-debug >/dev/null || \
-  error "configure (with debug) failed"
-build_and_test "with debug and Werror"
+  build_and_test "debug" -Dbuildtype=debug
 
-# check that it builds with each optional featureset
-echo Check compile with all options enabled
-./configure -C >/dev/null || \
-  error "configure failed"
-grep "XKB 1" config.log >/dev/null || error "missing xkb extension"
-grep "XRANDR 1" config.log >/dev/null || error "missing xrandr extension"
-grep "XINERAMA 1" config.log >/dev/null || error "missing xinerama extension"
-grep "SYNC 1" config.log >/dev/null || error "missing sync extension"
-grep "USE_XCURSOR 1" config.log >/dev/null || error "missing xcursor extension"
-grep "USE_IMLIB2 1" config.log >/dev/null || error "missing imlib2 library"
-grep "USE_LIBRSVG 1" config.log >/dev/null || error "missing librsvg library"
-grep "USE_SM 1" config.log >/dev/null || error "missing session management extension"
-build_and_test
+build_and_test "all-options"
+build_and_test "no-startup-notification" -Dstartup_notification=disabled
+build_and_test "no-xcursor" -Dxcursor=disabled
+build_and_test "no-imlib2" -Dimlib2=disabled
+build_and_test "no-librsvg" -Dlibrsvg=disabled
+build_and_test "no-session" -Dsession_management=disabled
+build_and_test "no-xkb" -Dxkb=disabled
+build_and_test "no-xrandr" -Dxrandr=disabled
+build_and_test "no-xinerama" -Dxinerama=disabled
+build_and_test "no-xsync" -Dxsync=disabled
 
-echo Check compile with startup notification disabled
-./configure -C --disable-startup-notification >/dev/null || \
-  error "configure failed"
-build_and_test "with --disable-startup-notification"
-
-echo Check compile with xcursor disabled
-./configure -C --disable-xcursor >/dev/null || \
-  error "configure failed"
-build_and_test "with --disable-xcursor"
-
-echo Check compile with imlib2 disabled
-./configure -C --disable-imlib2 >/dev/null || \
-  error "configure failed"
-build_and_test "with --disable-imlib2"
-
-echo Check compile with librsvg disabled
-./configure -C --disable-librsvg >/dev/null || \
-  error "configure failed"
-build_and_test "with --disable-librsvg"
-
-echo Check compile with session management disabled
-./configure -C --disable-session-management >/dev/null || \
-  error "configure failed"
-build_and_test "with --disable-session-management"
-
-echo Check compile with xkb disabled
-./configure -C --disable-xkb >/dev/null || error "configure failed"
-build_and_test "with --disable-xkb"
-
-echo Check compile with xrandr disabled
-./configure -C --disable-xrandr >/dev/null || error "configure failed"
-build_and_test "with --disable-xrandr"
-
-echo Check compile with xinerama disabled
-./configure -C --disable-xinerama >/dev/null || error "configure failed"
-build_and_test("with --disable-xinerama")
-
-echo Check compile with xsync disabled
-./configure -C --disable-xsync >/dev/null || error "configure failed"
-build_and_test("with --disable-xsync")
-
-# check that it installs sanely
-echo Check installation correctness
-./configure -C >/dev/null || \
-  error "configure failed"
-make distcheck >/dev/null || \
-  error "make distcheck failed"
+echo Creating release tarball
+make_dist
 
 # VERIFY TARBALL
 
-TAR="openbox-$VERSION.tar.gz"
-ASC="openbox-$VERSION.tar.gz.asc"
+ASC="$SRCDIR/openbox-$VERSION.tar.gz.asc"
 
-echo Found Openbox release tarball:
-ls -d openbox-*.tar.gz
-test -e "$TAR" || \
-  error "Specified version does not match configure.ac"
-
-# SIGN THE TARBALL
+test -e "$TAR" || error "release tarball missing"
 
 echo Signing the release tarball:
-gpg --sign --detach-sign --armor "$TAR"
-test $? = 0 || \
+gpg --sign --detach-sign --armor --output "$ASC" "$TAR" || \
   error "Failed to sign release tarball"
 
 echo Tagging the release:
 git tag -s -m "tagging the $VERSION release" "release-$VERSION" $REV || \
   error "Failed to tag the release"
-
-mv "$TAR" "$ASC" "$SRCDIR"
 
 echo "=$VERSION="
 echo "$CLNOWRAP"
