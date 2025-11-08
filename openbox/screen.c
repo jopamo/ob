@@ -846,6 +846,7 @@ static guint translate_row_col(guint r, guint c) {
           return (screen_desktop_layout.rows - 1 - r % screen_desktop_layout.rows) * screen_desktop_layout.columns +
                  (screen_desktop_layout.columns - 1 - c % screen_desktop_layout.columns);
       }
+      break;
     case OB_ORIENTATION_VERT:
       switch (screen_desktop_layout.start_corner) {
         case OB_CORNER_TOPLEFT:
@@ -860,6 +861,7 @@ static guint translate_row_col(guint r, guint c) {
           return (screen_desktop_layout.columns - 1 - c % screen_desktop_layout.columns) * screen_desktop_layout.rows +
                  (screen_desktop_layout.rows - 1 - r % screen_desktop_layout.rows);
       }
+      break;
   }
   g_assert_not_reached();
   return 0;
