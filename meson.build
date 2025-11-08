@@ -299,7 +299,7 @@ pkgconfig.generate(
 # ---------------------------------------------------------------------------
 install_data(
   [
-    'HACKING',
+    'HACKING.md',
     'COPYING',
     'data/rc.xsd',
     'data/menu.xsd',
