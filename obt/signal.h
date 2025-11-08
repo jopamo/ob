@@ -16,6 +16,20 @@
    See the COPYING file for a copy of the GNU General Public License.
 */
 
+#if defined(__has_include_next)
+#  /* Ensure we still get the real system signal API even though this header
+#     shadows <signal.h> in the include search order. */
+#  if __has_include_next(<signal.h>)
+#    include_next <signal.h>
+#  else
+#    error "system <signal.h> not found when including obt/signal.h"
+#  endif
+#elif defined(__GNUC__) || defined(__clang__)
+#  include_next <signal.h>
+#else
+#  error "Obt signal wrapper requires a compiler that supports #include_next"
+#endif
+
 #ifndef __obt_signal_h
 #define __obt_signal_h
 
