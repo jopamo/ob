@@ -384,6 +384,11 @@ gint RrFontMaxCharWidth(const RrFont* f);
    it is non-null. */
 Pixmap RrPaintPixmap(RrAppearance* a, gint w, gint h);
 void RrPaint(RrAppearance* a, Window win, gint w, gint h);
+void RrClearWindowColor(const RrInstance* inst, Window win, const RrColor* color);
+void RrSetWindowBorderColor(const RrInstance* inst, Window win, const RrColor* color);
+void RrSetWindowBorderWidth(const RrInstance* inst, Window win, guint width);
+void RrConfigureWindowBorder(const RrInstance* inst, Window win, guint width, const RrColor* color);
+void RrFlush(const RrInstance* inst);
 void RrMinSize(RrAppearance* a, gint* w, gint* h);
 gint RrMinWidth(RrAppearance* a);
 /* For text textures, if flow is TRUE, then the string must be set before

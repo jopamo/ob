@@ -158,6 +158,39 @@ void RrPaint(RrAppearance* a, Window win, gint w, gint h) {
     XFreePixmap(RrDisplay(a->inst), oldp);
 }
 
+void RrClearWindowColor(const RrInstance* inst, Window win, const RrColor* color) {
+  g_return_if_fail(inst != NULL);
+  g_return_if_fail(color != NULL);
+
+  XSetWindowBackground(RrDisplay(inst), win, RrColorPixel(color));
+  XClearWindow(RrDisplay(inst), win);
+}
+
+void RrSetWindowBorderColor(const RrInstance* inst, Window win, const RrColor* color) {
+  g_return_if_fail(inst != NULL);
+  g_return_if_fail(color != NULL);
+
+  XSetWindowBorder(RrDisplay(inst), win, RrColorPixel(color));
+}
+
+void RrSetWindowBorderWidth(const RrInstance* inst, Window win, guint width) {
+  g_return_if_fail(inst != NULL);
+
+  XSetWindowBorderWidth(RrDisplay(inst), win, (unsigned int)width);
+}
+
+void RrConfigureWindowBorder(const RrInstance* inst, Window win, guint width, const RrColor* color) {
+  if (color != NULL)
+    RrSetWindowBorderColor(inst, win, color);
+  RrSetWindowBorderWidth(inst, win, width);
+}
+
+void RrFlush(const RrInstance* inst) {
+  g_return_if_fail(inst != NULL);
+
+  XFlush(RrDisplay(inst));
+}
+
 RrAppearance* RrAppearanceNew(const RrInstance* inst, gint numtex) {
   RrAppearance* out;
 
