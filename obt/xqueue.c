@@ -346,7 +346,14 @@ struct x_source {
   GPollFD pfd;
 };
 
-static GSourceFuncs x_source_funcs = {x_source_prepare, x_source_check, event_read, NULL};
+static GSourceFuncs x_source_funcs = {
+  .prepare = x_source_prepare,
+  .check = x_source_check,
+  .dispatch = event_read,
+  .finalize = NULL,
+  .closure_callback = NULL,
+  .closure_marshal = NULL,
+};
 
 void xqueue_listen(void) {
   GSource* source = g_source_new(&x_source_funcs, sizeof(struct x_source));
