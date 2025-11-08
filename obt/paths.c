@@ -41,6 +41,7 @@
 #ifdef HAVE_PWD_H
 #include <pwd.h>
 #endif
+#include <glib/gstdio.h>
 
 struct _ObtPaths {
   gint ref;
@@ -246,29 +247,13 @@ gboolean obt_paths_mkdir(const gchar* path, gint mode) {
 }
 
 gboolean obt_paths_mkdir_path(const gchar* path, gint mode) {
-  gboolean ret = TRUE;
-
   g_return_val_if_fail(path != NULL, FALSE);
   g_return_val_if_fail(path[0] == '/', FALSE);
 
-  if (!g_file_test(path, G_FILE_TEST_IS_DIR)) {
-    gchar *c, *e;
+  if (g_file_test(path, G_FILE_TEST_IS_DIR))
+    return TRUE;
 
-    c = g_strdup(path);
-    e = c;
-    while ((e = strchr(e + 1, '/'))) {
-      *e = '\0';
-      if (!(ret = obt_paths_mkdir(c, mode)))
-        goto parse_mkdir_path_end;
-      *e = '/';
-    }
-    ret = obt_paths_mkdir(c, mode);
-
-  parse_mkdir_path_end:
-    g_free(c);
-  }
-
-  return ret;
+  return g_mkdir_with_parents(path, mode) == 0;
 }
 
 const gchar* obt_paths_config_home(ObtPaths* p) {
