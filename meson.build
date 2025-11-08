@@ -5,6 +5,8 @@ project('openbox', 'c',
 pkgconfig = import('pkgconfig')
 
 cc = meson.get_compiler('c')
+no_warn_args = cc.get_supported_arguments(['-Wno-unused-parameter'])
+add_project_arguments(no_warn_args, language: 'c')
 
 # ---------------------------------------------------------------------------
 # Paths
