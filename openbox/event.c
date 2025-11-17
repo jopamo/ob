@@ -205,7 +205,6 @@ static Window event_get_window(XEvent* e) {
       window = e->xconfigure.window;
       break;
     default:
-#ifdef XKB
       if (obt_display_extension_xkb && e->type == obt_display_extension_xkb_basep) {
         switch (((XkbAnyEvent*)e)->xkb_type) {
           case XkbBellNotify:
@@ -216,7 +215,6 @@ static Window event_get_window(XEvent* e) {
         }
       }
       else
-#endif
 #ifdef SYNC
           if (obt_display_extension_sync && e->type == obt_display_extension_sync_basep + XSyncAlarmNotify) {
         window = None;
@@ -543,7 +541,6 @@ static void event_process(const XEvent* ec, gpointer data) {
 
   event_coalesce(mutable_event);
 
-#ifdef XKB
   if (obt_display_extension_xkb && mutable_event->type == obt_display_extension_xkb_basep) {
     gboolean map_changed = obt_keyboard_handle_xkb_event((const XkbAnyEvent*)mutable_event);
     if (map_changed && config_keyboard_rebind_on_mapping_notify) {
@@ -554,7 +551,6 @@ static void event_process(const XEvent* ec, gpointer data) {
     }
     return;
   }
-#endif
 
   /* make a copy we can mangle */
   ee = *mutable_event;

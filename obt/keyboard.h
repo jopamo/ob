@@ -22,9 +22,7 @@
 #include <glib.h>
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
-#ifdef XKB
 #include <X11/XKBlib.h>
-#endif
 
 G_BEGIN_DECLS
 
@@ -73,9 +71,7 @@ gunichar obt_keyboard_keypress_to_unichar(ObtIC* ic, XEvent* ev);
 KeySym obt_keyboard_keypress_to_keysym(XEvent* ev);
 
 void obt_keyboard_handle_event(const XEvent* e);
-#ifdef XKB
 gboolean obt_keyboard_handle_xkb_event(const XkbAnyEvent* e);
-#endif
 
 /*! Create an input context for a window.
     @client The top-level client window for the input context.

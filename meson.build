@@ -131,23 +131,12 @@ if not xsync_opt.disabled()
   endif
 endif
 
-xkb_opt = get_option('xkb')
-have_xkb = false
-xkbcommon_deps = []
-if not xkb_opt.disabled()
-  have_xkb = cc.has_function('XkbBell', dependencies: x11_dep)
-  if not have_xkb and xkb_opt.enabled()
-    error('XKB support requested but libX11 does not provide XkbBell()')
-  endif
-  if have_xkb
-    xkbcommon_dep = dependency('xkbcommon', required: xkb_opt.enabled())
-    if xkbcommon_dep.found()
-      xkbcommon_deps = [xkbcommon_dep]
-    else
-      have_xkb = false
-    endif
-  endif
+have_xkb = cc.has_function('XkbBell', dependencies: x11_dep)
+if not have_xkb
+  error('XKB support requested but libX11 does not provide XkbBell()')
 endif
+xkbcommon_dep = dependency('xkbcommon', required: true)
+xkbcommon_deps = [xkbcommon_dep]
 
 session_opt = get_option('session_management')
 sm_deps = []
@@ -253,9 +242,6 @@ if have_librsvg
 endif
 if have_session
   feature_defines += ['-DUSE_SM']
-endif
-if have_xkb
-  feature_defines += ['-DXKB']
 endif
 if have_xrandr
   feature_defines += ['-DXRANDR']

@@ -23,9 +23,7 @@
 #include <glib.h>
 
 #include <X11/Xutil.h> /* shape.h uses Region which is in here */
-#ifdef XKB
 #include <X11/XKBlib.h>
-#endif
 #ifdef SHAPE
 #include <X11/extensions/shape.h>
 #endif

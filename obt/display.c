@@ -74,13 +74,11 @@ gboolean obt_display_open(const char* display_name) {
     XSetErrorHandler(xerror_handler);
 
     /* read what extensions are present */
-#ifdef XKB
     major = XkbMajorVersion;
     minor = XkbMinorVersion;
     obt_display_extension_xkb = XkbQueryExtension(d, &junk, &obt_display_extension_xkb_basep, &junk, &major, &minor);
     if (!obt_display_extension_xkb)
-      g_message("XKB extension is not present on the server or too old");
-#endif
+      g_error("XKB extension is not present on the server or too old");
 
 #ifdef SHAPE
     obt_display_extension_shape = XShapeQueryExtension(d, &obt_display_extension_shape_basep, &junk);

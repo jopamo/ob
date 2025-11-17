@@ -22,11 +22,9 @@
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 #include <X11/Xatom.h>
-#ifdef XKB
 #include <X11/XKBlib.h>
 #include <xkbcommon/xkbcommon.h>
 #include <xkbcommon/xkbcommon-compose.h>
-#endif
 
 #include <locale.h>
 #include <string.h>
@@ -46,21 +44,10 @@ struct _ObtIC {
 #define NUM_MASKS 8
 #define ALL_MASKS 0xff /* an or'ing of all 8 keyboard masks */
 
-/* Get the bitflag for the n'th modifier mask */
-#define nth_mask(n) (1 << n)
-
-#ifndef XKB
-static void set_modkey_mask(guchar mask, KeySym sym);
-#endif
 static void xim_init(void);
 void obt_keyboard_shutdown();
 void obt_keyboard_context_renew(ObtIC* ic);
 
-#ifndef XKB
-static XModifierKeymap* modmap;
-static KeySym* keymap;
-static gint min_keycode, max_keycode, keysyms_per_keycode;
-#else
 static struct xkb_context* keyboard_context;
 static struct xkb_keymap* keyboard_keymap;
 static struct xkb_state* keyboard_state;
@@ -71,20 +58,11 @@ static guint keyboard_last_keycode = 0;
 static guint keyboard_last_mask = 0;
 static Time keyboard_last_time = CurrentTime;
 static gboolean keyboard_selected_events = FALSE;
-#endif
 /*! This is a bitmask of the different masks for each modifier key */
 static guint modkeys_keys[OBT_KEYBOARD_NUM_MODKEYS];
 
-#ifndef XKB
-static gboolean alt_l = FALSE;
-static gboolean meta_l = FALSE;
-static gboolean super_l = FALSE;
-static gboolean hyper_l = FALSE;
-#endif
-
 static gboolean started = FALSE;
 
-#ifdef XKB
 static gboolean keyboard_build_keymap(void);
 static gboolean keyboard_load_rule_names(struct xkb_rule_names* names);
 static guint keyboard_mask_from_names(const char* const* names, guint fallback);
@@ -92,13 +70,10 @@ static void keyboard_update_modifiers(void);
 static void keyboard_destroy_xkb(void);
 static void keyboard_reset_compose_state(void);
 static void keyboard_sync_state_from_x11(void);
-#endif
 
 static XIM xim = NULL;
 static XIMStyle xim_style = 0;
 static GSList* xic_all = NULL;
-
-#ifdef XKB
 static gboolean keyboard_load_rule_names(struct xkb_rule_names* names) {
   Atom prop;
   Atom type;
@@ -301,7 +276,6 @@ static void keyboard_destroy_xkb(void) {
   keyboard_last_time = CurrentTime;
   keyboard_selected_events = FALSE;
 }
-#endif
 
 void obt_keyboard_reload(void) {
   if (started)
@@ -313,61 +287,14 @@ void obt_keyboard_reload(void) {
   for (gint i = 0; i < OBT_KEYBOARD_NUM_MODKEYS; ++i)
     modkeys_keys[i] = 0;
 
-#ifdef XKB
-  if (!keyboard_build_keymap()) {
-    g_warning("Falling back to legacy modifier mapping");
-    keyboard_update_modifiers();
-  }
-#else
-  gint i, j, k;
-
-  modmap = XGetModifierMapping(obt_display);
-  /* note: modmap->max_keypermod can be 0 when there is no valid key layout
-     available */
-
-  XDisplayKeycodes(obt_display, &min_keycode, &max_keycode);
-  keymap = XGetKeyboardMapping(obt_display, min_keycode, max_keycode - min_keycode + 1, &keysyms_per_keycode);
-
-  alt_l = meta_l = super_l = hyper_l = FALSE;
-
-  /* go through each of the modifier masks (eg ShiftMask, CapsMask...) */
-  for (i = 0; i < NUM_MASKS; ++i) {
-    /* go through each keycode that is bound to the mask */
-    for (j = 0; j < modmap->max_keypermod; ++j) {
-      KeySym sym;
-      /* get a keycode that is bound to the mask (i) */
-      KeyCode keycode = modmap->modifiermap[i * modmap->max_keypermod + j];
-      if (keycode) {
-        /* go through each keysym bound to the given keycode */
-        for (k = 0; k < keysyms_per_keycode; ++k) {
-          sym = keymap[(keycode - min_keycode) * keysyms_per_keycode + k];
-          if (sym != NoSymbol) {
-            /* bind the key to the mask (e.g. Alt_L => Mod1Mask) */
-            set_modkey_mask(nth_mask(i), sym);
-          }
-        }
-      }
-    }
-  }
-
-  /* CapsLock, Shift, and Control are special and hard-coded */
-  modkeys_keys[OBT_KEYBOARD_MODKEY_CAPSLOCK] = LockMask;
-  modkeys_keys[OBT_KEYBOARD_MODKEY_SHIFT] = ShiftMask;
-  modkeys_keys[OBT_KEYBOARD_MODKEY_CONTROL] = ControlMask;
-#endif
+  if (!keyboard_build_keymap())
+    g_error("Failed to initialize XKB keymap");
 }
 
 void obt_keyboard_shutdown(void) {
   GSList* it;
 
-#ifdef XKB
   keyboard_destroy_xkb();
-#else
-  XFreeModifiermap(modmap);
-  modmap = NULL;
-  XFree(keymap);
-  keymap = NULL;
-#endif
 
   for (it = xic_all; it; it = g_slist_next(it)) {
     ObtIC* ic = it->data;
@@ -439,7 +366,6 @@ void xim_init(void) {
 guint obt_keyboard_keyevent_to_modmask(XEvent* e) {
   g_return_val_if_fail(e->type == KeyPress || e->type == KeyRelease, OBT_KEYBOARD_MODKEY_NONE);
 
-#ifdef XKB
   if (!keyboard_state)
     return 0;
 
@@ -449,15 +375,6 @@ guint obt_keyboard_keyevent_to_modmask(XEvent* e) {
       return keyboard_last_mask;
   }
   return 0;
-#else
-  for (gint masknum = 0; masknum < NUM_MASKS; ++masknum)
-    for (gint i = 0; i < modmap->max_keypermod; ++i) {
-      KeyCode c = modmap->modifiermap[masknum * modmap->max_keypermod + i];
-      if (c == e->xkey.keycode)
-        return 1 << masknum;
-    }
-  return 0;
-#endif
 }
 
 guint obt_keyboard_only_modmasks(guint mask) {
@@ -476,55 +393,11 @@ guint obt_keyboard_modkey_to_modmask(ObtModkeysKey key) {
   return modkeys_keys[key];
 }
 
-#ifndef XKB
-static void set_modkey_mask(guchar mask, KeySym sym) {
-  /* find what key this is, and bind it to the mask */
-
-  if (sym == XK_Num_Lock)
-    modkeys_keys[OBT_KEYBOARD_MODKEY_NUMLOCK] |= mask;
-  else if (sym == XK_Scroll_Lock)
-    modkeys_keys[OBT_KEYBOARD_MODKEY_SCROLLLOCK] |= mask;
-
-  else if (sym == XK_Super_L && super_l)
-    modkeys_keys[OBT_KEYBOARD_MODKEY_SUPER] |= mask;
-  else if (sym == XK_Super_L && !super_l)
-    /* left takes precident over right, so erase any masks the right
-       key may have set */
-    modkeys_keys[OBT_KEYBOARD_MODKEY_SUPER] = mask, super_l = TRUE;
-  else if (sym == XK_Super_R && !super_l)
-    modkeys_keys[OBT_KEYBOARD_MODKEY_SUPER] |= mask;
-
-  else if (sym == XK_Hyper_L && hyper_l)
-    modkeys_keys[OBT_KEYBOARD_MODKEY_HYPER] |= mask;
-  else if (sym == XK_Hyper_L && !hyper_l)
-    modkeys_keys[OBT_KEYBOARD_MODKEY_HYPER] = mask, hyper_l = TRUE;
-  else if (sym == XK_Hyper_R && !hyper_l)
-    modkeys_keys[OBT_KEYBOARD_MODKEY_HYPER] |= mask;
-
-  else if (sym == XK_Alt_L && alt_l)
-    modkeys_keys[OBT_KEYBOARD_MODKEY_ALT] |= mask;
-  else if (sym == XK_Alt_L && !alt_l)
-    modkeys_keys[OBT_KEYBOARD_MODKEY_ALT] = mask, alt_l = TRUE;
-  else if (sym == XK_Alt_R && !alt_l)
-    modkeys_keys[OBT_KEYBOARD_MODKEY_ALT] |= mask;
-
-  else if (sym == XK_Meta_L && meta_l)
-    modkeys_keys[OBT_KEYBOARD_MODKEY_META] |= mask;
-  else if (sym == XK_Meta_L && !meta_l)
-    modkeys_keys[OBT_KEYBOARD_MODKEY_META] = mask, meta_l = TRUE;
-  else if (sym == XK_Meta_R && !meta_l)
-    modkeys_keys[OBT_KEYBOARD_MODKEY_META] |= mask;
-
-  /* CapsLock, Shift, and Control are special and hard-coded */
-}
-#endif
-
 KeyCode* obt_keyboard_keysym_to_keycode(KeySym sym) {
   KeyCode* ret = g_new(KeyCode, 1);
   guint n = 0;
   ret[0] = 0;
 
-#ifdef XKB
   if (!keyboard_keymap)
     return ret;
 
@@ -554,16 +427,6 @@ KeyCode* obt_keyboard_keysym_to_keycode(KeySym sym) {
     }
   }
   return ret;
-#else
-  for (gint i = min_keycode; i <= max_keycode; ++i)
-    for (gint j = 0; j < keysyms_per_keycode; ++j)
-      if (sym == keymap[(i - min_keycode) * keysyms_per_keycode + j]) {
-        ret = g_renew(KeyCode, ret, ++n + 1);
-        ret[n - 1] = i;
-        ret[n] = 0;
-      }
-  return ret;
-#endif
 }
 
 gunichar obt_keyboard_keypress_to_unichar(ObtIC* ic, XEvent* ev) {
@@ -631,7 +494,6 @@ gunichar obt_keyboard_keypress_to_unichar(ObtIC* ic, XEvent* ev) {
     return unikey;
   }
 
-#ifdef XKB
   if (!keyboard_state)
     return 0;
 
@@ -670,40 +532,17 @@ gunichar obt_keyboard_keypress_to_unichar(ObtIC* ic, XEvent* ev) {
   if (u && u != (gunichar)-1 && u != (gunichar)-2)
     return u;
   return 0;
-#else
-  gunichar unikey = 0;
-  KeySym sym;
-  gchar *buf, fixbuf[4];
-  gint len;
-
-  buf = fixbuf;
-  len = XLookupString(&ev->xkey, buf, sizeof(fixbuf), &sym, NULL);
-  if ((guchar)buf[0] >= 32) {
-    gunichar u = g_utf8_get_char_validated(buf, len);
-    if (u && u != (gunichar)-1 && u != (gunichar)-2)
-      unikey = u;
-  }
-
-  return unikey;
-#endif
 }
 
 KeySym obt_keyboard_keypress_to_keysym(XEvent* ev) {
   g_return_val_if_fail(ev->type == KeyPress, None);
 
-#ifdef XKB
   if (!keyboard_state)
     return None;
   return (KeySym)xkb_state_key_get_one_sym(keyboard_state, ev->xkey.keycode);
-#else
-  KeySym sym = None;
-  XLookupString(&ev->xkey, NULL, 0, &sym, NULL);
-  return sym;
-#endif
 }
 
 void obt_keyboard_handle_event(const XEvent* e) {
-#ifdef XKB
   if (!keyboard_state || (e->type != KeyPress && e->type != KeyRelease))
     return;
 
@@ -719,12 +558,8 @@ void obt_keyboard_handle_event(const XEvent* e) {
   keyboard_last_serial = e->xkey.serial;
   keyboard_last_keycode = e->xkey.keycode;
   keyboard_last_time = e->xkey.time;
-#else
-  (void)e;
-#endif
 }
 
-#ifdef XKB
 gboolean obt_keyboard_handle_xkb_event(const XkbAnyEvent* e) {
   if (!obt_display_extension_xkb)
     return FALSE;
@@ -747,7 +582,6 @@ gboolean obt_keyboard_handle_xkb_event(const XkbAnyEvent* e) {
 
   return FALSE;
 }
-#endif
 
 void obt_keyboard_context_renew(ObtIC* ic) {
   if (xim) {
