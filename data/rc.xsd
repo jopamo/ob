@@ -489,9 +489,8 @@
     </xsd:simpleType>
     <xsd:simpleType name="keyname">
         <xsd:restriction base="xsd:string">
-            <!-- FIXME: M, Mod2, Mod5 in addition to S, A, C -->
-            <!-- how do we do all substrings and permutations? -->
-            <xsd:pattern value="(([ACMSW]|Mod[1-5])-){,5}[a-zA-Z0-9]*"/>
+            <xsd:pattern
+                value="((([Aa]|[Aa][Ll][Tt])|([Cc]|[Cc][Oo][Nn][Tt][Rr][Oo][Ll])|([Ss]|[Ss][Hh][Ii][Ff][Tt])|([Ww]|[Ss][Uu][Pp][Ee][Rr])|([Mm]|[Mm][Ee][Tt][Aa])|([Hh]|[Hh][Yy][Pp][Ee][Rr])|([Mm][Oo][Dd][1-5]))-)*((0[xX][0-9a-fA-F]+)|([0-9A-Za-z_]+))"/>
         </xsd:restriction>
     </xsd:simpleType>
     <xsd:simpleType name="layer">
