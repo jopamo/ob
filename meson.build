@@ -1,6 +1,6 @@
 project('openbox', 'c',
         version: '3.6',
-        default_options: ['warning_level=2', 'c_std=gnu99'])
+        default_options: ['warning_level=2', 'c_std=c17'])
 
 pkgconfig = import('pkgconfig')
 

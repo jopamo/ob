@@ -6,17 +6,17 @@ option('imlib2', type: 'feature', value: 'auto',
        description: 'Enable Imlib2 for icon loading')
 option('librsvg', type: 'feature', value: 'auto',
        description: 'Enable librsvg for SVG icon loading')
-option('xkb', type: 'feature', value: 'auto',
+option('xkb', type: 'feature', value: 'enabled',
        description: 'Enable XKB extension support')
-option('xrandr', type: 'feature', value: 'auto',
+option('xrandr', type: 'feature', value: 'enabled',
        description: 'Enable XRandR extension support')
-option('xinerama', type: 'feature', value: 'auto',
+option('xinerama', type: 'feature', value: 'enabled',
        description: 'Enable Xinerama extension support')
-option('xshape', type: 'feature', value: 'auto',
+option('xshape', type: 'feature', value: 'enabled',
        description: 'Enable XShape extension support')
 option('xdamage', type: 'feature', value: 'auto',
        description: 'Enable XDamage extension support')
-option('xsync', type: 'feature', value: 'auto',
+option('xsync', type: 'feature', value: 'enabled',
        description: 'Enable XSync extension support')
 option('session_management', type: 'feature', value: 'auto',
        description: 'Enable X11 session management (libSM/libICE)')

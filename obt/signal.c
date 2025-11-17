@@ -16,6 +16,9 @@
    See the COPYING file for a copy of the GNU General Public License.
 */
 
+#define _POSIX_C_SOURCE 200809L
+#define _DEFAULT_SOURCE
+
 #include "signal.h"
 
 #ifdef HAVE_STDIO_H

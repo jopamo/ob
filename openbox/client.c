@@ -2501,12 +2501,10 @@ static void client_get_session_ids(ObClient* self) {
     got = OBT_PROP_GETS(self->window, WM_CLIENT_MACHINE, &s);
 
   if (got) {
-    gchar localhost[128];
+    const gchar* localhost = g_get_host_name();
     guint32 pid;
 
-    gethostname(localhost, 127);
-    localhost[127] = '\0';
-    if (strcmp(localhost, s) != 0)
+    if (localhost && strcmp(localhost, s) != 0)
       self->client_machine = s;
     else
       g_free(s);
