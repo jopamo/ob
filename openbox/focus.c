@@ -70,17 +70,23 @@ static void push_to_top(ObClient* client) {
 
 void focus_set_client(ObClient* client) {
   Window active;
+  ObClient* old = focus_client;
 
   ob_debug_type(OB_DEBUG_FOCUS, "focus_set_client 0x%lx", client ? client->window : 0);
 
-  if (focus_client == client)
+  if (old == client)
     return;
 
   /* uninstall the old colormap, and install the new one */
-  screen_install_colormap(focus_client, FALSE);
+  screen_install_colormap(old, FALSE);
   screen_install_colormap(client, TRUE);
 
   focus_client = client;
+
+  if (old)
+    client_recalc_opacity(old);
+  if (client)
+    client_recalc_opacity(client);
 
   if (client != NULL) {
     /* move to the top of the list */

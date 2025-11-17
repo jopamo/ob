@@ -63,6 +63,11 @@
 
 #define CLIENT_NOPROPAGATEMASK (ButtonPressMask | ButtonReleaseMask | ButtonMotionMask)
 
+#define OB_OPACITY_OPAQUE 0xffffffffu
+/* Dim unfocused windows to roughly 90% opacity */
+#define OB_INACTIVE_OPACITY_NUM 230u
+#define OB_INACTIVE_OPACITY_DEN 255u
+
 typedef struct {
   ObClientCallback func;
   gpointer data;
@@ -112,6 +117,9 @@ static gboolean client_can_steal_focus(ObClient* self,
                                        Time launch_time);
 static void client_setup_default_decor_and_functions(ObClient* self);
 static void client_setup_decor_undecorated(ObClient* self);
+static gboolean client_wm_controls_opacity(ObClient* self);
+static guint32 client_dim_unfocused_opacity(guint32 value);
+static void client_apply_frame_opacity(ObClient* self, gboolean apply, guint32 value);
 
 void client_startup(gboolean reconfig) {
   client_default_icon = RrImageNewFromData(ob_rr_icons, ob_rr_theme->def_win_icon, ob_rr_theme->def_win_icon_w,
@@ -257,6 +265,8 @@ void client_manage(Window window, ObPrompt* prompt) {
   self->window = window;
   self->prompt = prompt;
   self->managed = TRUE;
+  self->opacity_requested = OB_OPACITY_OPAQUE;
+  self->opacity_applied = OB_OPACITY_OPAQUE;
 
   /* non-zero defaults */
   self->wmstate = WithdrawnState; /* make sure it gets updated first time */
@@ -1655,10 +1665,60 @@ void client_update_colormap(ObClient* self, Colormap colormap) {
 void client_update_opacity(ObClient* self) {
   guint32 o;
 
-  if (OBT_PROP_GET32(self->window, NET_WM_WINDOW_OPACITY, CARDINAL, &o))
-    OBT_PROP_SET32(self->frame->window, NET_WM_WINDOW_OPACITY, CARDINAL, o);
-  else
-    OBT_PROP_ERASE(self->frame->window, NET_WM_WINDOW_OPACITY);
+  if (OBT_PROP_GET32(self->window, NET_WM_WINDOW_OPACITY, CARDINAL, &o)) {
+    self->opacity_requested = o;
+    self->opacity_requested_set = TRUE;
+  }
+  else {
+    self->opacity_requested = OB_OPACITY_OPAQUE;
+    self->opacity_requested_set = FALSE;
+  }
+
+  client_recalc_opacity(self);
+}
+
+void client_recalc_opacity(ObClient* self) {
+  gboolean apply = self->opacity_requested_set;
+  guint32 value = self->opacity_requested;
+
+  if (client_wm_controls_opacity(self) && !client_focused(self)) {
+    apply = TRUE;
+    value = client_dim_unfocused_opacity(value);
+  }
+
+  client_apply_frame_opacity(self, apply, value);
+}
+
+static gboolean client_wm_controls_opacity(ObClient* self) {
+  if (!self->frame || self->prompt)
+    return FALSE;
+
+  return client_normal(self) && !client_helper(self);
+}
+
+static guint32 client_dim_unfocused_opacity(guint32 value) {
+  return (guint32)(((guint64)value * OB_INACTIVE_OPACITY_NUM) / OB_INACTIVE_OPACITY_DEN);
+}
+
+static void client_apply_frame_opacity(ObClient* self, gboolean apply, guint32 value) {
+  if (!self->frame)
+    return;
+
+  if (!apply) {
+    if (self->opacity_applied_set) {
+      OBT_PROP_ERASE(self->frame->window, NET_WM_WINDOW_OPACITY);
+      self->opacity_applied_set = FALSE;
+      self->opacity_applied = OB_OPACITY_OPAQUE;
+    }
+    return;
+  }
+
+  if (self->opacity_applied_set && self->opacity_applied == value)
+    return;
+
+  OBT_PROP_SET32(self->frame->window, NET_WM_WINDOW_OPACITY, CARDINAL, value);
+  self->opacity_applied_set = TRUE;
+  self->opacity_applied = value;
 }
 
 void client_update_normal_hints(ObClient* self) {

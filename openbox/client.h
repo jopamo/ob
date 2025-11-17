@@ -206,6 +206,15 @@ struct _ObClient {
   /*! The client's specified colormap */
   Colormap colormap;
 
+  /*! Base opacity requested by the client window */
+  guint32 opacity_requested;
+  /*! Opacity currently applied on the frame window */
+  guint32 opacity_applied;
+  /*! TRUE if the client explicitly set _NET_WM_WINDOW_OPACITY */
+  gboolean opacity_requested_set;
+  /*! TRUE if the frame currently has _NET_WM_WINDOW_OPACITY set */
+  gboolean opacity_applied_set;
+
   /*! Where to place the decorated window in relation to the undecorated
     window */
   gint gravity;
@@ -642,6 +651,8 @@ void client_update_sync_request_counter(ObClient* self);
 void client_update_colormap(ObClient* self, Colormap colormap);
 /*! Updates the requested opacity for the window from the client. */
 void client_update_opacity(ObClient* self);
+/*! Recalculates the compositor-facing opacity for the window. */
+void client_recalc_opacity(ObClient* self);
 /*! Updates the WMNormalHints and adjusts things if they change */
 void client_update_normal_hints(ObClient* self);
 
