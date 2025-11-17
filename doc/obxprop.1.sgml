@@ -96,8 +96,7 @@ manpage.1: manpage.sgml
   <refsect1>
     <title>SEE ALSO</title>
 
-    <para>openbox (1), openbox-session(1), openbox-gnome-session(1),
-      openbox-kde-session(1).</para>
+    <para>openbox (1), openbox-session(1), openbox-gnome-session(1).</para>
 
     <para>Please report bugs to: <literal>http://bugzilla.icculus.org/
       </literal></para>
@@ -120,5 +119,4 @@ sgml-local-catalogs:nil
 sgml-local-ecat-files:nil
 End:
 -->
-
 

@@ -11,7 +11,7 @@ Openbox as the window manager.
 arguments. 
 .SH "SEE ALSO" 
 .PP 
-openbox(1), openbox-kde-session(1), openbox-session(1). 
+openbox(1), openbox-session(1). 
  
 .PP 
 The program's full documentation is available on the website: 

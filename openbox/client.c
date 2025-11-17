@@ -1570,13 +1570,6 @@ void client_get_type_and_transientness(ObClient* self) {
         self->type = OB_CLIENT_TYPE_COMBO;
       else if (val[i] == OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_DND))
         self->type = OB_CLIENT_TYPE_DND;
-      else if (val[i] == OBT_PROP_ATOM(KDE_NET_WM_WINDOW_TYPE_OVERRIDE)) {
-        /* prevent this window from getting any decor or
-           functionality */
-        self->mwmhints.flags &= (OB_MWM_FLAG_FUNCTIONS | OB_MWM_FLAG_DECORATIONS);
-        self->mwmhints.decorations = 0;
-        self->mwmhints.functions = 0;
-      }
       if (self->type != (ObClientType)-1)
         break; /* grab the first legit type */
     }
@@ -2591,8 +2584,6 @@ static void client_change_wm_state(ObClient* self) {
     self->wmstate = NormalState;
 
   if (old != self->wmstate) {
-    OBT_PROP_MSG(ob_screen, self->window, KDE_WM_CHANGE_STATE, self->wmstate, 1, 0, 0, 0);
-
     state[0] = self->wmstate;
     state[1] = None;
     OBT_PROP_SETA32(self->window, WM_STATE, WM_STATE, state, 2);

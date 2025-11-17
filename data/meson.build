@@ -9,7 +9,6 @@ data_conf.set('bindir', bindir_abs)
 session_scripts = [
   ['xsession/openbox-session.in', 'openbox-session'],
   ['xsession/openbox-gnome-session.in', 'openbox-gnome-session'],
-  ['xsession/openbox-kde-session.in', 'openbox-kde-session'],
 ]
 foreach script : session_scripts
   configure_file(
@@ -25,7 +24,6 @@ endforeach
 desktop_entries = [
   ['xsession/openbox.desktop.in', 'openbox.desktop'],
   ['xsession/openbox-gnome.desktop.in', 'openbox-gnome.desktop'],
-  ['xsession/openbox-kde.desktop.in', 'openbox-kde.desktop'],
 ]
 foreach entry : desktop_entries
   configure_file(

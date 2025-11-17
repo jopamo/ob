@@ -256,12 +256,6 @@ static guint parse_value_environments(const gchar* in, const ObtDDParse* const p
           s += 4;
         }
         break;
-      case 'K':
-        if (strcmp(s, "DE") == 0) {
-          mask |= OBT_LINK_ENV_KDE;
-          s += 2;
-        }
-        break;
       case 'L':
         if (strcmp(s, "XDE") == 0) {
           mask |= OBT_LINK_ENV_LXDE;

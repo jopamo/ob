@@ -374,12 +374,6 @@ static void sm_save_yourself(SmcConn conn,
   vendor = SmcVendor(sm_conn);
   ob_debug_type(OB_DEBUG_SM, "Session manager's vendor: %s", vendor);
 
-  if (!strcmp(vendor, "KDE")) {
-    /* ksmserver guarantees that phase 1 will complete before allowing any
-       clients interaction, so we can save this sanely here before they
-       get messed up from interaction */
-    savedata = sm_save_get_data();
-  }
   free(vendor);
 
   if (!SmcRequestSaveYourselfPhase2(conn, sm_save_yourself_2, savedata)) {

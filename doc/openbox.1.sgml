@@ -54,17 +54,16 @@ manpage.1: manpage.sgml
     <para>Openbox is minimalistic, highly configurable, next generation window
       manager with extensive standards support.</para>
 
-    <para>You can start Openbox in three ways:</para>
+    <para>You can start Openbox in a few ways:</para>
 
-    <para>If you run a display manager such as GDM, you will find 3 entries
+    <para>If you run a display manager such as GDM, you will find entries
       in the login session type menu for Openbox:
-      <command>GNOME/Openbox</command>, <command>KDE/Openbox</command>
-      and <command>Openbox</command>. If you want to use Openbox
-      within GNOME or KDE, you can choose the appropriate entry, and it will
-      launch GNOME or KDE with Openbox as the window manager.</para>
+      <command>GNOME/Openbox</command> and <command>Openbox</command>. If you
+      want to use Openbox within GNOME you can choose the appropriate entry,
+      and it will launch GNOME with Openbox as the window manager.</para>
 
-    <para>The third option at log in, which is <command>Openbox</command>
-      without a session manager, uses the <command>openbox-session</command>
+    <para>If you log in using <command>Openbox</command>
+      without a session manager, it uses the <command>openbox-session</command>
       command to start Openbox. On log in, <command>&dhpackage;</command> will
       run the ~/.config/openbox/autostart.sh script if it exists, and will run
       the system-wide script @configdir@/openbox/autostart.sh otherwise. You
@@ -198,8 +197,7 @@ manpage.1: manpage.sgml
   <refsect1>
     <title>SEE ALSO</title>
 
-    <para>obconf (1), openbox-session(1), openbox-gnome-session(1),
-      openbox-kde-session(1).</para>
+    <para>obconf (1), openbox-session(1), openbox-gnome-session(1).</para>
 
     <para>The program's full documentation is available on the website:
       <literal>http://openbox.org/</literal></para>
@@ -225,5 +223,3 @@ sgml-local-catalogs:nil
 sgml-local-ecat-files:nil
 End:
 -->
-
-

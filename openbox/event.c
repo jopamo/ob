@@ -1370,10 +1370,10 @@ static void event_handle_client(ObClient* client, XEvent* e) {
 
       /* check for broken apps moving to their root position
 
-         XXX remove this some day...that would be nice. right now all
-         kde apps do this when they try activate themselves on another
-         desktop. eg. open amarok window on desktop 1, switch to desktop
-         2, click amarok tray icon. it will move by its decoration size.
+         XXX remove this some day...that would be nice. some apps do this when they
+         try activate themselves on another desktop. eg. open a window on desktop 1,
+         switch to desktop 2, activate it via its tray icon. it will move by its
+         decoration size.
       */
       if (x != client->area.x && x == (client->frame->area.x + client->frame->size.left - (gint)client->border_width) &&
           y != client->area.y && y == (client->frame->area.y + client->frame->size.top - (gint)client->border_width) &&

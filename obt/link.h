@@ -38,11 +38,10 @@ typedef enum {
 typedef enum {
   OBT_LINK_ENV_OPENBOX = 1 << 0,
   OBT_LINK_ENV_GNOME = 1 << 1,
-  OBT_LINK_ENV_KDE = 1 << 2,
-  OBT_LINK_ENV_LXDE = 1 << 3,
-  OBT_LINK_ENV_ROX = 1 << 4,
-  OBT_LINK_ENV_XFCE = 1 << 5,
-  OBT_LINK_ENV_OLD = 1 << 6
+  OBT_LINK_ENV_LXDE = 1 << 2,
+  OBT_LINK_ENV_ROX = 1 << 3,
+  OBT_LINK_ENV_XFCE = 1 << 4,
+  OBT_LINK_ENV_OLD = 1 << 5
 } ObtLinkEnvFlags;
 
 typedef enum {
@@ -75,7 +74,7 @@ ObtLinkType obt_link_type(ObtLink* e);
     current environment.  If FALSE, the .desktop file should not be showed.
     This also uses the TryExec option if it is present.
     @env A semicolon-deliminated list of environemnts.  Can be one or more of:
-         GNOME, KDE, ROX, XFCE.  Other environments not listed here may also
+         GNOME, ROX, XFCE.  Other environments not listed here may also
          be supported.  This can be null also if not listing any environment. */
 gboolean obt_link_display(ObtLink* e, const gchar* env);
 

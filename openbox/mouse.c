@@ -236,7 +236,7 @@ gboolean mouse_event(ObClient* client, XEvent* e) {
          after all the actions are finished.
 
          (We do it after all the actions because FocusIn interrupts
-         dragging for kdesktop, so if we send the button event now, and
+         dragging for some desktop shells, so if we send the button event now, and
          then they get a focus event after, it breaks.  Instead, wait to send
          the button press until after the actions when possible.)
       */

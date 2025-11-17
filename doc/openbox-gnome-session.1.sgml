@@ -45,7 +45,7 @@ manpage.1: manpage.sgml
   <refsect1>
     <title>SEE ALSO</title>
 
-    <para>openbox(1), openbox-kde-session(1), openbox-session(1).
+    <para>openbox(1), openbox-session(1).
       </para>
 
     <para>The program's full documentation is available on the website:
@@ -72,5 +72,4 @@ sgml-local-catalogs:nil
 sgml-local-ecat-files:nil
 End:
 -->
-
 
