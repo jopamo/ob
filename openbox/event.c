@@ -543,6 +543,19 @@ static void event_process(const XEvent* ec, gpointer data) {
 
   event_coalesce(mutable_event);
 
+#ifdef XKB
+  if (obt_display_extension_xkb && mutable_event->type == obt_display_extension_xkb_basep) {
+    gboolean map_changed = obt_keyboard_handle_xkb_event((const XkbAnyEvent*)mutable_event);
+    if (map_changed && config_keyboard_rebind_on_mapping_notify) {
+      ob_debug("Keyboard map changed. Reloading keyboard bindings.");
+      ob_set_state(OB_STATE_RECONFIGURING);
+      keyboard_rebind();
+      ob_set_state(OB_STATE_RUNNING);
+    }
+    return;
+  }
+#endif
+
   /* make a copy we can mangle */
   ee = *mutable_event;
   e = &ee;
@@ -579,6 +592,9 @@ static void event_process(const XEvent* ec, gpointer data) {
   }
 
   event_hack_mods(e);
+
+  if (e->type == KeyPress || e->type == KeyRelease)
+    obt_keyboard_handle_event(e);
 
   /* deal with it in the kernel */
 

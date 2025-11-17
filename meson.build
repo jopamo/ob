@@ -133,10 +133,19 @@ endif
 
 xkb_opt = get_option('xkb')
 have_xkb = false
+xkbcommon_deps = []
 if not xkb_opt.disabled()
   have_xkb = cc.has_function('XkbBell', dependencies: x11_dep)
   if not have_xkb and xkb_opt.enabled()
     error('XKB support requested but libX11 does not provide XkbBell()')
+  endif
+  if have_xkb
+    xkbcommon_dep = dependency('xkbcommon', required: xkb_opt.enabled())
+    if xkbcommon_dep.found()
+      xkbcommon_deps = [xkbcommon_dep]
+    else
+      have_xkb = false
+    endif
   endif
 endif
 
