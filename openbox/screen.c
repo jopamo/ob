@@ -238,6 +238,11 @@ gboolean screen_annex(void) {
   supported[i++] = OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_SPLASH);
   supported[i++] = OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_DIALOG);
   supported[i++] = OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_NORMAL);
+  supported[i++] = OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_POPUP_MENU);
+  supported[i++] = OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_TOOLTIP);
+  supported[i++] = OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_NOTIFICATION);
+  supported[i++] = OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_COMBO);
+  supported[i++] = OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_DND);
   supported[i++] = OBT_PROP_ATOM(NET_WM_ALLOWED_ACTIONS);
   supported[i++] = OBT_PROP_ATOM(NET_WM_WINDOW_OPACITY);
   supported[i++] = OBT_PROP_ATOM(NET_WM_BYPASS_COMPOSITOR);

@@ -196,7 +196,6 @@ Use `TODO(owner|tracker-id): short description` only for work that is known, sco
 ## Modernization TODO
 
 * XCB-first X11 path — replace `XPending`/`XNextEvent`/`XGetWindowProperty` use in `obt/xqueue.c`, `openbox/event.c`, and `obt/prop.c` with `xcb_poll_for_event` plus bounded property replies to cut round-trips and oversized allocations.
-* Tight property validation — cap sizes (no `G_MAXLONG` reads), verify types/lengths for every getter, and centralize the checks in `obt/prop.c` so mis-sized properties never reach window-management code.
 * Complete EWMH window-type coverage — add the missing spec types (`_NET_WM_WINDOW_TYPE_POPUP_MENU`, `_NET_WM_WINDOW_TYPE_TOOLTIP`, notification/combo/dnd) to `_NET_SUPPORTED` in `openbox/screen.c` and teach `openbox/client.c`/`frame.c` to honor their focus/placement rules.
 * Virtual roots support — either implement `_NET_VIRTUAL_ROOTS` handling (root redirection, focus gating) or explicitly document the unsupported status in `_NET_SUPPORTED` and client handling.
 * Modern toolchain defaults — bump Meson to `c_std=c17`, enable the existing optional features by default when headers are present (`xsync`, `xrandr`, `xinerama`, `xshape`, `xkb`), and fix resulting warnings so hardened builds stay clean.

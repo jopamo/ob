@@ -1560,6 +1560,16 @@ void client_get_type_and_transientness(ObClient* self) {
         self->type = OB_CLIENT_TYPE_DIALOG;
       else if (val[i] == OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_NORMAL))
         self->type = OB_CLIENT_TYPE_NORMAL;
+      else if (val[i] == OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_POPUP_MENU))
+        self->type = OB_CLIENT_TYPE_POPUP_MENU;
+      else if (val[i] == OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_TOOLTIP))
+        self->type = OB_CLIENT_TYPE_TOOLTIP;
+      else if (val[i] == OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_NOTIFICATION))
+        self->type = OB_CLIENT_TYPE_NOTIFICATION;
+      else if (val[i] == OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_COMBO))
+        self->type = OB_CLIENT_TYPE_COMBO;
+      else if (val[i] == OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_DND))
+        self->type = OB_CLIENT_TYPE_DND;
       else if (val[i] == OBT_PROP_ATOM(KDE_NET_WM_WINDOW_TYPE_OVERRIDE)) {
         /* prevent this window from getting any decor or
            functionality */
@@ -1588,7 +1598,10 @@ void client_get_type_and_transientness(ObClient* self) {
 
   /* then, based on our type, we can update our transientness.. */
   if (self->type == OB_CLIENT_TYPE_DIALOG || self->type == OB_CLIENT_TYPE_TOOLBAR ||
-      self->type == OB_CLIENT_TYPE_MENU || self->type == OB_CLIENT_TYPE_UTILITY) {
+      self->type == OB_CLIENT_TYPE_MENU || self->type == OB_CLIENT_TYPE_UTILITY ||
+      self->type == OB_CLIENT_TYPE_POPUP_MENU || self->type == OB_CLIENT_TYPE_TOOLTIP ||
+      self->type == OB_CLIENT_TYPE_NOTIFICATION || self->type == OB_CLIENT_TYPE_COMBO ||
+      self->type == OB_CLIENT_TYPE_DND) {
     self->transient = TRUE;
   }
 }
@@ -1858,6 +1871,16 @@ static void client_setup_default_decor_and_functions(ObClient* self) {
          do with them is move them */
       self->decorations = 0;
       self->functions = OB_CLIENT_FUNC_MOVE;
+      break;
+
+    case OB_CLIENT_TYPE_POPUP_MENU:
+    case OB_CLIENT_TYPE_COMBO:
+    case OB_CLIENT_TYPE_TOOLTIP:
+    case OB_CLIENT_TYPE_NOTIFICATION:
+    case OB_CLIENT_TYPE_DND:
+      /* transient helper windows should not be decorated or managed heavily */
+      self->decorations = 0;
+      self->functions = 0;
       break;
 
     case OB_CLIENT_TYPE_DESKTOP:
@@ -2523,6 +2546,21 @@ const gchar* client_type_to_string(ObClient* self) {
     case OB_CLIENT_TYPE_DOCK:
       type = "dock";
       break;
+    case OB_CLIENT_TYPE_POPUP_MENU:
+      type = "popup_menu";
+      break;
+    case OB_CLIENT_TYPE_TOOLTIP:
+      type = "tooltip";
+      break;
+    case OB_CLIENT_TYPE_NOTIFICATION:
+      type = "notification";
+      break;
+    case OB_CLIENT_TYPE_COMBO:
+      type = "combo";
+      break;
+    case OB_CLIENT_TYPE_DND:
+      type = "dnd";
+      break;
   }
 
   return type;
@@ -2838,21 +2876,31 @@ void client_showhide(ObClient* self) {
 
 gboolean client_normal(ObClient* self) {
   return !(self->type == OB_CLIENT_TYPE_DESKTOP || self->type == OB_CLIENT_TYPE_DOCK ||
-           self->type == OB_CLIENT_TYPE_SPLASH);
+           self->type == OB_CLIENT_TYPE_SPLASH || self->type == OB_CLIENT_TYPE_POPUP_MENU ||
+           self->type == OB_CLIENT_TYPE_TOOLTIP || self->type == OB_CLIENT_TYPE_NOTIFICATION ||
+           self->type == OB_CLIENT_TYPE_COMBO || self->type == OB_CLIENT_TYPE_DND);
 }
 
 gboolean client_helper(ObClient* self) {
   return (self->type == OB_CLIENT_TYPE_UTILITY || self->type == OB_CLIENT_TYPE_MENU ||
-          self->type == OB_CLIENT_TYPE_TOOLBAR);
+          self->type == OB_CLIENT_TYPE_TOOLBAR || self->type == OB_CLIENT_TYPE_POPUP_MENU ||
+          self->type == OB_CLIENT_TYPE_TOOLTIP || self->type == OB_CLIENT_TYPE_NOTIFICATION ||
+          self->type == OB_CLIENT_TYPE_COMBO || self->type == OB_CLIENT_TYPE_DND);
 }
 
 gboolean client_occupies_space(ObClient* self) {
-  return !(self->type == OB_CLIENT_TYPE_DESKTOP || self->type == OB_CLIENT_TYPE_SPLASH);
+  return !(self->type == OB_CLIENT_TYPE_DESKTOP || self->type == OB_CLIENT_TYPE_SPLASH ||
+           self->type == OB_CLIENT_TYPE_POPUP_MENU || self->type == OB_CLIENT_TYPE_TOOLTIP ||
+           self->type == OB_CLIENT_TYPE_NOTIFICATION || self->type == OB_CLIENT_TYPE_COMBO ||
+           self->type == OB_CLIENT_TYPE_DND);
 }
 
 gboolean client_mouse_focusable(ObClient* self) {
   return !(self->type == OB_CLIENT_TYPE_MENU || self->type == OB_CLIENT_TYPE_TOOLBAR ||
-           self->type == OB_CLIENT_TYPE_SPLASH || self->type == OB_CLIENT_TYPE_DOCK);
+           self->type == OB_CLIENT_TYPE_SPLASH || self->type == OB_CLIENT_TYPE_DOCK ||
+           self->type == OB_CLIENT_TYPE_POPUP_MENU || self->type == OB_CLIENT_TYPE_TOOLTIP ||
+           self->type == OB_CLIENT_TYPE_NOTIFICATION || self->type == OB_CLIENT_TYPE_COMBO ||
+           self->type == OB_CLIENT_TYPE_DND);
 }
 
 gboolean client_enter_focusable(ObClient* self) {

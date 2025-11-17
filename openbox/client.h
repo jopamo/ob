@@ -50,7 +50,12 @@ typedef enum {
   OB_CLIENT_TYPE_UTILITY, /*!< A small utility window such as a palette */
   OB_CLIENT_TYPE_SPLASH,  /*!< A splash screen window */
   OB_CLIENT_TYPE_DIALOG,  /*!< A dialog window */
-  OB_CLIENT_TYPE_NORMAL   /*!< A normal application window */
+  OB_CLIENT_TYPE_NORMAL,        /*!< A normal application window */
+  OB_CLIENT_TYPE_POPUP_MENU,    /*!< Transient popup/context menus */
+  OB_CLIENT_TYPE_TOOLTIP,       /*!< Tooltip-style helpers */
+  OB_CLIENT_TYPE_NOTIFICATION,  /*!< Notification bubbles and alerts */
+  OB_CLIENT_TYPE_COMBO,         /*!< Combo box/dropdown popups */
+  OB_CLIENT_TYPE_DND            /*!< Drag-and-drop helper windows */
 } ObClientType;
 
 /*! The things the user can do to the client window */
