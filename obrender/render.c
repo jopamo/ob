@@ -18,12 +18,42 @@
 #endif
 
 static void pixel_data_to_pixmap(RrAppearance* l, gint x, gint y, gint w, gint h);
+static Pixmap ensure_pixmap(RrAppearance* a, gint w, gint h);
+
+static Pixmap ensure_pixmap(RrAppearance* a, gint w, gint h) {
+  Pixmap oldp = None;
+  gboolean resized = (a->w != w || a->h != h);
+  const gboolean need_pixmap = (a->pixmap == None || resized);
+
+  if (need_pixmap) {
+    oldp = a->pixmap;
+    a->pixmap = XCreatePixmap(RrDisplay(a->inst), RrRootWindow(a->inst), w, h, RrDepth(a->inst));
+    g_assert(a->pixmap != None);
+    if (a->xftdraw != NULL)
+      XftDrawDestroy(a->xftdraw);
+    a->xftdraw = XftDrawCreate(RrDisplay(a->inst), a->pixmap, RrVisual(a->inst), RrColormap(a->inst));
+    g_assert(a->xftdraw != NULL);
+  }
+  else if (a->xftdraw == NULL) {
+    a->xftdraw = XftDrawCreate(RrDisplay(a->inst), a->pixmap, RrVisual(a->inst), RrColormap(a->inst));
+    g_assert(a->xftdraw != NULL);
+  }
+
+  if (resized || a->surface.pixel_data == NULL) {
+    g_free(a->surface.pixel_data);
+    a->surface.pixel_data = g_new(RrPixel32, (gsize)w * (gsize)h);
+  }
+
+  a->w = w;
+  a->h = h;
+
+  return oldp;
+}
 
 Pixmap RrPaintPixmap(RrAppearance* a, gint w, gint h) {
   gint i, transferred = 0, force_transfer = 0;
   Pixmap oldp = None;
   RrRect tarea; /* area in which to draw textures */
-  gboolean resized;
 
   if (w <= 0 || h <= 0)
     return None;
@@ -38,24 +68,7 @@ Pixmap RrPaintPixmap(RrAppearance* a, gint w, gint h) {
     return None;
   }
 
-  resized = (a->w != w || a->h != h);
-
-  oldp = a->pixmap; /* save to free after changing the visible pixmap */
-  a->pixmap = XCreatePixmap(RrDisplay(a->inst), RrRootWindow(a->inst), w, h, RrDepth(a->inst));
-
-  g_assert(a->pixmap != None);
-  a->w = w;
-  a->h = h;
-
-  if (a->xftdraw != NULL)
-    XftDrawDestroy(a->xftdraw);
-  a->xftdraw = XftDrawCreate(RrDisplay(a->inst), a->pixmap, RrVisual(a->inst), RrColormap(a->inst));
-  g_assert(a->xftdraw != NULL);
-
-  if (resized) {
-    g_free(a->surface.pixel_data);
-    a->surface.pixel_data = g_new(RrPixel32, (gsize)w * (gsize)h);
-  }
+  oldp = ensure_pixmap(a, w, h);
 
   RrRender(a, w, h);
 

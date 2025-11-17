@@ -379,9 +379,9 @@ RrSize* RrFontMeasureString(const RrFont* f,
 gint RrFontHeight(const RrFont* f, gint shadow_offset_y);
 gint RrFontMaxCharWidth(const RrFont* f);
 
-/* Paint into the appearance. The old pixmap is returned (if there was one). It
-   is the responsibility of the caller to call XFreePixmap on the return when
-   it is non-null. */
+/* Paint into the appearance. When a new backing pixmap must be created, the
+   previous one is returned so the caller can XFreePixmap() it after the window
+   has been updated. If the cached pixmap is reused, None is returned. */
 Pixmap RrPaintPixmap(RrAppearance* a, gint w, gint h);
 void RrPaint(RrAppearance* a, Window win, gint w, gint h);
 void RrClearWindowColor(const RrInstance* inst, Window win, const RrColor* color);
