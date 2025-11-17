@@ -2,11 +2,15 @@
 
 ## Directory Overview
 
-* **openbox** — core of the window manager
-* **render** — `librender`, rendering routines for the WM and for apps
-* **parser** — `libparser`, for parsing configuration files
-* **obconf** — configuration tool, not part of the WM runtime
+* **openbox** — core window manager code
+* **obrender** — `librender`, shared rendering routines
+* **obt** — shared utility library (display, xml, keyboard, xqueue)
 * **data** — default configuration, themes, menu files
+* **tests** — X11 regression tests and unit tests
+* **tools** — helper utilities (e.g. obxprop, themeupdate)
+* **doc** — documentation (manpages, doxygen config)
+* **themes** — shipped themes
+* **po** — translations
 
 ---
 
@@ -45,7 +49,7 @@ Clients are represented by the `Client` struct:
 
 * `Client.area` tracks the *logical* client rectangle  
 * `Client.frame` wraps decorations and tracks the rendered extents  
-* `Client.transient_for` links transient relationships  
+* `Client.transient` plus `parents`/`transients` track transient relationships  
 * `Client.obwin` is the server-side representation of the frame window  
 * `Client.desktop` indexes into the workspace manager
 
@@ -60,16 +64,15 @@ The WM should never assume a client is well-behaved; sanitize properties and typ
 
 ---
 
-## `Client.transient_for`
+## Transient Hierarchy
 
-Be cautious when using `Client.transient_for`.
-It can be set to a non-NULL value of `TRAN_GROUP`, which is **not a valid pointer**.
+Transience is tracked with explicit fields:
 
-Always check for `TRAN_GROUP` before following `transient_for`.
-If a window is transient for the group, this **excludes**:
+* `transient` — whether the client advertises a transient relationship
+* `transient_for_group` — TRUE when the transient-for hint points at Root or when group-level transience is inferred
+* `parents` / `transients` — GSLists that form the tree
 
-* other windows transient for the group, and
-* windows that are children of the window (to avoid infinite loops)
+Group transients must **never** be treated as a real parent pointer. `client_direct_parent()` intentionally returns `NULL` for group-level transients so higher-level code does not walk into invalid pointers or loops. When updating or traversing transient trees, always guard on `transient_for_group` before following parent chains and avoid letting group transients adopt other group transients.
 
 ---
 
@@ -197,12 +200,12 @@ The following lists all **NetWM (EWMH)** hints from freedesktop.org and Openbox�
 | `_NET_WM_STRUT_PARTIAL`           | 1.3     | +      | Per-monitor struts in Xinerama setups |
 | `_NET_WM_ICON_GEOMETRY`           | 1.3     | +      |                                       |
 | `_NET_WM_ICON`                    | 1.3     | +      |                                       |
-| `_NET_WM_PID`                     | 1.3     | -      | Openbox does not kill processes       |
+| `_NET_WM_PID`                     | 1.3     | +      | Uses PID to terminate hung local apps |
 | `_NET_WM_HANDLED_ICONS`           | 1.3     | +      | Icons for iconic windows not shown    |
 | `_NET_WM_BYPASS_COMPOSITOR`       | 1.3     | +      | Honors bypass requests for dimming    |
 | `_NET_WM_USER_TIME`               | 1.3     | +      |                                       |
 | `_NET_WM_USER_TIME_WINDOW`        | 1.4     | +      | Helper-window timestamps respected    |
-| `_NET_WM_PING`                    | 1.3     | -      | Does not check for hung processes     |
+| `_NET_WM_PING`                    | 1.3     | +      | Pings clients and prompts on timeout  |
 | `_NET_FRAME_EXTENTS`              | 1.3     | +      |                                       |
 | `_NET_WM_STATE_DEMANDS_ATTENTION` | 1.3     | +      |                                       |
 | `_NET_RESTACK_WINDOW`             | 1.3     | +      |                                       |
@@ -235,7 +238,7 @@ Openbox historically has little automated testing. Developers should use:
 * Logging wrappers around X11 property fetches  
 * Reproducible test scripts for stacking, focus, and EWMH behavior  
 
-Include a simple test runner in `test/` rather than scattering ad-hoc scripts.
+Include a simple test runner in `tests/` rather than scattering ad-hoc scripts, and wire new binaries into `tests/meson.build` so `ninja -C build x11-regression-tests` can exercise them.
 
 ---
 
