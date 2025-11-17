@@ -201,7 +201,9 @@ gboolean screen_annex(void) {
 
   /* set the _NET_SUPPORTED_ATOMS hint */
 
-  /* this is all the atoms after NET_SUPPORTED in the ObtPropAtoms enum */
+  /* this is all the atoms after NET_SUPPORTED in the ObtPropAtoms enum.
+     _NET_VIRTUAL_ROOTS is intentionally omitted because virtual roots are not
+     supported; clients are expected to use the real root window. */
   num_support = OBT_PROP_NUM_ATOMS - OBT_PROP_NET_SUPPORTED - 1;
   i = 0;
   supported = g_new(gulong, num_support);

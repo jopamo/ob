@@ -162,14 +162,14 @@ Openbox advertises the following EWMH hints via `_NET_SUPPORTED` (see `openbox/s
 | Root messages | `_NET_CLOSE_WINDOW`, `_NET_MOVERESIZE_WINDOW`, `_NET_RESTACK_WINDOW`, `_NET_REQUEST_FRAME_EXTENTS` | Supported | Handled in the central event dispatcher. |
 | Client identity & geometry | `_NET_WM_NAME`, `_NET_WM_VISIBLE_NAME`, `_NET_WM_ICON_NAME`, `_NET_WM_VISIBLE_ICON_NAME`, `_NET_WM_DESKTOP`, `_NET_WM_PID`, `_NET_FRAME_EXTENTS` | Supported | Applied during manage and on property changes. |
 | Icons & struts | `_NET_WM_ICON`, `_NET_WM_ICON_GEOMETRY`, `_NET_WM_STRUT`, `_NET_WM_STRUT_PARTIAL` | Supported | `_NET_WM_HANDLED_ICONS` tells clients Openbox renders iconic windows itself. |
-| Window types | `_NET_WM_WINDOW_TYPE` values: Desktop, Dock, Toolbar, Menu, Utility, Splash, Dialog, Normal | Supported | Popup/tooltip/notification/combo/DND types are not advertised and fall back to normal handling. |
+| Window types | `_NET_WM_WINDOW_TYPE` values: Desktop, Dock, Toolbar, Menu, Utility, Splash, Dialog, Normal, PopupMenu, Tooltip, Notification, Combo, DND | Supported | Popup-style helper types are managed as transient, undecorated helper windows and are not focusable. |
 | Window states | `_NET_WM_STATE` values: Modal, Sticky, MaximizedVert, MaximizedHorz, Shaded, SkipTaskbar, SkipPager, Hidden, Fullscreen, Above, Below, DemandsAttention | Supported | All states are listed in `_NET_SUPPORTED`. |
 | Allowed actions | `_NET_WM_ALLOWED_ACTIONS` values: Move, Resize, Minimize, Shade, Stick, MaximizeHorz, MaximizeVert, Fullscreen, ChangeDesktop, Close, Above, Below | Supported | Sent per window based on capabilities. |
 | Focus/timing & compositor hints | `_NET_WM_USER_TIME`, `_NET_WM_USER_TIME_WINDOW`, `_NET_WM_BYPASS_COMPOSITOR`, `_NET_WM_WINDOW_OPACITY` | Supported | Opacity is widely used but outside the core spec. |
 | Ping & moveresize | `_NET_WM_PING`, `_NET_WM_MOVERESIZE`, `_NET_MOVERESIZE_WINDOW` | Supported | Includes keyboard directions and cancel codes. |
 | Startup notification | `_NET_STARTUP_ID` | Supported (optional) | Functional when built with `-Dstartup_notification`; otherwise stubbed. |
 | Sync requests | `_NET_WM_SYNC_REQUEST`, `_NET_WM_SYNC_REQUEST_COUNTER` | Supported (optional) | Advertised and used when XSync is available (`-Dxsync`). |
-| Not advertised | `_NET_VIRTUAL_ROOTS`, `_NET_WM_WINDOW_TYPE` popup/tooltip/notification/combo/dnd | Not supported | These hints currently fall back to default handling. |
+| Not advertised | `_NET_VIRTUAL_ROOTS` | Not supported | `_NET_VIRTUAL_ROOTS` is intentionally not advertised; the WM sticks to the real root window. |
 
 ---
 
@@ -196,8 +196,6 @@ Use `TODO(owner|tracker-id): short description` only for work that is known, sco
 ## Modernization TODO
 
 * XCB-first X11 path — replace `XPending`/`XNextEvent`/`XGetWindowProperty` use in `obt/xqueue.c`, `openbox/event.c`, and `obt/prop.c` with `xcb_poll_for_event` plus bounded property replies to cut round-trips and oversized allocations.
-* Complete EWMH window-type coverage — add the missing spec types (`_NET_WM_WINDOW_TYPE_POPUP_MENU`, `_NET_WM_WINDOW_TYPE_TOOLTIP`, notification/combo/dnd) to `_NET_SUPPORTED` in `openbox/screen.c` and teach `openbox/client.c`/`frame.c` to honor their focus/placement rules.
-* Virtual roots support — either implement `_NET_VIRTUAL_ROOTS` handling (root redirection, focus gating) or explicitly document the unsupported status in `_NET_SUPPORTED` and client handling.
 * Modern toolchain defaults — bump Meson to `c_std=c17`, enable the existing optional features by default when headers are present (`xsync`, `xrandr`, `xinerama`, `xshape`, `xkb`), and fix resulting warnings so hardened builds stay clean.
 * Event path profiling — add a small Xephyr-based perf harness under `tests/` to track event-to-frame latency and repaint batching, then use it to guide regression checks while pruning redundant buffering in `obt/xqueue`.
 
