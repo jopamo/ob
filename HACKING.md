@@ -199,6 +199,7 @@ The following lists all **NetWM (EWMH)** hints from freedesktop.org and Openboxâ
 | `_NET_WM_ICON`                    | 1.3     | +      |                                       |
 | `_NET_WM_PID`                     | 1.3     | -      | Openbox does not kill processes       |
 | `_NET_WM_HANDLED_ICONS`           | 1.3     | +      | Icons for iconic windows not shown    |
+| `_NET_WM_BYPASS_COMPOSITOR`       | 1.3     | +      | Honors bypass requests for dimming    |
 | `_NET_WM_USER_TIME`               | 1.3     | +      |                                       |
 | `_NET_WM_USER_TIME_WINDOW`        | 1.4     | +      | Helper-window timestamps respected    |
 | `_NET_WM_PING`                    | 1.3     | -      | Does not check for hung processes     |

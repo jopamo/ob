@@ -214,6 +214,8 @@ struct _ObClient {
   gboolean opacity_requested_set;
   /*! TRUE if the frame currently has _NET_WM_WINDOW_OPACITY set */
   gboolean opacity_applied_set;
+  /*! TRUE if the client requested bypassing compositors */
+  gboolean bypass_compositor;
 
   /*! Where to place the decorated window in relation to the undecorated
     window */
@@ -651,6 +653,8 @@ void client_update_sync_request_counter(ObClient* self);
 void client_update_colormap(ObClient* self, Colormap colormap);
 /*! Updates the requested opacity for the window from the client. */
 void client_update_opacity(ObClient* self);
+/*! Tracks _NET_WM_BYPASS_COMPOSITOR and related dimming exemptions. */
+void client_update_bypass_compositor(ObClient* self);
 /*! Recalculates the compositor-facing opacity for the window. */
 void client_recalc_opacity(ObClient* self);
 /*! Updates the WMNormalHints and adjusts things if they change */

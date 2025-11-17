@@ -117,7 +117,8 @@ static gboolean client_can_steal_focus(ObClient* self,
                                        Time launch_time);
 static void client_setup_default_decor_and_functions(ObClient* self);
 static void client_setup_decor_undecorated(ObClient* self);
-static gboolean client_wm_controls_opacity(ObClient* self);
+static gboolean client_dim_supported(ObClient* self);
+static gboolean client_dim_blocked(ObClient* self);
 static guint32 client_dim_unfocused_opacity(guint32 value);
 static void client_apply_frame_opacity(ObClient* self, gboolean apply, guint32 value);
 
@@ -1240,6 +1241,7 @@ static void client_get_all(ObClient* self, gboolean real) {
   client_get_desktop(self); /* uses transient data/group/startup id if a
                                desktop is not specified */
   client_get_shaped(self);
+  client_update_bypass_compositor(self);
 
   {
     /* a couple type-based defaults for new windows */
@@ -1677,11 +1679,25 @@ void client_update_opacity(ObClient* self) {
   client_recalc_opacity(self);
 }
 
+void client_update_bypass_compositor(ObClient* self) {
+  guint32 flag = 0;
+  gboolean bypass = FALSE;
+
+  if (OBT_PROP_GET32(self->window, NET_WM_BYPASS_COMPOSITOR, CARDINAL, &flag))
+    bypass = (flag != 0);
+
+  if (self->bypass_compositor == bypass)
+    return;
+
+  self->bypass_compositor = bypass;
+  client_recalc_opacity(self);
+}
+
 void client_recalc_opacity(ObClient* self) {
   gboolean apply = self->opacity_requested_set;
   guint32 value = self->opacity_requested;
 
-  if (client_wm_controls_opacity(self) && !client_focused(self)) {
+  if (client_dim_supported(self) && !client_dim_blocked(self) && !client_focused(self)) {
     apply = TRUE;
     value = client_dim_unfocused_opacity(value);
   }
@@ -1689,11 +1705,20 @@ void client_recalc_opacity(ObClient* self) {
   client_apply_frame_opacity(self, apply, value);
 }
 
-static gboolean client_wm_controls_opacity(ObClient* self) {
+static gboolean client_dim_supported(ObClient* self) {
   if (!self->frame || self->prompt)
     return FALSE;
 
   return client_normal(self) && !client_helper(self);
+}
+
+static gboolean client_dim_blocked(ObClient* self) {
+  /* Each condition below intentionally stands alone to make future
+     exemptions easy to add. */
+  if (self->bypass_compositor)
+    return TRUE;
+
+  return FALSE;
 }
 
 static guint32 client_dim_unfocused_opacity(guint32 value) {
