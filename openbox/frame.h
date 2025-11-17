@@ -186,6 +186,7 @@ struct _ObFrame {
 
   gboolean focused;
   gboolean need_render;
+  gboolean suppress_damage_once;
 
   gboolean flashing;
   gboolean flash_on;

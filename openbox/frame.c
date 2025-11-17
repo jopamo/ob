@@ -294,11 +294,14 @@ void frame_adjust_theme(ObFrame* self) {
 }
 
 static void frame_publish_updates(ObFrame* self, gboolean force_extents, gboolean send_damage) {
+  gboolean suppress_damage = self->suppress_damage_once;
+  self->suppress_damage_once = FALSE;
 #ifdef DAMAGE
-  if (send_damage && obt_display_extension_damage)
+  if (send_damage && obt_display_extension_damage && !suppress_damage)
     XDamageAdd(obt_display, self->window, None);
 #else
   (void)send_damage;
+  (void)suppress_damage;
 #endif
 
   if (force_extents || !STRUT_EQUAL(self->size, self->oldsize)) {
@@ -772,6 +775,7 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
     if (resized) {
       self->need_render = TRUE;
       framerender_frame(self);
+      self->suppress_damage_once = !self->need_render;
       frame_update_shape(self);
     }
     else {

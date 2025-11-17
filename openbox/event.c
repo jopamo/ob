@@ -1028,6 +1028,24 @@ static gboolean skip_property_change(XEvent* e, gpointer data) {
   return FALSE;
 }
 
+#ifdef SHAPE
+struct ObSkipShapeChange {
+  Window window;
+  gint kind;
+};
+
+static gboolean skip_shape_change(XEvent* e, gpointer data) {
+  const struct ObSkipShapeChange s = *(const struct ObSkipShapeChange*)data;
+
+  if (obt_display_extension_shape && e->type == obt_display_extension_shape_basep) {
+    const XShapeEvent* se = (const XShapeEvent*)e;
+    if (se->window == s.window && se->kind == s.kind)
+      return TRUE;
+  }
+  return FALSE;
+}
+#endif
+
 static void event_update_user_time_from_window(ObClient* client, Window win, Time timestamp) {
   guint32 t;
 
@@ -1759,6 +1777,12 @@ static void event_handle_client(ObClient* client, XEvent* e) {
 #ifdef SHAPE
       {
         if (obt_display_extension_shape && e->type == obt_display_extension_shape_basep) {
+          struct ObSkipShapeChange s;
+          s.window = ((XShapeEvent*)e)->window;
+          s.kind = ((XShapeEvent*)e)->kind;
+          if (xqueue_exists_local(skip_shape_change, &s))
+            break;
+
           switch (((XShapeEvent*)e)->kind) {
             case ShapeBounding:
             case ShapeClip:
