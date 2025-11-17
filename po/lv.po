@@ -381,11 +381,6 @@ msgstr "  --debug-focus       Rādīt atkļūdošanas izvadi fokusēšanas darb�
 msgid "  --debug-session     Display debugging output for session management\n"
 msgstr ""
 
-#: openbox/openbox.c:552
-msgid "  --debug-xinerama    Split the display into fake xinerama screens\n"
-msgstr ""
-"  --debug-xinerama    Sadalīt displeju vairākos viltus xinerama ekrānos\n"
-
 #: openbox/openbox.c:553
 #, c-format
 msgid ""

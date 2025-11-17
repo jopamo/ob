@@ -394,10 +394,6 @@ msgid "  --debug-session     Display debugging output for session management\n"
 msgstr ""
 "  --debug-session     Mostra o resultado de depuração da gestão de sessão\n"
 
-#: openbox/openbox.c:552
-msgid "  --debug-xinerama    Split the display into fake xinerama screens\n"
-msgstr "  --debug-xinerama    Divide o ecrã em falsos ecrãs xinerama\n"
-
 #: openbox/openbox.c:553
 #, c-format
 msgid ""

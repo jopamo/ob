@@ -385,11 +385,6 @@ msgstr "  --debug-focus       Vertoon ontfouting afvoer vir fokus hantering\n"
 msgid "  --debug-session     Display debugging output for session management\n"
 msgstr ""
 
-#: openbox/openbox.c:552
-msgid "  --debug-xinerama    Split the display into fake xinerama screens\n"
-msgstr ""
-"  --debug-xinerama    Verdeel die vertoning in nagemaakte xinerama skerms\n"
-
 #: openbox/openbox.c:553
 #, c-format
 msgid ""

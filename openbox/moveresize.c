@@ -603,7 +603,7 @@ static void do_edge_warp(gint x, gint y) {
     if (y == RECT_BOTTOM(*a))
       dir = OB_DIRECTION_SOUTH;
 
-    /* try check for xinerama boundaries */
+    /* try check for monitor boundaries */
     if ((x + 1 == RECT_LEFT(*a) || x - 1 == RECT_RIGHT(*a)) && (dir == OB_DIRECTION_WEST || dir == OB_DIRECTION_EAST)) {
       dir = -1;
     }

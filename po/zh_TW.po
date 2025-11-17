@@ -375,10 +375,6 @@ msgstr "  --debug-focus       顯示焦點處理的偵錯輸出\n"
 msgid "  --debug-session     Display debugging output for session management\n"
 msgstr ""
 
-#: openbox/openbox.c:552
-msgid "  --debug-xinerama    Split the display into fake xinerama screens\n"
-msgstr "  --debug-xinerama    分割顯示以進入假造的 xinerama 螢幕\n"
-
 #: openbox/openbox.c:553
 #, c-format
 msgid ""

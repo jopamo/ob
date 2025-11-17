@@ -399,11 +399,6 @@ msgstr ""
 "  --debug-session     Affiche la sortie de déboguage pour la gestion du "
 "session\n"
 
-#: openbox/openbox.c:552
-msgid "  --debug-xinerama    Split the display into fake xinerama screens\n"
-msgstr ""
-"  --debug-xinerama    Découpe l'affichage en écrans xinerama factices\n"
-
 #: openbox/openbox.c:553
 #, c-format
 msgid ""

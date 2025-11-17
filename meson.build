@@ -94,9 +94,6 @@ librsvg_dep = dependency('librsvg-2.0', required: librsvg_opt.enabled())
 xrandr_opt = get_option('xrandr')
 xrandr_dep = dependency('xrandr', required: xrandr_opt.enabled())
 
-xinerama_opt = get_option('xinerama')
-xinerama_dep = dependency('xinerama', required: xinerama_opt.enabled())
-
 xshape_opt = get_option('xshape')
 have_xshape = false
 if not xshape_opt.disabled()
@@ -166,18 +163,6 @@ endif
 have_imlib = (not imlib_opt.disabled()) and imlib_dep.found()
 have_librsvg = (not librsvg_opt.disabled()) and librsvg_dep.found()
 have_xrandr = (not xrandr_opt.disabled()) and xrandr_dep.found()
-have_xinerama = false
-if not xinerama_opt.disabled()
-  have_xinerama = xinerama_dep.found()
-  if have_xinerama
-    have_xinerama = cc.has_header(
-      'X11/extensions/Xinerama.h',
-      dependencies: [x11_dep, xinerama_dep])
-  endif
-  if not have_xinerama and xinerama_opt.enabled()
-    error('Xinerama support requested but X11/extensions/Xinerama.h not found')
-  endif
-endif
 
 # ---------------------------------------------------------------------------
 # Common compile helpers
@@ -244,9 +229,6 @@ endif
 if have_xrandr
   feature_defines += ['-DXRANDR']
 endif
-if have_xinerama
-  feature_defines += ['-DXINERAMA']
-endif
 if have_xshape
   feature_defines += ['-DSHAPE']
 endif
@@ -285,9 +267,6 @@ subdir('po')
 obt_private_libs = [x11_dep, xext_dep, xrender_dep, xml_dep, glib_dep]
 if have_xrandr
   obt_private_libs += xrandr_dep
-endif
-if have_xinerama
-  obt_private_libs += xinerama_dep
 endif
 if have_xdamage
   obt_private_libs += xdamage_dep
@@ -354,7 +333,6 @@ summary({
   'Imlib2 icons': have_imlib,
   'SVG icons (librsvg)': have_librsvg,
   'XRandR': have_xrandr,
-  'Xinerama': have_xinerama,
   'XShape': have_xshape,
   'XSync': have_xsync,
   'XKB': have_xkb,

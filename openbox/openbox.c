@@ -92,7 +92,6 @@ gboolean ob_sm_use = TRUE;
 gchar* ob_sm_id = NULL;
 gchar* ob_sm_save_file = NULL;
 gboolean ob_sm_restore = TRUE;
-gboolean ob_debug_xinerama = FALSE;
 const gchar* ob_locale_msg = NULL;
 
 static ObState state;
@@ -524,7 +523,6 @@ static void print_help(void) {
   g_print(_("  --debug             Display debugging output\n"));
   g_print(_("  --debug-focus       Display debugging output for focus handling\n"));
   g_print(_("  --debug-session     Display debugging output for session management\n"));
-  g_print(_("  --debug-xinerama    Split the display into fake xinerama screens\n"));
   g_print(_("\nPlease report bugs at %s\n"), PACKAGE_BUGREPORT);
 }
 
@@ -605,9 +603,6 @@ static void parse_args(gint* argc, gchar** argv) {
     }
     else if (!strcmp(argv[i], "--debug-session")) {
       ob_debug_enable(OB_DEBUG_SM, TRUE);
-    }
-    else if (!strcmp(argv[i], "--debug-xinerama")) {
-      ob_debug_xinerama = TRUE;
     }
     else if (!strcmp(argv[i], "--reconfigure")) {
       remote_control = 1;

@@ -81,7 +81,6 @@ build_and_test "no-librsvg" -Dlibrsvg=disabled
 build_and_test "no-session" -Dsession_management=disabled
 build_and_test "no-xkb" -Dxkb=disabled
 build_and_test "no-xrandr" -Dxrandr=disabled
-build_and_test "no-xinerama" -Dxinerama=disabled
 build_and_test "no-xsync" -Dxsync=disabled
 
 echo Creating release tarball

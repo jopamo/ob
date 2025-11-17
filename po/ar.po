@@ -376,10 +376,6 @@ msgstr "  --debug-focus       اعرض خرج التنقيح للتعامل مع
 msgid "  --debug-session     Display debugging output for session management\n"
 msgstr ""
 
-#: openbox/openbox.c:552
-msgid "  --debug-xinerama    Split the display into fake xinerama screens\n"
-msgstr "  --debug-xinerama    شق العرض إلى شاشات xinerama زائفة\n"
-
 #: openbox/openbox.c:553
 #, c-format
 msgid ""

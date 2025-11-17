@@ -339,7 +339,7 @@ static void parse_single_per_app_settings(xmlNodePtr app, ObAppSettings* setting
 
 /* Manages settings for individual applications.
    Some notes: monitor is the screen number in a multi monitor
-   (Xinerama) setup (starting from 0), or mouse: the monitor the pointer
+   setup (starting from 0), or mouse: the monitor the pointer
    is on, active: the active monitor, primary: the primary monitor.
    Layer can be three values, above (Always on top), below
    (Always on bottom) and everything else (normal behaviour).

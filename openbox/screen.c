@@ -1236,56 +1236,32 @@ typedef struct {
     }                                              \
   }
 
-static void get_xinerama_screens(Rect** xin_areas, guint* nxin) {
+static void get_monitor_areas(Rect** areas, guint* nmonitors) {
   guint i;
   gint l, r, t, b;
-#ifdef XINERAMA
-  gint n;
-  XineramaScreenInfo* info;
-#endif
 
-  if (ob_debug_xinerama) {
-    gint w = WidthOfScreen(ScreenOfDisplay(obt_display, ob_screen));
-    gint h = HeightOfScreen(ScreenOfDisplay(obt_display, ob_screen));
-    *nxin = 2;
-    *xin_areas = g_new(Rect, *nxin + 1);
-    RECT_SET((*xin_areas)[0], 0, 0, w / 2, h);
-    RECT_SET((*xin_areas)[1], w / 2, 0, w - (w / 2), h);
-  }
-#ifdef XINERAMA
-  else if (obt_display_extension_xinerama && (info = XineramaQueryScreens(obt_display, &n))) {
-    *nxin = n;
-    *xin_areas = g_new(Rect, *nxin + 1);
-    for (i = 0; i < *nxin; ++i)
-      RECT_SET((*xin_areas)[i], info[i].x_org, info[i].y_org, info[i].width, info[i].height);
-    XFree(info);
-  }
-#endif
-  else {
-    *nxin = 1;
-    *xin_areas = g_new(Rect, *nxin + 1);
-    RECT_SET((*xin_areas)[0], 0, 0, WidthOfScreen(ScreenOfDisplay(obt_display, ob_screen)),
-             HeightOfScreen(ScreenOfDisplay(obt_display, ob_screen)));
-  }
+  *nmonitors = 1;
+  *areas = g_new(Rect, *nmonitors + 1);
+  RECT_SET((*areas)[0], 0, 0, WidthOfScreen(ScreenOfDisplay(obt_display, ob_screen)),
+           HeightOfScreen(ScreenOfDisplay(obt_display, ob_screen)));
 
   /* returns one extra with the total area in it */
-  l = (*xin_areas)[0].x;
-  t = (*xin_areas)[0].y;
-  r = (*xin_areas)[0].x + (*xin_areas)[0].width - 1;
-  b = (*xin_areas)[0].y + (*xin_areas)[0].height - 1;
-  for (i = 1; i < *nxin; ++i) {
-    l = MIN(l, (*xin_areas)[i].x);
-    t = MIN(l, (*xin_areas)[i].y);
-    r = MAX(r, (*xin_areas)[i].x + (*xin_areas)[i].width - 1);
-    b = MAX(b, (*xin_areas)[i].y + (*xin_areas)[i].height - 1);
+  l = (*areas)[0].x;
+  t = (*areas)[0].y;
+  r = (*areas)[0].x + (*areas)[0].width - 1;
+  b = (*areas)[0].y + (*areas)[0].height - 1;
+  for (i = 1; i < *nmonitors; ++i) {
+    l = MIN(l, (*areas)[i].x);
+    t = MIN(t, (*areas)[i].y);
+    r = MAX(r, (*areas)[i].x + (*areas)[i].width - 1);
+    b = MAX(b, (*areas)[i].y + (*areas)[i].height - 1);
   }
-  RECT_SET((*xin_areas)[*nxin], l, t, r - l + 1, b - t + 1);
+  RECT_SET((*areas)[*nmonitors], l, t, r - l + 1, b - t + 1);
 
-  for (i = 0; i < *nxin; ++i)
-    ob_debug("Monitor %d @ %d,%d %dx%d\n", i, (*xin_areas)[i].x, (*xin_areas)[i].y, (*xin_areas)[i].width,
-             (*xin_areas)[i].height);
-  ob_debug("Full desktop @ %d,%d %dx%d\n", (*xin_areas)[i].x, (*xin_areas)[i].y, (*xin_areas)[i].width,
-           (*xin_areas)[i].height);
+  for (i = 0; i < *nmonitors; ++i)
+    ob_debug("Monitor %d @ %d,%d %dx%d\n", i, (*areas)[i].x, (*areas)[i].y, (*areas)[i].width,
+             (*areas)[i].height);
+  ob_debug("Full desktop @ %d,%d %dx%d\n", (*areas)[i].x, (*areas)[i].y, (*areas)[i].width, (*areas)[i].height);
 }
 
 void screen_update_areas(void) {
@@ -1301,7 +1277,7 @@ void screen_update_areas(void) {
   }
 
   g_free(monitor_area);
-  get_xinerama_screens(&monitor_area, &screen_num_monitors);
+  get_monitor_areas(&monitor_area, &screen_num_monitors);
 
   /* set up the user-specified margins */
   config_margins.top_start = RECT_LEFT(monitor_area[screen_num_monitors]);

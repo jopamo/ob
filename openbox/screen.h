@@ -34,7 +34,7 @@ typedef enum {
 
 /*! The number of available desktops */
 extern guint screen_num_desktops;
-/*! The number of virtual "xinerama" screens/heads */
+/*! The number of virtual monitors */
 extern guint screen_num_monitors;
 /*! The current desktop */
 extern guint screen_desktop;

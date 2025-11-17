@@ -70,7 +70,7 @@ struct _ObMenuFrame {
   gint text_w;  /* width of the text area in the items */
   gint text_h;  /* height of the items */
 
-  gint monitor; /* monitor on which to show the menu in xinerama */
+  gint monitor; /* monitor on which to show the menu */
 
   /* We make a copy of this for each menu, so that we don't have to re-render
      the background of the entire menu each time we render an item inside it.

@@ -394,12 +394,6 @@ msgstr ""
 "  --debug-session     Mostra la sortida de depuració per a la gestió del "
 "session management\n"
 
-#: openbox/openbox.c:552
-msgid "  --debug-xinerama    Split the display into fake xinerama screens\n"
-msgstr ""
-"  --debug-xinerama    Divideix la visualització en pantalles xinerama "
-"falses\n"
-
 #: openbox/openbox.c:553
 #, c-format
 msgid ""

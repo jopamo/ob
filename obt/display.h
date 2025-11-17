@@ -30,9 +30,6 @@
 #ifdef DAMAGE
 #include <X11/extensions/Xdamage.h>
 #endif
-#ifdef XINERAMA
-#include <X11/extensions/Xinerama.h>
-#endif
 #ifdef XRANDR
 #include <X11/extensions/Xrandr.h>
 #endif
@@ -52,8 +49,6 @@ extern gint obt_display_extension_shape_basep;
 extern gboolean obt_display_extension_damage;
 extern gint obt_display_extension_damage_basep;
 #endif
-extern gboolean obt_display_extension_xinerama;
-extern gint obt_display_extension_xinerama_basep;
 extern gboolean obt_display_extension_randr;
 extern gint obt_display_extension_randr_basep;
 extern gboolean obt_display_extension_sync;

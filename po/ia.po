@@ -393,12 +393,6 @@ msgstr ""
 "  --debug-session     Monstrar datos pro eliminar faltas in le gestion de "
 "session\n"
 
-#: openbox/openbox.c:552
-msgid "  --debug-xinerama    Split the display into fake xinerama screens\n"
-msgstr ""
-"  --debug-xinerama    Separar le visualisation in schermos de xinerama "
-"false\n"
-
 #: openbox/openbox.c:553
 #, c-format
 msgid ""

@@ -383,10 +383,6 @@ msgstr "  --debug-focus       Visa debuginformation för fokushantering\n"
 msgid "  --debug-session     Display debugging output for session management\n"
 msgstr "  --debug-session     Visa debuginformation för sessionshantering\n"
 
-#: openbox/openbox.c:552
-msgid "  --debug-xinerama    Split the display into fake xinerama screens\n"
-msgstr "  --debug-xinerama    Dela skärmen i simulerade xinerama-skärmar\n"
-
 #: openbox/openbox.c:553
 #, c-format
 msgid ""

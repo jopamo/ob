@@ -379,10 +379,6 @@ msgstr "  --debug-focus       Zobrazit ladící výstup pro aktivaci oken\n"
 msgid "  --debug-session     Display debugging output for session management\n"
 msgstr ""
 
-#: openbox/openbox.c:552
-msgid "  --debug-xinerama    Split the display into fake xinerama screens\n"
-msgstr "  --debug-xinerama    Rozdělit displej na falešné obrazovky xinerama\n"
-
 #: openbox/openbox.c:553
 #, c-format
 msgid ""

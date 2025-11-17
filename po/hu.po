@@ -388,10 +388,6 @@ msgstr ""
 "  --debug-session     Munkamenet-kezelésre vonatkozó hibakeresési kimenetek "
 "megjelenítése\n"
 
-#: openbox/openbox.c:552
-msgid "  --debug-xinerama    Split the display into fake xinerama screens\n"
-msgstr "  --debug-xinerama    Képernyő felosztása két ál-xinerama képernyőre\n"
-
 #: openbox/openbox.c:553
 #, c-format
 msgid ""

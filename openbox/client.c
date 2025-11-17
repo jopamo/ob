@@ -428,9 +428,9 @@ void client_manage(Window window, ObPrompt* prompt) {
            they placed themselves are subjected to
            harder rules, ones that are placed by
            place.c or by the user are allowed partially
-           off-screen and on xinerama divides (ie,
+           off-screen and on monitor divides (ie,
            it is up to the placement routines to avoid
-           the xinerama divides)
+           the monitor divides)
 
            children and splash screens are forced on
            screen, but i don't remember why i decided to

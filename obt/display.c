@@ -48,8 +48,6 @@ gint obt_display_extension_shape_basep;
 gboolean obt_display_extension_damage = FALSE;
 gint obt_display_extension_damage_basep;
 #endif
-gboolean obt_display_extension_xinerama = FALSE;
-gint obt_display_extension_xinerama_basep;
 gboolean obt_display_extension_randr = FALSE;
 gint obt_display_extension_randr_basep;
 gboolean obt_display_extension_sync = FALSE;
@@ -89,13 +87,6 @@ gboolean obt_display_open(const char* display_name) {
     obt_display_extension_damage = XDamageQueryExtension(d, &obt_display_extension_damage_basep, &junk);
     if (!obt_display_extension_damage)
       g_message("X Damage extension is not present on the server");
-#endif
-
-#ifdef XINERAMA
-    obt_display_extension_xinerama =
-        XineramaQueryExtension(d, &obt_display_extension_xinerama_basep, &junk) && XineramaIsActive(d);
-    if (!obt_display_extension_xinerama)
-      g_message("Xinerama extension is not present on the server");
 #endif
 
 #ifdef XRANDR

@@ -385,10 +385,6 @@ msgstr ""
 "  --debug-session     Prikazuje izlaz traženja pogrešaka za rukovanje "
 "sessionom\n"
 
-#: openbox/openbox.c:552
-msgid "  --debug-xinerama    Split the display into fake xinerama screens\n"
-msgstr "  --debug-xinerama    Podijeli zaslon u lažne xinerama zaslone\n"
-
 #: openbox/openbox.c:553
 #, c-format
 msgid ""

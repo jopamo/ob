@@ -43,7 +43,6 @@ extern gchar* ob_sm_id;
 extern gchar* ob_sm_save_file;
 extern gboolean ob_sm_restore;
 extern gboolean ob_replace_wm;
-extern gboolean ob_debug_xinerama;
 
 /*! The current locale for the LC_MESSAGES category */
 extern const gchar* ob_locale_msg;

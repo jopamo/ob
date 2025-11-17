@@ -381,10 +381,6 @@ msgstr ""
 "  --debug-focus       Εμφάνισης αποτελεσμάτων αποσφαλμάτωσης για εστίαση "
 "χειρισμών\n"
 
-#: openbox/openbox.c:547
-msgid "  --debug-xinerama    Split the display into fake xinerama screens\n"
-msgstr "  --debug-xinerama    Διαίρεση οθόνης σε ψευδείς οθόνες xinerama\n"
-
 #: openbox/openbox.c:548
 #, c-format
 msgid ""

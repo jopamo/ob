@@ -4,7 +4,7 @@ openbox \(em A minimalistic, highly configurable, next generation window
 manager with extensive standards support. 
 .SH "SYNOPSIS" 
 .PP 
-\fBopenbox\fR [\fB\-\-help\fP]  [\fB\-\-version\fP]  [\fB\-\-replace\fP]  [\fB\-\-reconfigure\fP]  [\fB\-\-restart\fP]  [\fB\-\-sm-disable\fP]  [\fB\-\-sync\fP]  [\fB\-\-debug\fP]  [\fB\-\-debug-focus\fP]  [\fB\-\-debug-xinerama\fP]  
+\fBopenbox\fR [\fB\-\-help\fP]  [\fB\-\-version\fP]  [\fB\-\-replace\fP]  [\fB\-\-reconfigure\fP]  [\fB\-\-restart\fP]  [\fB\-\-sm-disable\fP]  [\fB\-\-sync\fP]  [\fB\-\-debug\fP]  [\fB\-\-debug-focus\fP]  
 .SH "DESCRIPTION" 
 .PP 
 Openbox is minimalistic, highly configurable, next generation window 
@@ -84,10 +84,6 @@ Display debugging output.
 Display debugging output for focus handling. 
 .IP "\fB\-\-debug-session\fP" 10 
 Display debugging output for session management. 
-.IP "\fB\-\-debug-xinerama\fP" 10 
-Split the display into two fake xinerama regions, if 
-xinerama is not already enabled. This is for debugging 
-xinerama support. 
 .SH "SEE ALSO" 
 .PP 
 obconf (1), openbox-session(1).

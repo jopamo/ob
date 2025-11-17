@@ -86,9 +86,6 @@ endif
 if have_xrandr
   openbox_deps += xrandr_dep
 endif
-if have_xinerama
-  openbox_deps += xinerama_dep
-endif
 if have_xdamage
   openbox_deps += xdamage_dep
 endif

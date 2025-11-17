@@ -8,8 +8,6 @@ option('librsvg', type: 'feature', value: 'auto',
        description: 'Enable librsvg for SVG icon loading')
 option('xrandr', type: 'feature', value: 'enabled',
        description: 'Enable XRandR extension support')
-option('xinerama', type: 'feature', value: 'enabled',
-       description: 'Enable Xinerama extension support')
 option('xshape', type: 'feature', value: 'enabled',
        description: 'Enable XShape extension support')
 option('xdamage', type: 'feature', value: 'auto',
