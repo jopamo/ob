@@ -150,81 +150,26 @@ HiDPI support requires resolution-independent geometry; avoid pixel assumptions 
 
 ---
 
-## EWMH Compliance Document
+## EWMH Coverage
 
-The following lists all **NetWM (EWMH)** hints from freedesktop.org and Openbox’s current level of compliance.
+Openbox advertises the following EWMH hints via `_NET_SUPPORTED` (see `openbox/screen.c`), with optional pieces noted.
 
-### Legend
-
-```
-
-* = none
-  / = partial
-
-- = complete
-
-* = compliant, but something else needs checking
-  ? = unknown
-
-```
-
-### Compliance Table
-
-| Hint                              | Version | Status | Notes                                 |
-| --------------------------------- | ------- | ------ | ------------------------------------- |
-| `_NET_SUPPORTED`                  | 1.3     | +      |                                       |
-| `_NET_CLIENT_LIST`                | 1.3     | +      |                                       |
-| `_NET_NUMBER_OF_DESKTOPS`         | 1.3     | +      |                                       |
-| `_NET_DESKTOP_GEOMETRY`           | 1.3     | +      | Matches screen size only              |
-| `_NET_DESKTOP_VIEWPORT`           | 1.3     | +      | Always (0,0); no large desktops       |
-| `_NET_CURRENT_DESKTOP`            | 1.3     | +      |                                       |
-| `_NET_DESKTOP_NAMES`              | 1.3     | +      |                                       |
-| `_NET_ACTIVE_WINDOW`              | 1.3     | +      |                                       |
-| `_NET_WORKAREA`                   | 1.3     | +      |                                       |
-| `_NET_SUPPORTING_WM_CHECK`        | 1.3     | +      |                                       |
-| `_NET_VIRTUAL_ROOTS`              | 1.3     | +      | Not used by Openbox                   |
-| `_NET_DESKTOP_LAYOUT`             | 1.3     | +      |                                       |
-| `_NET_SHOWING_DESKTOP`            | 1.3     | +      |                                       |
-| `_NET_CLOSE_WINDOW`               | 1.3     | +      |                                       |
-| `_NET_MOVERESIZE_WINDOW`          | 1.3     | +      |                                       |
-| `_NET_WM_MOVERESIZE`              | 1.3     | +      |                                       |
-| `_NET_WM_NAME`                    | 1.3     | +      |                                       |
-| `_NET_WM_VISIBLE_NAME`            | 1.3     | +      |                                       |
-| `_NET_WM_ICON_NAME`               | 1.3     | +      |                                       |
-| `_NET_WM_VISIBLE_ICON_NAME`       | 1.3     | +      |                                       |
-| `_NET_WM_DESKTOP`                 | 1.3     | +      |                                       |
-| `_NET_WM_WINDOW_TYPE`             | 1.3     | +      | Cannot be changed post-mapping        |
-| `_NET_WM_STATE`                   | 1.3     | +      |                                       |
-| `_NET_WM_ALLOWED_ACTIONS`         | 1.3     | +      |                                       |
-| `_NET_WM_STRUT`                   | 1.3     | +      |                                       |
-| `_NET_WM_STRUT_PARTIAL`           | 1.3     | +      | Per-monitor struts in Xinerama setups |
-| `_NET_WM_ICON_GEOMETRY`           | 1.3     | +      |                                       |
-| `_NET_WM_ICON`                    | 1.3     | +      |                                       |
-| `_NET_WM_PID`                     | 1.3     | +      | Uses PID to terminate hung local apps |
-| `_NET_WM_HANDLED_ICONS`           | 1.3     | +      | Icons for iconic windows not shown    |
-| `_NET_WM_BYPASS_COMPOSITOR`       | 1.3     | +      | Honors bypass requests for dimming    |
-| `_NET_WM_USER_TIME`               | 1.3     | +      |                                       |
-| `_NET_WM_USER_TIME_WINDOW`        | 1.4     | +      | Helper-window timestamps respected    |
-| `_NET_WM_PING`                    | 1.3     | +      | Pings clients and prompts on timeout  |
-| `_NET_FRAME_EXTENTS`              | 1.3     | +      |                                       |
-| `_NET_WM_STATE_DEMANDS_ATTENTION` | 1.3     | +      |                                       |
-| `_NET_RESTACK_WINDOW`             | 1.3     | +      |                                       |
-| `_NET_WM_SYNC_REQUEST`            | 1.3     | +      |                                       |
-| `_NET_WM_FULL_PLACEMENT`          | 1.4     | +      |                                       |
-| `_NET_WM_MOVERESIZE_CANCEL`       | 1.4     | +      |                                       |
-| `_NET_REQUEST_FRAME_EXTENTS`      | 1.3     | +      |                                       |
-| `_NET_WM_ACTION_MOVE`             | 1.3     | +      |                                       |
-| `_NET_WM_ACTION_RESIZE`           | 1.3     | +      |                                       |
-| `_NET_WM_ACTION_MINIMIZE`         | 1.3     | +      |                                       |
-| `_NET_WM_ACTION_SHADE`            | 1.3     | +      |                                       |
-| `_NET_WM_ACTION_STICK`            | 1.3     | -      | No large desktops → no sticky state   |
-| `_NET_WM_ACTION_MAXIMIZE_HORZ`    | 1.3     | +      |                                       |
-| `_NET_WM_ACTION_MAXIMIZE_VERT`    | 1.3     | +      |                                       |
-| `_NET_WM_ACTION_FULLSCREEN`       | 1.3     | +      |                                       |
-| `_NET_WM_ACTION_CHANGE_DESKTOP`   | 1.3     | +      |                                       |
-| `_NET_WM_ACTION_CLOSE`            | 1.3     | +      |                                       |
-| `_NET_WM_ACTION_ABOVE`            | 1.4?    | +      |                                       |
-| `_NET_WM_ACTION_BELOW`            | 1.4?    | +      |                                       |
+| Category | Hints | Status | Notes |
+| --- | --- | --- | --- |
+| Root & WM metadata | `_NET_SUPPORTED`, `_NET_SUPPORTING_WM_CHECK`, `_NET_WM_FULL_PLACEMENT`, `_NET_ACTIVE_WINDOW`, `_NET_WM_HANDLED_ICONS` | Supported | Support window is created and lowered on startup. |
+| Desktop management | `_NET_NUMBER_OF_DESKTOPS`, `_NET_DESKTOP_GEOMETRY`, `_NET_DESKTOP_VIEWPORT`, `_NET_CURRENT_DESKTOP`, `_NET_DESKTOP_LAYOUT`, `_NET_DESKTOP_NAMES`, `_NET_WORKAREA`, `_NET_SHOWING_DESKTOP` | Supported | Values are kept in sync with internal workspace state. |
+| Client lists & stacking | `_NET_CLIENT_LIST`, `_NET_CLIENT_LIST_STACKING` | Supported | Updated whenever stacking or desktop membership changes. |
+| Root messages | `_NET_CLOSE_WINDOW`, `_NET_MOVERESIZE_WINDOW`, `_NET_RESTACK_WINDOW`, `_NET_REQUEST_FRAME_EXTENTS` | Supported | Handled in the central event dispatcher. |
+| Client identity & geometry | `_NET_WM_NAME`, `_NET_WM_VISIBLE_NAME`, `_NET_WM_ICON_NAME`, `_NET_WM_VISIBLE_ICON_NAME`, `_NET_WM_DESKTOP`, `_NET_WM_PID`, `_NET_FRAME_EXTENTS` | Supported | Applied during manage and on property changes. |
+| Icons & struts | `_NET_WM_ICON`, `_NET_WM_ICON_GEOMETRY`, `_NET_WM_STRUT`, `_NET_WM_STRUT_PARTIAL` | Supported | `_NET_WM_HANDLED_ICONS` tells clients Openbox renders iconic windows itself. |
+| Window types | `_NET_WM_WINDOW_TYPE` values: Desktop, Dock, Toolbar, Menu, Utility, Splash, Dialog, Normal | Supported | Popup/tooltip/notification/combo/DND types are not advertised and fall back to normal handling. |
+| Window states | `_NET_WM_STATE` values: Modal, Sticky, MaximizedVert, MaximizedHorz, Shaded, SkipTaskbar, SkipPager, Hidden, Fullscreen, Above, Below, DemandsAttention | Supported | All states are listed in `_NET_SUPPORTED`. |
+| Allowed actions | `_NET_WM_ALLOWED_ACTIONS` values: Move, Resize, Minimize, Shade, Stick, MaximizeHorz, MaximizeVert, Fullscreen, ChangeDesktop, Close, Above, Below | Supported | Sent per window based on capabilities. |
+| Focus/timing & compositor hints | `_NET_WM_USER_TIME`, `_NET_WM_USER_TIME_WINDOW`, `_NET_WM_BYPASS_COMPOSITOR`, `_NET_WM_WINDOW_OPACITY` | Supported | Opacity is widely used but outside the core spec. |
+| Ping & moveresize | `_NET_WM_PING`, `_NET_WM_MOVERESIZE`, `_NET_MOVERESIZE_WINDOW` | Supported | Includes keyboard directions and cancel codes. |
+| Startup notification | `_NET_STARTUP_ID` | Supported (optional) | Functional when built with `-Dstartup_notification`; otherwise stubbed. |
+| Sync requests | `_NET_WM_SYNC_REQUEST`, `_NET_WM_SYNC_REQUEST_COUNTER` | Supported (optional) | Advertised and used when XSync is available (`-Dxsync`). |
+| Not advertised | `_NET_VIRTUAL_ROOTS`, `_NET_WM_WINDOW_TYPE` popup/tooltip/notification/combo/dnd | Not supported | These hints currently fall back to default handling. |
 
 ---
 
