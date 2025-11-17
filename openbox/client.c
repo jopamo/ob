@@ -317,8 +317,12 @@ void client_manage(Window window, ObPrompt* prompt) {
   /* tell startup notification that this app started */
   launch_time = sn_app_started(self->startup_id, self->class, self->name);
 
-  if (!OBT_PROP_GET32(self->window, NET_WM_USER_TIME, CARDINAL, &user_time))
-    user_time = event_time();
+  if (!OBT_PROP_GET32(self->window, NET_WM_USER_TIME, CARDINAL, &user_time)) {
+    if (self->user_time_window != None && OBT_PROP_GET32(self->user_time_window, NET_WM_USER_TIME, CARDINAL, &user_time))
+      ;
+    else
+      user_time = event_time();
+  }
 
   /* do this after we have a frame.. it uses the frame to help determine the
      WM_STATE to apply. */
@@ -604,6 +608,7 @@ void client_unmanage(ObClient* self) {
   mouse_grab_for_client(self, FALSE);
 
   self->managed = FALSE;
+  client_set_user_time_window(self, None);
 
   /* remove the window from our save set, unless we are managing an internal
      ObPrompt window */
@@ -1242,6 +1247,7 @@ static void client_get_all(ObClient* self, gboolean real) {
   client_update_strut(self);
   client_update_icons(self);
   client_update_icon_geometry(self);
+  client_update_user_time_window(self);
 }
 
 static void client_get_startup_id(ObClient* self) {
@@ -2232,6 +2238,42 @@ void client_update_icon_geometry(ObClient* self) {
       /* don't let them set it with an area < 0 */
       RECT_SET(self->icon_geometry, data[0], data[1], MAX(data[2], 0), MAX(data[3], 0));
     g_free(data);
+  }
+}
+
+void client_update_user_time_window(ObClient* self) {
+  guint32 helper = None;
+
+  if (!OBT_PROP_GET32(self->window, NET_WM_USER_TIME_WINDOW, WINDOW, &helper))
+    helper = None;
+
+  client_set_user_time_window(self, (Window)helper);
+}
+
+void client_set_user_time_window(ObClient* self, Window win) {
+  Window prev = self->user_time_window;
+
+  if (win == self->window)
+    win = None;
+
+  if (prev == win)
+    return;
+
+  if (prev != None) {
+    window_remove(prev);
+    obt_display_ignore_errors(TRUE);
+    XSelectInput(obt_display, prev, NoEventMask);
+    obt_display_ignore_errors(FALSE);
+  }
+
+  self->user_time_window = None;
+
+  if (win != None) {
+    self->user_time_window = win;
+    window_add(&self->user_time_window, CLIENT_AS_WINDOW(self));
+    obt_display_ignore_errors(TRUE);
+    XSelectInput(obt_display, win, PropertyChangeMask | StructureNotifyMask);
+    obt_display_ignore_errors(FALSE);
   }
 }
 

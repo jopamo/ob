@@ -262,9 +262,7 @@ gboolean screen_annex(void) {
   supported[i++] = OBT_PROP_ATOM(NET_MOVERESIZE_WINDOW);
   supported[i++] = OBT_PROP_ATOM(NET_WM_MOVERESIZE);
   supported[i++] = OBT_PROP_ATOM(NET_WM_USER_TIME);
-  /*
-      supported[i++] = OBT_PROP_ATOM(NET_WM_USER_TIME_WINDOW);
-  */
+  supported[i++] = OBT_PROP_ATOM(NET_WM_USER_TIME_WINDOW);
   supported[i++] = OBT_PROP_ATOM(NET_FRAME_EXTENTS);
   supported[i++] = OBT_PROP_ATOM(NET_REQUEST_FRAME_EXTENTS);
   supported[i++] = OBT_PROP_ATOM(NET_RESTACK_WINDOW);

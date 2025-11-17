@@ -85,6 +85,7 @@ static gboolean event_handle_prompt(ObPrompt* p, XEvent* e);
 static void event_handle_dock(ObDock* s, XEvent* e);
 static void event_handle_dockapp(ObDockApp* app, XEvent* e);
 static void event_handle_client(ObClient* c, XEvent* e);
+static gboolean event_handle_user_time_window_event(ObClient* client, XEvent* e);
 static gboolean event_handle_user_input(ObClient* client, XEvent* e);
 static void event_coalesce(XEvent* e);
 static void event_coalesce_configurenotify(XEvent* e);
@@ -93,6 +94,7 @@ static gboolean is_enter_focus_event_ignored(gulong serial);
 static void event_ignore_enter_range(gulong start, gulong end);
 static void lookup_window_cached(Window win, ObWindow** out_obwin, ObDockApp** out_dockapp);
 static ObWindow* cached_window_find(Window win);
+static void event_update_user_time_from_window(ObClient* client, Window win, Time timestamp);
 
 static void focus_delay_dest(gpointer data);
 static void unfocus_delay_dest(gpointer data);
@@ -1026,6 +1028,50 @@ static gboolean skip_property_change(XEvent* e, gpointer data) {
   return FALSE;
 }
 
+static void event_update_user_time_from_window(ObClient* client, Window win, Time timestamp) {
+  guint32 t;
+
+  if (!client || client != focus_client)
+    return;
+
+  if (!OBT_PROP_GET32(win, NET_WM_USER_TIME, CARDINAL, &t))
+    return;
+
+  if (!t)
+    return;
+
+  if (event_time_after(t, timestamp))
+    return;
+
+  if (event_last_user_time && !event_time_after(t, event_last_user_time))
+    return;
+
+  event_last_user_time = t;
+}
+
+static gboolean event_handle_user_time_window_event(ObClient* client, XEvent* e) {
+  if (!client || client->user_time_window == None)
+    return FALSE;
+
+  if (e->xany.window != client->user_time_window)
+    return FALSE;
+
+  switch (e->type) {
+    case PropertyNotify:
+      if (e->xproperty.atom == OBT_PROP_ATOM(NET_WM_USER_TIME))
+        event_update_user_time_from_window(client, client->user_time_window, e->xproperty.time);
+      break;
+    case DestroyNotify:
+    case UnmapNotify:
+      client_set_user_time_window(client, None);
+      break;
+    default:
+      break;
+  }
+
+  return TRUE;
+}
+
 static void event_handle_client(ObClient* client, XEvent* e) {
   Atom msgtype;
   ObFrameContext con;
@@ -1033,6 +1079,9 @@ static void event_handle_client(ObClient* client, XEvent* e) {
   static gint px = -1, py = -1;
   static guint pb = 0;
   static ObFrameContext pcon = OB_FRAME_CONTEXT_NONE;
+
+  if (event_handle_user_time_window_event(client, e))
+    return;
 
   switch (e->type) {
     case ButtonPress:
@@ -1680,12 +1729,10 @@ static void event_handle_client(ObClient* client, XEvent* e) {
         client_update_icon_geometry(client);
       }
       else if (msgtype == OBT_PROP_ATOM(NET_WM_USER_TIME)) {
-        guint32 t;
-        if (client == focus_client && OBT_PROP_GET32(client->window, NET_WM_USER_TIME, CARDINAL, &t) && t &&
-            !event_time_after(t, e->xproperty.time) &&
-            (!event_last_user_time || event_time_after(t, event_last_user_time))) {
-          event_last_user_time = t;
-        }
+        event_update_user_time_from_window(client, client->window, e->xproperty.time);
+      }
+      else if (msgtype == OBT_PROP_ATOM(NET_WM_USER_TIME_WINDOW)) {
+        client_update_user_time_window(client);
       }
       else if (msgtype == OBT_PROP_ATOM(NET_WM_WINDOW_OPACITY)) {
         client_update_opacity(client);

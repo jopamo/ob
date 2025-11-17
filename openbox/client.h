@@ -86,6 +86,9 @@ struct _ObClient {
   /*! The id of the group the window belongs to */
   struct _ObGroup* group;
 
+  /*! Helper window that carries NET_WM_USER_TIME timestamps */
+  Window user_time_window;
+
   /*! Saved session data to apply to this client */
   struct _ObSessionState* session;
 
@@ -656,6 +659,10 @@ void client_update_strut(ObClient* self);
 void client_update_icons(ObClient* self);
 /*! Updates the window's icon geometry (where to iconify to/from) */
 void client_update_icon_geometry(ObClient* self);
+/*! Updates the NET_WM_USER_TIME helper window tracking */
+void client_update_user_time_window(ObClient* self);
+/*! Sets the helper window used for NET_WM_USER_TIME timestamps */
+void client_set_user_time_window(ObClient* self, Window win);
 
 /*! Helper function to convert the ->type member to string representation */
 const gchar* client_type_to_string(ObClient* self);

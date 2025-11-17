@@ -1,89 +1,85 @@
-/* usertimewin.c for the Openbox window manager */
+/* usertimewin.c ensures helper-window timestamps block unwanted focus */
 
-#include <stdio.h>
-#include <unistd.h>
+#include <X11/Xatom.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
-#include <X11/Xatom.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
-int main() {
-  Display* display;
-  Window win, twin;
-  XEvent report;
-  Atom atime, atimewin;
-  int x = 10, y = 10, h = 400, w = 400;
-  Time num;
+static Window read_active_window(Display* dpy, Atom active_atom) {
+  Atom actual;
+  int format;
+  unsigned long nitems = 0, bytes = 0;
+  unsigned char* data = NULL;
+  Window active = None;
 
-  // Open the X display
-  display = XOpenDisplay(NULL);
-  if (display == NULL) {
-    fprintf(stderr, "couldn't connect to X server :0\n");
-    return 1;  // Return 1 to indicate failure if unable to connect to the X server
+  if (XGetWindowProperty(dpy, RootWindow(dpy, DefaultScreen(dpy)), active_atom, 0, 1, False, XA_WINDOW, &actual,
+                         &format, &nitems, &bytes, &data) == Success &&
+      actual == XA_WINDOW && format == 32 && nitems == 1 && data) {
+    active = *((Window*)data);
   }
 
-  // Intern atoms for window time properties
-  atime = XInternAtom(display, "_NET_WM_USER_TIME", True);
-  atimewin = XInternAtom(display, "_NET_WM_USER_TIME_WINDOW", True);
+  if (data)
+    XFree(data);
 
-  // Create two windows
-  win = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 10, CopyFromParent, CopyFromParent, CopyFromParent,
-                      0, 0);
-  twin = XCreateWindow(display, RootWindow(display, 0), x, y, w / 2, h / 2, 10, CopyFromParent, CopyFromParent,
-                       CopyFromParent, 0, 0);
+  return active;
+}
 
-  // Set the background color for the window
-  XSetWindowBackground(display, win, WhitePixel(display, 0));
+int main(void) {
+  Display* display = XOpenDisplay(NULL);
+  if (!display) {
+    fprintf(stderr, "couldn't connect to X server\n");
+    return EXIT_FAILURE;
+  }
 
-  // Map the window and flush the display
-  XMapWindow(display, win);
+  const int screen = DefaultScreen(display);
+  Atom atime = XInternAtom(display, "_NET_WM_USER_TIME", False);
+  Atom atimewin = XInternAtom(display, "_NET_WM_USER_TIME_WINDOW", False);
+  Atom active_atom = XInternAtom(display, "_NET_ACTIVE_WINDOW", False);
+
+  Window focus_win =
+      XCreateSimpleWindow(display, RootWindow(display, screen), 10, 10, 200, 150, 0, BlackPixel(display, screen),
+                          WhitePixel(display, screen));
+  XMapWindow(display, focus_win);
   XFlush(display);
-
-  // Simulate some delay
-  sleep(2);
-
-  // Set the _NET_WM_USER_TIME_WINDOW property on the first window
-  printf("Setting time window\n");
-  XChangeProperty(display, win, atimewin, XA_WINDOW, 32, PropModeReplace, (unsigned char*)&twin, 1);
-  XFlush(display);
-
-  // Simulate some delay
   sleep(1);
 
-  // Set the _NET_WM_USER_TIME property on the second window
-  num = 100;
-  printf("Setting time stamp on time window\n");
-  XChangeProperty(display, twin, atime, XA_CARDINAL, 32, PropModeReplace, (unsigned char*)&num, 1);
+  XSetInputFocus(display, focus_win, RevertToPointerRoot, CurrentTime);
+  XSync(display, False);
+
+  Window helper = XCreateWindow(display, RootWindow(display, screen), 0, 0, 1, 1, 0, CopyFromParent, InputOnly,
+                                CopyFromParent, 0, NULL);
+  XMapWindow(display, helper);
+
+  Window test_win =
+      XCreateSimpleWindow(display, RootWindow(display, screen), 240, 10, 200, 150, 0, BlackPixel(display, screen),
+                          WhitePixel(display, screen));
+
+  /* Tell Openbox that helper carries timestamps for test_win */
+  unsigned long helper_id = helper;
+  XChangeProperty(display, test_win, atimewin, XA_WINDOW, 32, PropModeReplace, (unsigned char*)&helper_id, 1);
+
+  /* Report "do not focus" by setting timestamp 0 on the helper window */
+  unsigned long ts = 0;
+  XChangeProperty(display, helper, atime, XA_CARDINAL, 32, PropModeReplace, (unsigned char*)&ts, 1);
+
+  XMapWindow(display, test_win);
   XFlush(display);
+  sleep(1);
 
-  // Select input events to listen for
-  XSelectInput(display, win, ExposureMask | StructureNotifyMask);
-  XSelectInput(display, twin, ExposureMask | StructureNotifyMask);
+  Window active = read_active_window(display, active_atom);
 
-  // Event loop to process events
-  while (1) {
-    XNextEvent(display, &report);
-
-    switch (report.type) {
-      case Expose:
-        printf("exposed\n");
-        break;
-      case ConfigureNotify:
-        printf("confignotify %i,%i-%ix%i\n", report.xconfigure.x, report.xconfigure.y, report.xconfigure.width,
-               report.xconfigure.height);
-        break;
-    }
-
-    // Exit after processing the first event to avoid infinite loops in CI
-    if (report.type == Expose && report.xexpose.count == 0) {
-      printf("Test completed. Closing the program.\n");
-      break;
-    }
-  }
-
-  // Clean up and close the display connection
-  XDestroyWindow(display, win);
-  XDestroyWindow(display, twin);
+  XDestroyWindow(display, test_win);
+  XDestroyWindow(display, helper);
+  XDestroyWindow(display, focus_win);
   XCloseDisplay(display);
 
-  return 0;  // Return 0 to indicate success
+  if (active == test_win) {
+    fprintf(stderr, "helper timestamps ignored; new window became active\n");
+    return EXIT_FAILURE;
+  }
+
+  printf("helper timestamps respected; active window 0x%lx\n", active);
+  return EXIT_SUCCESS;
 }
