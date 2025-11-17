@@ -51,6 +51,8 @@ static void set_theme_statics(ObFrame* self);
 static void free_theme_statics(ObFrame* self);
 static gboolean frame_animate_iconify(gpointer self);
 static void frame_adjust_cursors(ObFrame* self);
+static void frame_publish_updates(ObFrame* self, gboolean force_extents, gboolean send_damage);
+static void frame_apply_shape(ObFrame* self);
 
 typedef struct {
   Colormap cmap;
@@ -291,6 +293,27 @@ void frame_adjust_theme(ObFrame* self) {
   set_theme_statics(self);
 }
 
+static void frame_publish_updates(ObFrame* self, gboolean force_extents, gboolean send_damage) {
+#ifdef DAMAGE
+  if (send_damage && obt_display_extension_damage)
+    XDamageAdd(obt_display, self->window, None);
+#else
+  (void)send_damage;
+#endif
+
+  if (force_extents || !STRUT_EQUAL(self->size, self->oldsize)) {
+    gulong vals[4];
+
+    vals[0] = self->size.left;
+    vals[1] = self->size.right;
+    vals[2] = self->size.top;
+    vals[3] = self->size.bottom;
+    OBT_PROP_SETA32(self->client->window, NET_FRAME_EXTENTS, CARDINAL, vals, 4);
+    OBT_PROP_SETA32(self->client->window, KDE_NET_WM_FRAME_STRUT, CARDINAL, vals, 4);
+    self->oldsize = self->size;
+  }
+}
+
 #ifdef SHAPE
 void frame_adjust_shape_kind(ObFrame* self, int kind) {
   gint num;
@@ -333,13 +356,22 @@ void frame_adjust_shape_kind(ObFrame* self, int kind) {
 }
 #endif
 
-void frame_adjust_shape(ObFrame* self) {
+static void frame_apply_shape(ObFrame* self) {
 #ifdef SHAPE
   frame_adjust_shape_kind(self, ShapeBounding);
 #ifdef ShapeInput
   frame_adjust_shape_kind(self, ShapeInput);
 #endif
 #endif
+}
+
+void frame_adjust_shape(ObFrame* self) {
+  frame_apply_shape(self);
+}
+
+void frame_update_shape(ObFrame* self) {
+  frame_apply_shape(self);
+  frame_publish_updates(self, TRUE, TRUE);
 }
 
 void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean fake) {
@@ -740,18 +772,10 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
     if (resized) {
       self->need_render = TRUE;
       framerender_frame(self);
-      frame_adjust_shape(self);
+      frame_update_shape(self);
     }
-
-    if (!STRUT_EQUAL(self->size, self->oldsize)) {
-      gulong vals[4];
-      vals[0] = self->size.left;
-      vals[1] = self->size.right;
-      vals[2] = self->size.top;
-      vals[3] = self->size.bottom;
-      OBT_PROP_SETA32(self->client->window, NET_FRAME_EXTENTS, CARDINAL, vals, 4);
-      OBT_PROP_SETA32(self->client->window, KDE_NET_WM_FRAME_STRUT, CARDINAL, vals, 4);
-      self->oldsize = self->size;
+    else {
+      frame_publish_updates(self, FALSE, FALSE);
     }
 
     /* if this occurs while we are focus cycling, the indicator needs to

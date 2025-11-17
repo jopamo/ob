@@ -108,6 +108,20 @@ if not xshape_opt.disabled()
   endif
 endif
 
+xdamage_opt = get_option('xdamage')
+xdamage_dep = dependency('xdamage', required: xdamage_opt.enabled())
+have_xdamage = false
+if not xdamage_opt.disabled()
+  have_xdamage = xdamage_dep.found()
+  if have_xdamage
+    have_xdamage = cc.has_header('X11/extensions/Xdamage.h',
+                                 dependencies: [x11_dep, xdamage_dep])
+  endif
+  if not have_xdamage and xdamage_opt.enabled()
+    error('XDamage support requested but X11/extensions/Xdamage.h not found')
+  endif
+endif
+
 xsync_opt = get_option('xsync')
 have_xsync = false
 if not xsync_opt.disabled()
@@ -243,6 +257,9 @@ endif
 if have_xshape
   feature_defines += ['-DSHAPE']
 endif
+if have_xdamage
+  feature_defines += ['-DDAMAGE']
+endif
 if have_xsync
   feature_defines += ['-DSYNC']
 endif
@@ -277,6 +294,9 @@ if have_xrandr
 endif
 if have_xinerama
   obt_private_libs += xinerama_dep
+endif
+if have_xdamage
+  obt_private_libs += xdamage_dep
 endif
 
 pkgconfig.generate(

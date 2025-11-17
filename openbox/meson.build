@@ -89,6 +89,9 @@ endif
 if have_xinerama
   openbox_deps += xinerama_dep
 endif
+if have_xdamage
+  openbox_deps += xdamage_dep
+endif
 if have_session
   openbox_deps += sm_deps
 endif

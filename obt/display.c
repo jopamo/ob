@@ -44,6 +44,10 @@ gboolean obt_display_extension_xkb = FALSE;
 gint obt_display_extension_xkb_basep;
 gboolean obt_display_extension_shape = FALSE;
 gint obt_display_extension_shape_basep;
+#ifdef DAMAGE
+gboolean obt_display_extension_damage = FALSE;
+gint obt_display_extension_damage_basep;
+#endif
 gboolean obt_display_extension_xinerama = FALSE;
 gint obt_display_extension_xinerama_basep;
 gboolean obt_display_extension_randr = FALSE;
@@ -82,6 +86,11 @@ gboolean obt_display_open(const char* display_name) {
     obt_display_extension_shape = XShapeQueryExtension(d, &obt_display_extension_shape_basep, &junk);
     if (!obt_display_extension_shape)
       g_message("X Shape extension is not present on the server");
+#endif
+#ifdef DAMAGE
+    obt_display_extension_damage = XDamageQueryExtension(d, &obt_display_extension_damage_basep, &junk);
+    if (!obt_display_extension_damage)
+      g_message("X Damage extension is not present on the server");
 #endif
 
 #ifdef XINERAMA

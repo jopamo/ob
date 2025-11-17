@@ -14,6 +14,8 @@ option('xinerama', type: 'feature', value: 'auto',
        description: 'Enable Xinerama extension support')
 option('xshape', type: 'feature', value: 'auto',
        description: 'Enable XShape extension support')
+option('xdamage', type: 'feature', value: 'auto',
+       description: 'Enable XDamage extension support')
 option('xsync', type: 'feature', value: 'auto',
        description: 'Enable XSync extension support')
 option('session_management', type: 'feature', value: 'auto',

@@ -211,6 +211,7 @@ void frame_adjust_theme(ObFrame* self);
 void frame_adjust_shape_kind(ObFrame* self, int kind);
 #endif
 void frame_adjust_shape(ObFrame* self);
+void frame_update_shape(ObFrame* self);
 void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean fake);
 void frame_adjust_client_area(ObFrame* self);
 void frame_adjust_state(ObFrame* self);

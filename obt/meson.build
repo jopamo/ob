@@ -18,6 +18,9 @@ endif
 if have_xrandr
   obt_deps += xrandr_dep
 endif
+if have_xdamage
+  obt_deps += xdamage_dep
+endif
 
 obt_version_conf = configuration_data()
 obt_version_conf.set('OBT_MAJOR_VERSION', obt_major_version)

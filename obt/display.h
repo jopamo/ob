@@ -29,6 +29,9 @@
 #ifdef SHAPE
 #include <X11/extensions/shape.h>
 #endif
+#ifdef DAMAGE
+#include <X11/extensions/Xdamage.h>
+#endif
 #ifdef XINERAMA
 #include <X11/extensions/Xinerama.h>
 #endif
@@ -47,6 +50,10 @@ extern gboolean obt_display_extension_xkb;
 extern gint obt_display_extension_xkb_basep;
 extern gboolean obt_display_extension_shape;
 extern gint obt_display_extension_shape_basep;
+#ifdef DAMAGE
+extern gboolean obt_display_extension_damage;
+extern gint obt_display_extension_damage_basep;
+#endif
 extern gboolean obt_display_extension_xinerama;
 extern gint obt_display_extension_xinerama_basep;
 extern gboolean obt_display_extension_randr;
