@@ -81,7 +81,6 @@ static void session_setup_program();
 static void session_setup_user();
 static void session_setup_restart_style(gboolean restart);
 static void session_setup_pid();
-static void session_setup_priority();
 static void session_setup_clone_command();
 static void session_setup_restart_command();
 
@@ -136,7 +135,6 @@ void session_startup(gint argc, gchar** argv) {
     session_setup_user();
     session_setup_restart_style(TRUE);
     session_setup_pid();
-    session_setup_priority();
     session_setup_clone_command();
   }
 
@@ -242,19 +240,6 @@ static void session_setup_pid(void) {
   g_free(prop.name);
   g_free(prop.type);
   g_free(pid);
-}
-
-/*! This is a gnome-session-manager extension */
-static void session_setup_priority(void) {
-  gchar priority = 20; /* 20 is a lower prioity to run before other apps */
-
-  SmPropValue vals = {.value = &priority, .length = 1};
-  SmProp prop = {.name = g_strdup("_GSM_Priority"), .type = g_strdup(SmCARD8), .num_vals = 1, .vals = &vals};
-  SmProp* list = &prop;
-  ob_debug_type(OB_DEBUG_SM, "Setting priority: %d", priority);
-  SmcSetProperties(sm_conn, 1, &list);
-  g_free(prop.name);
-  g_free(prop.type);
 }
 
 static void session_setup_clone_command(void) {

@@ -12,11 +12,8 @@ manager with extensive standards support.
 .PP 
 You can start Openbox in a few ways: 
 .PP 
-If you run a display manager such as GDM, you will find entries
-in the login session type menu for Openbox:
-\fBGNOME/Openbox\fR and \fBOpenbox\fR. If you want to use Openbox
-within GNOME you can choose the appropriate entry, and it will
-launch GNOME with Openbox as the window manager. 
+If you run a display manager, you can choose the \fBOpenbox\fR session
+from the login menu to start Openbox directly.
 .PP 
 If you log in using \fBOpenbox\fR without a session manager, it uses the \fBopenbox-session\fR       command to start Openbox. On log in, \fBopenbox\fR will 
 run the ~/.config/openbox/autostart.sh script if it exists, and will run 
@@ -29,7 +26,7 @@ example:
 .PP 
 .nf 
 xsetroot \-solid grey & 
-gnome-settings-daemon & 
+tint2 & 
 .fi 
 .RE 
 .PP 
@@ -93,7 +90,7 @@ xinerama is not already enabled. This is for debugging
 xinerama support. 
 .SH "SEE ALSO" 
 .PP 
-obconf (1), openbox-session(1), openbox-gnome-session(1).
+obconf (1), openbox-session(1).
 .PP 
 The program's full documentation is available on the website: 
 \fBhttp://openbox.org/\fP 

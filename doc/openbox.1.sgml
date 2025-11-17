@@ -56,11 +56,9 @@ manpage.1: manpage.sgml
 
     <para>You can start Openbox in a few ways:</para>
 
-    <para>If you run a display manager such as GDM, you will find entries
-      in the login session type menu for Openbox:
-      <command>GNOME/Openbox</command> and <command>Openbox</command>. If you
-      want to use Openbox within GNOME you can choose the appropriate entry,
-      and it will launch GNOME with Openbox as the window manager.</para>
+    <para>If you run a display manager you can choose the
+      <command>Openbox</command> session from the login menu to start
+      Openbox directly.</para>
 
     <para>If you log in using <command>Openbox</command>
       without a session manager, it uses the <command>openbox-session</command>
@@ -73,7 +71,7 @@ manpage.1: manpage.sgml
 
     <blockquote><literallayout>
       xsetroot -solid grey &
-      gnome-settings-daemon &</literallayout></blockquote>
+      tint2 &</literallayout></blockquote>
 
     <para>Make sure that each line is followed by a "&" or else the script will
       stop there and further commands will not be executed. You can use the
@@ -197,7 +195,7 @@ manpage.1: manpage.sgml
   <refsect1>
     <title>SEE ALSO</title>
 
-    <para>obconf (1), openbox-session(1), openbox-gnome-session(1).</para>
+    <para>obconf (1), openbox-session(1).</para>
 
     <para>The program's full documentation is available on the website:
       <literal>http://openbox.org/</literal></para>

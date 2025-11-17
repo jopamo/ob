@@ -26,8 +26,6 @@ themedir_rel = join_paths(datadir_rel, 'themes')
 pixmapdir_rel = join_paths(datadir_rel, 'pixmaps')
 appsdir_rel = join_paths(datadir_rel, 'applications')
 xsessionsdir_rel = join_paths(datadir_rel, 'xsessions')
-gnome_session_dir_rel = join_paths(datadir_rel, 'gnome-session', 'sessions')
-gnome_wm_dir_rel = join_paths(datadir_rel, 'gnome', 'wm-properties')
 docxbm_dir_rel = join_paths(docdir_rel, 'xbm')
 xsddir_rel = join_paths(datadir_rel, 'openbox')
 

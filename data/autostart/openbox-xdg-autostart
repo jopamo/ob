@@ -173,7 +173,7 @@ Options
   --version     Show version information and exit
 
 If no ENVIRONMENT is given, only files not limited to specific environments
-are executed.  Valid environments include: GNOME, ROX, XFCE, Old.
+are executed.  Valid environments include: Openbox, ROX, XFCE, Old.
 """
     )
 

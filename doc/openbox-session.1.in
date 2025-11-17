@@ -21,7 +21,7 @@ place anything you want to run automatically in those files, for example:
 .PP 
 .nf 
 xsetroot \-solid grey & 
-gnome-settings-daemon & 
+tint2 & 
 .fi 
 .RE 
 .PP 
@@ -31,7 +31,7 @@ stop there and further commands will not be executed. You can use the
 own. 
 .SH "SEE ALSO" 
 .PP 
-openbox(1), openbox-session(1), openbox-gnome-session(1). 
+openbox(1). 
  
 .PP 
 The program's full documentation is available on the website: 

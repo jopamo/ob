@@ -38,7 +38,7 @@ you may pass one or more property names to have
 requested. 
 .SH "SEE ALSO" 
 .PP 
-openbox (1), openbox-session(1), openbox-gnome-session(1). 
+openbox (1), openbox-session(1). 
 .PP 
 Please report bugs to: \fBhttp://bugzilla.icculus.org/ 
 \fP 

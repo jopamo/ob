@@ -2137,10 +2137,7 @@ void client_update_title(ObClient* self) {
     /* try old x stuff */
     if (!OBT_PROP_GETS(self->window, WM_NAME, &data)) {
       if (self->transient) {
-        /*
-        GNOME alert windows are not given titles:
-        http://developer.gnome.org/projects/gup/hig/draft_hig_new/windows-alert.html
-        */
+        /* Some alert windows intentionally omit titles per HIG guidance. */
         data = g_strdup("");
       }
       else

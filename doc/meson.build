@@ -4,7 +4,6 @@ doc_conf.set('configdir', configdir_abs)
 man_templates = [
   ['openbox.1.in', 'openbox.1'],
   ['openbox-session.1.in', 'openbox-session.1'],
-  ['openbox-gnome-session.1.in', 'openbox-gnome-session.1'],
   ['obxprop.1.in', 'obxprop.1'],
 ]
 

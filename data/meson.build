@@ -8,7 +8,6 @@ data_conf.set('bindir', bindir_abs)
 # Session launcher scripts
 session_scripts = [
   ['xsession/openbox-session.in', 'openbox-session'],
-  ['xsession/openbox-gnome-session.in', 'openbox-gnome-session'],
 ]
 foreach script : session_scripts
   configure_file(
@@ -23,7 +22,6 @@ endforeach
 # Desktop entries for display managers
 desktop_entries = [
   ['xsession/openbox.desktop.in', 'openbox.desktop'],
-  ['xsession/openbox-gnome.desktop.in', 'openbox-gnome.desktop'],
 ]
 foreach entry : desktop_entries
   configure_file(
@@ -56,16 +54,6 @@ install_data('openbox.desktop', install_dir: appsdir_rel)
 install_data('openbox.png', install_dir: pixmapdir_rel)
 install_data(['rc.xml', 'menu.xml'], install_dir: rcdir_rel)
 install_data('environment', install_dir: rcdir_rel, install_mode: 'rwxr-xr-x')
-
-install_data(
-  [
-    'gnome-session/openbox-gnome.session',
-    'gnome-session/openbox-gnome-fallback.session',
-  ],
-  install_dir: gnome_session_dir_rel)
-
-install_data('gnome-wm-properties/openbox.desktop',
-             install_dir: gnome_wm_dir_rel)
 
 install_data('autostart/openbox-xdg-autostart',
              install_dir: libexecdir_rel,

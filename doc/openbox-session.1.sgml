@@ -51,7 +51,7 @@ manpage.1: manpage.sgml
 
     <blockquote><literallayout>
       xsetroot -solid grey &
-      gnome-settings-daemon &</literallayout></blockquote>
+      tint2 &</literallayout></blockquote>
 
     <para>Make sure that each line is followed by a "&" or else the script will
       stop there and further commands will not be executed. You can use the
@@ -62,8 +62,7 @@ manpage.1: manpage.sgml
   <refsect1>
     <title>SEE ALSO</title>
 
-    <para>openbox(1), openbox-session(1), openbox-gnome-session(1).
-      </para>
+    <para>openbox(1).</para>
 
     <para>The program's full documentation is available on the website:
       <literal>http://openbox.org/</literal></para>
@@ -89,5 +88,4 @@ sgml-local-catalogs:nil
 sgml-local-ecat-files:nil
 End:
 -->
-
 
