@@ -13,9 +13,7 @@ obt_sources = files(
 obt_cargs = common_defines + feature_defines + ['-DG_LOG_DOMAIN="Obt"']
 obt_deps = [glib_dep, xml_dep, x11_dep, xext_dep, obx11_dep]
 obt_deps += xkbcommon_deps
-if have_xrandr
-  obt_deps += xrandr_dep
-endif
+obt_deps += xrandr_dep
 if have_xdamage
   obt_deps += xdamage_dep
 endif

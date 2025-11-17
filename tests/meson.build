@@ -43,9 +43,7 @@ test_sources = [
   'wmhints.c',
 ]
 
-if have_xshape
-  test_sources += ['shape.c']
-endif
+test_sources += ['shape.c']
 
 test_deps = [x11_dep, xext_dep, glib_dep]
 test_targets = []

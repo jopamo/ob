@@ -83,9 +83,7 @@ endif
 if have_xcursor
   openbox_deps += xcursor_dep
 endif
-if have_xrandr
-  openbox_deps += xrandr_dep
-endif
+openbox_deps += xrandr_dep
 if have_xdamage
   openbox_deps += xdamage_dep
 endif

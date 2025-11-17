@@ -91,16 +91,11 @@ imlib_dep = dependency('imlib2', required: imlib_opt.enabled())
 librsvg_opt = get_option('librsvg')
 librsvg_dep = dependency('librsvg-2.0', required: librsvg_opt.enabled())
 
-xrandr_opt = get_option('xrandr')
-xrandr_dep = dependency('xrandr', required: xrandr_opt.enabled())
+xrandr_dep = dependency('xrandr', required: true)
 
-xshape_opt = get_option('xshape')
-have_xshape = false
-if not xshape_opt.disabled()
-  have_xshape = cc.has_header('X11/extensions/shape.h', dependencies: xext_dep)
-  if not have_xshape and xshape_opt.enabled()
-    error('XShape support requested but X11/extensions/shape.h not found')
-  endif
+have_xshape = cc.has_header('X11/extensions/shape.h', dependencies: xext_dep)
+if not have_xshape
+  error('XShape support requires X11/extensions/shape.h')
 endif
 
 xdamage_opt = get_option('xdamage')
@@ -117,13 +112,9 @@ if not xdamage_opt.disabled()
   endif
 endif
 
-xsync_opt = get_option('xsync')
-have_xsync = false
-if not xsync_opt.disabled()
-  have_xsync = cc.has_header('X11/extensions/sync.h', dependencies: xext_dep)
-  if not have_xsync and xsync_opt.enabled()
-    error('XSync support requested but X11/extensions/sync.h not found')
-  endif
+have_xsync = cc.has_header('X11/extensions/sync.h', dependencies: xext_dep)
+if not have_xsync
+  error('XSync support requires X11/extensions/sync.h')
 endif
 
 have_xkb = cc.has_function('XkbBell', dependencies: x11_dep)
@@ -162,7 +153,7 @@ if not xcursor_opt.disabled()
 endif
 have_imlib = (not imlib_opt.disabled()) and imlib_dep.found()
 have_librsvg = (not librsvg_opt.disabled()) and librsvg_dep.found()
-have_xrandr = (not xrandr_opt.disabled()) and xrandr_dep.found()
+have_xrandr = xrandr_dep.found()
 
 # ---------------------------------------------------------------------------
 # Common compile helpers
@@ -265,9 +256,7 @@ subdir('po')
 # Install pkg-config files for the public libraries
 # ---------------------------------------------------------------------------
 obt_private_libs = [x11_dep, xext_dep, xrender_dep, xml_dep, glib_dep]
-if have_xrandr
-  obt_private_libs += xrandr_dep
-endif
+obt_private_libs += xrandr_dep
 if have_xdamage
   obt_private_libs += xdamage_dep
 endif
