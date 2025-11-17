@@ -1449,13 +1449,17 @@ static void event_handle_client(ObClient* client, XEvent* e) {
         client_close(client);
       }
       else if (msgtype == OBT_PROP_ATOM(NET_ACTIVE_WINDOW)) {
-        ob_debug(
-            "net_active_window for 0x%lx source=%s", client->window,
-            (e->xclient.data.l[0] == 0
-                 ? "unknown"
-                 : (e->xclient.data.l[0] == 1 ? "application" : (e->xclient.data.l[0] == 2 ? "user" : "INVALID"))));
+        gulong source_indication = e->xclient.data.l[0];
+        gboolean user_requested = (source_indication == 0 || source_indication == 2);
+
+        ob_debug("net_active_window for 0x%lx source=%s user_requested=%s", client->window,
+                 (source_indication == 0
+                      ? "unknown"
+                      : (source_indication == 1 ? "application" : (source_indication == 2 ? "user" : "INVALID"))),
+                 (user_requested ? "yes" : "no"));
+
         /* XXX make use of data.l[2] !? */
-        if (e->xclient.data.l[0] == 1 || e->xclient.data.l[0] == 2) {
+        if (source_indication == 1 || source_indication == 2) {
           /* we can not trust the timestamp from applications.
              e.g. chromium passes a very old timestamp.  openbox thinks
              the window will get focus and calls XSetInputFocus with the
@@ -1473,20 +1477,12 @@ static void event_handle_client(ObClient* client, XEvent* e) {
                           " missing a timestamp",
                           client->title);
         }
-        else
+        else if (source_indication != 0)
           ob_debug_type(OB_DEBUG_APP_BUGS,
                         "_NET_ACTIVE_WINDOW message for window %s is "
                         "missing source indication",
                         client->title);
-        /* TODO(danakj) This should use
-           (e->xclient.data.l[0] == 0 ||
-            e->xclient.data.l[0] == 2)
-           to determine if a user requested the activation, however GTK+
-           applications seem unable to make this distinction ever
-           (including panels such as xfce4-panel and gnome-panel).
-           So we are left just assuming all activations are from the user.
-        */
-        client_activate(client, FALSE, FALSE, TRUE, TRUE, TRUE);
+        client_activate(client, FALSE, FALSE, TRUE, TRUE, user_requested);
       }
       else if (msgtype == OBT_PROP_ATOM(NET_WM_MOVERESIZE)) {
         ob_debug("net_wm_moveresize for 0x%lx direction %d", client->window, e->xclient.data.l[2]);
