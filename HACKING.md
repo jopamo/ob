@@ -196,7 +196,6 @@ Use `TODO(owner|tracker-id): short description` only for work that is known, sco
 ## Modernization TODO
 
 * XCB-first X11 path — replace `XPending`/`XNextEvent`/`XGetWindowProperty` use in `obt/xqueue.c`, `openbox/event.c`, and `obt/prop.c` with `xcb_poll_for_event` plus bounded property replies to cut round-trips and oversized allocations.
-* Modern toolchain defaults — bump Meson to `c_std=c17`, enable the existing optional features by default when headers are present (`xsync`, `xrandr`, `xinerama`, `xshape`, `xkb`), and fix resulting warnings so hardened builds stay clean.
 * Event path profiling — add a small Xephyr-based perf harness under `tests/` to track event-to-frame latency and repaint batching, then use it to guide regression checks while pruning redundant buffering in `obt/xqueue`.
 
 ---

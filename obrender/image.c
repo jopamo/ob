@@ -564,7 +564,8 @@ static RsvgLoader* LoadWithRsvg(gchar* path, RrPixel32** pixel_data, gint* width
   }
 
   cairo_t* cr = cairo_create(loader->surface);
-  if (!rsvg_handle_render_document(loader->handle, cr, NULL, &error)) {
+  RsvgRectangle viewport = {.x = 0.0, .y = 0.0, .width = svg_w, .height = svg_h};
+  if (!rsvg_handle_render_document(loader->handle, cr, &viewport, &error)) {
     g_warning("RSVG: render failed for “%s”: %s", path, error ? error->message : "unknown error");
     g_clear_error(&error);
     cairo_destroy(cr);
