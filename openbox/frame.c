@@ -237,17 +237,19 @@ ObFrame* frame_new(ObClient* client) {
 }
 
 static void set_theme_statics(ObFrame* self) {
+  const RrFrameGeometry* geom = &ob_rr_theme->frame_geom;
+
   /* set colors/appearance/sizes for stuff that doesn't change */
-  XResizeWindow(obt_display, self->max, ob_rr_theme->button_size, ob_rr_theme->button_size);
-  XResizeWindow(obt_display, self->iconify, ob_rr_theme->button_size, ob_rr_theme->button_size);
-  XResizeWindow(obt_display, self->icon, ob_rr_theme->button_size + 2, ob_rr_theme->button_size + 2);
-  XResizeWindow(obt_display, self->close, ob_rr_theme->button_size, ob_rr_theme->button_size);
-  XResizeWindow(obt_display, self->desk, ob_rr_theme->button_size, ob_rr_theme->button_size);
-  XResizeWindow(obt_display, self->shade, ob_rr_theme->button_size, ob_rr_theme->button_size);
-  XResizeWindow(obt_display, self->tltresize, ob_rr_theme->grip_width, ob_rr_theme->paddingy + 1);
-  XResizeWindow(obt_display, self->trtresize, ob_rr_theme->grip_width, ob_rr_theme->paddingy + 1);
-  XResizeWindow(obt_display, self->tllresize, ob_rr_theme->paddingx + 1, ob_rr_theme->title_height);
-  XResizeWindow(obt_display, self->trrresize, ob_rr_theme->paddingx + 1, ob_rr_theme->title_height);
+  XResizeWindow(obt_display, self->max, geom->button_size, geom->button_size);
+  XResizeWindow(obt_display, self->iconify, geom->button_size, geom->button_size);
+  XResizeWindow(obt_display, self->icon, geom->button_size + 2, geom->button_size + 2);
+  XResizeWindow(obt_display, self->close, geom->button_size, geom->button_size);
+  XResizeWindow(obt_display, self->desk, geom->button_size, geom->button_size);
+  XResizeWindow(obt_display, self->shade, geom->button_size, geom->button_size);
+  XResizeWindow(obt_display, self->tltresize, geom->grip_width, geom->paddingy + 1);
+  XResizeWindow(obt_display, self->trtresize, geom->grip_width, geom->paddingy + 1);
+  XResizeWindow(obt_display, self->tllresize, geom->paddingx + 1, geom->title_height);
+  XResizeWindow(obt_display, self->trrresize, geom->paddingx + 1, geom->title_height);
 }
 
 static void free_theme_statics(ObFrame* self) {}
@@ -319,6 +321,7 @@ static void frame_publish_updates(ObFrame* self, gboolean force_extents, gboolea
 
 #ifdef SHAPE
 void frame_adjust_shape_kind(ObFrame* self, int kind) {
+  const RrFrameGeometry* geom = &ob_rr_theme->frame_geom;
   gint num;
   XRectangle xrect[2];
   gboolean shaped;
@@ -346,11 +349,11 @@ void frame_adjust_shape_kind(ObFrame* self, int kind) {
       ++num;
     }
 
-    if (self->decorations & OB_FRAME_DECOR_HANDLE && ob_rr_theme->handle_height > 0) {
+    if (self->decorations & OB_FRAME_DECOR_HANDLE && geom->handle_height > 0) {
       xrect[1].x = 0;
       xrect[1].y = FRAME_HANDLE_Y(self);
       xrect[1].width = self->area.width;
-      xrect[1].height = ob_rr_theme->handle_height + self->bwidth * 2;
+      xrect[1].height = geom->handle_height + self->bwidth * 2;
       ++num;
     }
 
@@ -378,6 +381,7 @@ void frame_update_shape(ObFrame* self) {
 }
 
 void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean fake) {
+  const RrFrameGeometry* geom = &ob_rr_theme->frame_geom;
   if (resized) {
     /* do this before changing the frame's status like max_horz max_vert */
     frame_adjust_cursors(self);
@@ -389,13 +393,13 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
     self->shaded = self->client->shaded;
 
     if (self->decorations & OB_FRAME_DECOR_BORDER)
-      self->bwidth = self->client->undecorated ? ob_rr_theme->ubwidth : ob_rr_theme->fbwidth;
+      self->bwidth = self->client->undecorated ? geom->ubwidth : geom->fbwidth;
     else
       self->bwidth = 0;
 
     if (self->decorations & OB_FRAME_DECOR_BORDER && !self->client->undecorated) {
-      self->cbwidth_l = self->cbwidth_r = ob_rr_theme->cbwidthx;
-      self->cbwidth_t = self->cbwidth_b = ob_rr_theme->cbwidthy;
+      self->cbwidth_l = self->cbwidth_r = geom->cbwidthx;
+      self->cbwidth_t = self->cbwidth_b = geom->cbwidthy;
     }
     else
       self->cbwidth_l = self->cbwidth_t = self->cbwidth_r = self->cbwidth_b = 0;
@@ -411,7 +415,7 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
 
     /* some elements are sized based of the width, so don't let them have
        negative values */
-    self->width = MAX(self->width, (ob_rr_theme->grip_width + self->bwidth) * 2 + 1);
+    self->width = MAX(self->width, (geom->grip_width + self->bwidth) * 2 + 1);
 
     STRUT_SET(self->size, self->cbwidth_l + (!self->max_horz ? self->bwidth : 0),
               self->cbwidth_t + (!self->max_horz || !self->max_vert ? self->bwidth : 0),
@@ -419,7 +423,7 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
               self->cbwidth_b + (!self->max_horz || !self->max_vert ? self->bwidth : 0));
 
     if (self->decorations & OB_FRAME_DECOR_TITLEBAR)
-      self->size.top += ob_rr_theme->title_height + self->bwidth;
+      self->size.top += geom->title_height + self->bwidth;
     else if (self->max_horz && self->max_vert) {
       /* A maximized and undecorated window needs a border on the
          top of the window to let the user still undecorate/unmaximize the
@@ -427,14 +431,14 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
       self->size.top += self->bwidth;
     }
 
-    if (self->decorations & OB_FRAME_DECOR_HANDLE && ob_rr_theme->handle_height > 0) {
-      self->size.bottom += ob_rr_theme->handle_height + self->bwidth;
+    if (self->decorations & OB_FRAME_DECOR_HANDLE && geom->handle_height > 0) {
+      self->size.bottom += geom->handle_height + self->bwidth;
     }
 
     /* position/size and map/unmap all the windows */
 
     if (!fake) {
-      gint innercornerheight = ob_rr_theme->grip_width - self->size.bottom;
+      gint innercornerheight = geom->grip_width - self->size.bottom;
 
       if (self->cbwidth_l) {
         XMoveResizeWindow(obt_display, self->innerleft, self->size.left - self->cbwidth_l, self->size.top,
@@ -447,8 +451,8 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
 
       if (self->cbwidth_l && innercornerheight > 0) {
         XMoveResizeWindow(obt_display, self->innerbll, 0,
-                          self->client->area.height - (ob_rr_theme->grip_width - self->size.bottom), self->cbwidth_l,
-                          ob_rr_theme->grip_width - self->size.bottom);
+                          self->client->area.height - (geom->grip_width - self->size.bottom), self->cbwidth_l,
+                          geom->grip_width - self->size.bottom);
 
         XMapWindow(obt_display, self->innerbll);
       }
@@ -466,8 +470,8 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
 
       if (self->cbwidth_r && innercornerheight > 0) {
         XMoveResizeWindow(obt_display, self->innerbrr, 0,
-                          self->client->area.height - (ob_rr_theme->grip_width - self->size.bottom), self->cbwidth_r,
-                          ob_rr_theme->grip_width - self->size.bottom);
+                          self->client->area.height - (geom->grip_width - self->size.bottom), self->cbwidth_r,
+                          geom->grip_width - self->size.bottom);
 
         XMapWindow(obt_display, self->innerbrr);
       }
@@ -489,11 +493,11 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
                           self->size.top + self->client->area.height,
                           self->client->area.width + self->cbwidth_l + self->cbwidth_r, self->cbwidth_b);
 
-        XMoveResizeWindow(obt_display, self->innerblb, 0, 0, ob_rr_theme->grip_width + self->bwidth, self->cbwidth_b);
-        XMoveResizeWindow(
-            obt_display, self->innerbrb,
-            self->client->area.width + self->cbwidth_l + self->cbwidth_r - (ob_rr_theme->grip_width + self->bwidth), 0,
-            ob_rr_theme->grip_width + self->bwidth, self->cbwidth_b);
+        XMoveResizeWindow(obt_display, self->innerblb, 0, 0, geom->grip_width + self->bwidth, self->cbwidth_b);
+        XMoveResizeWindow(obt_display, self->innerbrb,
+                          self->client->area.width + self->cbwidth_l + self->cbwidth_r -
+                              (geom->grip_width + self->bwidth),
+                          0, geom->grip_width + self->bwidth, self->cbwidth_b);
 
         XMapWindow(obt_display, self->innerbottom);
         XMapWindow(obt_display, self->innerblb);
@@ -509,16 +513,16 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
         gint titlesides;
 
         /* height of titleleft and titleright */
-        titlesides = (!self->max_horz ? ob_rr_theme->grip_width : 0);
+        titlesides = (!self->max_horz ? geom->grip_width : 0);
 
-        XMoveResizeWindow(obt_display, self->titletop, ob_rr_theme->grip_width + self->bwidth, 0,
+        XMoveResizeWindow(obt_display, self->titletop, geom->grip_width + self->bwidth, 0,
                           /* width + bwidth*2 - bwidth*2 - grips*2 */
-                          self->width - ob_rr_theme->grip_width * 2, self->bwidth);
-        XMoveResizeWindow(obt_display, self->titletopleft, 0, 0, ob_rr_theme->grip_width + self->bwidth, self->bwidth);
-        XMoveResizeWindow(
-            obt_display, self->titletopright,
-            self->client->area.width + self->size.left + self->size.right - ob_rr_theme->grip_width - self->bwidth, 0,
-            ob_rr_theme->grip_width + self->bwidth, self->bwidth);
+                          self->width - geom->grip_width * 2, self->bwidth);
+        XMoveResizeWindow(obt_display, self->titletopleft, 0, 0, geom->grip_width + self->bwidth, self->bwidth);
+        XMoveResizeWindow(obt_display, self->titletopright,
+                          self->client->area.width + self->size.left + self->size.right - geom->grip_width -
+                              self->bwidth,
+                          0, geom->grip_width + self->bwidth, self->bwidth);
 
         if (titlesides > 0) {
           XMoveResizeWindow(obt_display, self->titleleft, 0, self->bwidth, self->bwidth, titlesides);
@@ -540,7 +544,7 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
 
         if (self->decorations & OB_FRAME_DECOR_TITLEBAR) {
           XMoveResizeWindow(obt_display, self->titlebottom, (self->max_horz ? 0 : self->bwidth),
-                            ob_rr_theme->title_height + self->bwidth, self->width, self->bwidth);
+                            geom->title_height + self->bwidth, self->width, self->bwidth);
 
           XMapWindow(obt_display, self->titlebottom);
         }
@@ -559,18 +563,18 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
 
       if (self->decorations & OB_FRAME_DECOR_TITLEBAR) {
         XMoveResizeWindow(obt_display, self->title, (self->max_horz ? 0 : self->bwidth), self->bwidth, self->width,
-                          ob_rr_theme->title_height);
+                          geom->title_height);
 
         XMapWindow(obt_display, self->title);
 
         if (self->decorations & OB_FRAME_DECOR_GRIPS) {
-          XMoveResizeWindow(obt_display, self->topresize, ob_rr_theme->grip_width, 0,
-                            self->width - ob_rr_theme->grip_width * 2, ob_rr_theme->paddingy + 1);
+          XMoveResizeWindow(obt_display, self->topresize, geom->grip_width, 0,
+                            self->width - geom->grip_width * 2, geom->paddingy + 1);
 
           XMoveWindow(obt_display, self->tltresize, 0, 0);
           XMoveWindow(obt_display, self->tllresize, 0, 0);
-          XMoveWindow(obt_display, self->trtresize, self->width - ob_rr_theme->grip_width, 0);
-          XMoveWindow(obt_display, self->trrresize, self->width - ob_rr_theme->paddingx - 1, 0);
+          XMoveWindow(obt_display, self->trtresize, self->width - geom->grip_width, 0);
+          XMoveWindow(obt_display, self->trrresize, self->width - geom->paddingx - 1, 0);
 
           XMapWindow(obt_display, self->topresize);
           XMapWindow(obt_display, self->tltresize);
@@ -598,22 +602,21 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
       gint sidebwidth = self->max_horz ? 0 : self->bwidth;
 
       if (self->bwidth && self->size.bottom) {
-        XMoveResizeWindow(obt_display, self->handlebottom, ob_rr_theme->grip_width + self->bwidth + sidebwidth,
+        XMoveResizeWindow(obt_display, self->handlebottom, geom->grip_width + self->bwidth + sidebwidth,
                           self->size.top + self->client->area.height + self->size.bottom - self->bwidth,
-                          self->width - (ob_rr_theme->grip_width + sidebwidth) * 2, self->bwidth);
+                          self->width - (geom->grip_width + sidebwidth) * 2, self->bwidth);
 
         if (sidebwidth) {
           XMoveResizeWindow(obt_display, self->lgripleft, 0,
                             self->size.top + self->client->area.height + self->size.bottom -
-                                (!self->max_horz ? ob_rr_theme->grip_width : self->size.bottom - self->cbwidth_b),
-                            self->bwidth,
-                            (!self->max_horz ? ob_rr_theme->grip_width : self->size.bottom - self->cbwidth_b));
+                                (!self->max_horz ? geom->grip_width : self->size.bottom - self->cbwidth_b),
+                            self->bwidth, (!self->max_horz ? geom->grip_width : self->size.bottom - self->cbwidth_b));
           XMoveResizeWindow(obt_display, self->rgripright,
                             self->size.left + self->client->area.width + self->size.right - self->bwidth,
                             self->size.top + self->client->area.height + self->size.bottom -
-                                (!self->max_horz ? ob_rr_theme->grip_width : self->size.bottom - self->cbwidth_b),
+                                (!self->max_horz ? geom->grip_width : self->size.bottom - self->cbwidth_b),
                             self->bwidth,
-                            (!self->max_horz ? ob_rr_theme->grip_width : self->size.bottom - self->cbwidth_b));
+                            (!self->max_horz ? geom->grip_width : self->size.bottom - self->cbwidth_b));
 
           XMapWindow(obt_display, self->lgripleft);
           XMapWindow(obt_display, self->rgripright);
@@ -625,35 +628,33 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
 
         XMoveResizeWindow(obt_display, self->lgripbottom, sidebwidth,
                           self->size.top + self->client->area.height + self->size.bottom - self->bwidth,
-                          ob_rr_theme->grip_width + self->bwidth, self->bwidth);
+                          geom->grip_width + self->bwidth, self->bwidth);
         XMoveResizeWindow(obt_display, self->rgripbottom,
                           self->size.left + self->client->area.width + self->size.right - self->bwidth - sidebwidth -
-                              ob_rr_theme->grip_width,
+                              geom->grip_width,
                           self->size.top + self->client->area.height + self->size.bottom - self->bwidth,
-                          ob_rr_theme->grip_width + self->bwidth, self->bwidth);
+                          geom->grip_width + self->bwidth, self->bwidth);
 
         XMapWindow(obt_display, self->handlebottom);
         XMapWindow(obt_display, self->lgripbottom);
         XMapWindow(obt_display, self->rgripbottom);
 
-        if (self->decorations & OB_FRAME_DECOR_HANDLE && ob_rr_theme->handle_height > 0) {
-          XMoveResizeWindow(obt_display, self->handletop, ob_rr_theme->grip_width + self->bwidth + sidebwidth,
-                            FRAME_HANDLE_Y(self), self->width - (ob_rr_theme->grip_width + sidebwidth) * 2,
-                            self->bwidth);
+        if (self->decorations & OB_FRAME_DECOR_HANDLE && geom->handle_height > 0) {
+          XMoveResizeWindow(obt_display, self->handletop, geom->grip_width + self->bwidth + sidebwidth,
+                            FRAME_HANDLE_Y(self), self->width - (geom->grip_width + sidebwidth) * 2, self->bwidth);
           XMapWindow(obt_display, self->handletop);
 
           if (self->decorations & OB_FRAME_DECOR_GRIPS) {
-            XMoveResizeWindow(obt_display, self->handleleft, ob_rr_theme->grip_width, 0, self->bwidth,
-                              ob_rr_theme->handle_height);
-            XMoveResizeWindow(obt_display, self->handleright, self->width - ob_rr_theme->grip_width - self->bwidth, 0,
-                              self->bwidth, ob_rr_theme->handle_height);
+            XMoveResizeWindow(obt_display, self->handleleft, geom->grip_width, 0, self->bwidth, geom->handle_height);
+            XMoveResizeWindow(obt_display, self->handleright, self->width - geom->grip_width - self->bwidth, 0,
+                              self->bwidth, geom->handle_height);
 
             XMoveResizeWindow(obt_display, self->lgriptop, sidebwidth, FRAME_HANDLE_Y(self),
-                              ob_rr_theme->grip_width + self->bwidth, self->bwidth);
+                              geom->grip_width + self->bwidth, self->bwidth);
             XMoveResizeWindow(obt_display, self->rgriptop,
                               self->size.left + self->client->area.width + self->size.right - self->bwidth -
-                                  sidebwidth - ob_rr_theme->grip_width,
-                              FRAME_HANDLE_Y(self), ob_rr_theme->grip_width + self->bwidth, self->bwidth);
+                                  sidebwidth - geom->grip_width,
+                              FRAME_HANDLE_Y(self), geom->grip_width + self->bwidth, self->bwidth);
 
             XMapWindow(obt_display, self->handleleft);
             XMapWindow(obt_display, self->handleright);
@@ -691,15 +692,15 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
         XUnmapWindow(obt_display, self->rgripbottom);
       }
 
-      if (self->decorations & OB_FRAME_DECOR_HANDLE && ob_rr_theme->handle_height > 0) {
+      if (self->decorations & OB_FRAME_DECOR_HANDLE && geom->handle_height > 0) {
         XMoveResizeWindow(obt_display, self->handle, sidebwidth, FRAME_HANDLE_Y(self) + self->bwidth, self->width,
-                          ob_rr_theme->handle_height);
+                          geom->handle_height);
         XMapWindow(obt_display, self->handle);
 
         if (self->decorations & OB_FRAME_DECOR_GRIPS) {
-          XMoveResizeWindow(obt_display, self->lgrip, 0, 0, ob_rr_theme->grip_width, ob_rr_theme->handle_height);
-          XMoveResizeWindow(obt_display, self->rgrip, self->width - ob_rr_theme->grip_width, 0, ob_rr_theme->grip_width,
-                            ob_rr_theme->handle_height);
+          XMoveResizeWindow(obt_display, self->lgrip, 0, 0, geom->grip_width, geom->handle_height);
+          XMoveResizeWindow(obt_display, self->rgrip, self->width - geom->grip_width, 0, geom->grip_width,
+                            geom->handle_height);
 
           XMapWindow(obt_display, self->lgrip);
           XMapWindow(obt_display, self->rgrip);
@@ -717,9 +718,9 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
       }
 
       if (self->bwidth && !self->max_horz &&
-          (self->client->area.height + self->size.top + self->size.bottom) > ob_rr_theme->grip_width * 2) {
-        XMoveResizeWindow(obt_display, self->left, 0, self->bwidth + ob_rr_theme->grip_width, self->bwidth,
-                          self->client->area.height + self->size.top + self->size.bottom - ob_rr_theme->grip_width * 2);
+          (self->client->area.height + self->size.top + self->size.bottom) > geom->grip_width * 2) {
+        XMoveResizeWindow(obt_display, self->left, 0, self->bwidth + geom->grip_width, self->bwidth,
+                          self->client->area.height + self->size.top + self->size.bottom - geom->grip_width * 2);
 
         XMapWindow(obt_display, self->left);
       }
@@ -727,11 +728,11 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
         XUnmapWindow(obt_display, self->left);
 
       if (self->bwidth && !self->max_horz &&
-          (self->client->area.height + self->size.top + self->size.bottom) > ob_rr_theme->grip_width * 2) {
+          (self->client->area.height + self->size.top + self->size.bottom) > geom->grip_width * 2) {
         XMoveResizeWindow(obt_display, self->right,
                           self->client->area.width + self->cbwidth_l + self->cbwidth_r + self->bwidth,
-                          self->bwidth + ob_rr_theme->grip_width, self->bwidth,
-                          self->client->area.height + self->size.top + self->size.bottom - ob_rr_theme->grip_width * 2);
+                          self->bwidth + geom->grip_width, self->bwidth,
+                          self->client->area.height + self->size.top + self->size.bottom - geom->grip_width * 2);
 
         XMapWindow(obt_display, self->right);
       }
@@ -745,7 +746,7 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
 
   /* shading can change without being moved or resized */
   RECT_SET_SIZE(self->area, self->client->area.width + self->size.left + self->size.right,
-                (self->client->shaded ? ob_rr_theme->title_height + self->bwidth * 2
+                (self->client->shaded ? geom->title_height + self->bwidth * 2
                                       : self->client->area.height + self->size.top + self->size.bottom));
 
   if ((moved || resized) && !fake) {
@@ -788,7 +789,7 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
       focus_cycle_update_indicator(self->client);
   }
   if (resized && (self->decorations & OB_FRAME_DECOR_TITLEBAR) && self->label_width) {
-    XResizeWindow(obt_display, self->label, self->label_width, ob_rr_theme->label_height);
+    XResizeWindow(obt_display, self->label, self->label_width, geom->label_height);
   }
 }
 
@@ -1065,19 +1066,20 @@ place_button(ObFrame* self, const char* lc, gint bwidth, gint left, gint i, gint
 }
 
 static void layout_title(ObFrame* self) {
+  const RrFrameGeometry* geom = &ob_rr_theme->frame_geom;
   gchar* lc;
   gint i;
 
-  const gint bwidth = ob_rr_theme->button_size + ob_rr_theme->paddingx + 1;
+  const gint bwidth = geom->button_size + geom->paddingx + 1;
   /* position of the leftmost button */
-  const gint left = ob_rr_theme->paddingx + 1;
+  const gint left = geom->paddingx + 1;
   /* position of the rightmost button */
   const gint right = self->width;
 
   /* turn them all off */
   self->icon_on = self->desk_on = self->shade_on = self->iconify_on = self->max_on = self->close_on = self->label_on =
       FALSE;
-  self->label_width = self->width - (ob_rr_theme->paddingx + 1) * 2;
+  self->label_width = self->width - (geom->paddingx + 1) * 2;
   self->leftmost = self->rightmost = OB_FRAME_CONTEXT_NONE;
 
   /* figure out what's being shown, find each element's position, and the
@@ -1150,49 +1152,49 @@ static void layout_title(ObFrame* self) {
   /* position and map the elements */
   if (self->icon_on) {
     XMapWindow(obt_display, self->icon);
-    XMoveWindow(obt_display, self->icon, self->icon_x, ob_rr_theme->paddingy);
+    XMoveWindow(obt_display, self->icon, self->icon_x, geom->paddingy);
   }
   else
     XUnmapWindow(obt_display, self->icon);
 
   if (self->desk_on) {
     XMapWindow(obt_display, self->desk);
-    XMoveWindow(obt_display, self->desk, self->desk_x, ob_rr_theme->paddingy + 1);
+    XMoveWindow(obt_display, self->desk, self->desk_x, geom->paddingy + 1);
   }
   else
     XUnmapWindow(obt_display, self->desk);
 
   if (self->shade_on) {
     XMapWindow(obt_display, self->shade);
-    XMoveWindow(obt_display, self->shade, self->shade_x, ob_rr_theme->paddingy + 1);
+    XMoveWindow(obt_display, self->shade, self->shade_x, geom->paddingy + 1);
   }
   else
     XUnmapWindow(obt_display, self->shade);
 
   if (self->iconify_on) {
     XMapWindow(obt_display, self->iconify);
-    XMoveWindow(obt_display, self->iconify, self->iconify_x, ob_rr_theme->paddingy + 1);
+    XMoveWindow(obt_display, self->iconify, self->iconify_x, geom->paddingy + 1);
   }
   else
     XUnmapWindow(obt_display, self->iconify);
 
   if (self->max_on) {
     XMapWindow(obt_display, self->max);
-    XMoveWindow(obt_display, self->max, self->max_x, ob_rr_theme->paddingy + 1);
+    XMoveWindow(obt_display, self->max, self->max_x, geom->paddingy + 1);
   }
   else
     XUnmapWindow(obt_display, self->max);
 
   if (self->close_on) {
     XMapWindow(obt_display, self->close);
-    XMoveWindow(obt_display, self->close, self->close_x, ob_rr_theme->paddingy + 1);
+    XMoveWindow(obt_display, self->close, self->close_x, geom->paddingy + 1);
   }
   else
     XUnmapWindow(obt_display, self->close);
 
   if (self->label_on && self->label_width > 0) {
     XMapWindow(obt_display, self->label);
-    XMoveWindow(obt_display, self->label, self->label_x, ob_rr_theme->paddingy);
+    XMoveWindow(obt_display, self->label, self->label_x, geom->paddingy);
   }
   else
     XUnmapWindow(obt_display, self->label);
@@ -1292,6 +1294,7 @@ ObFrameContext frame_context_from_string(const gchar* name) {
 }
 
 ObFrameContext frame_context(ObClient* client, Window win, gint x, gint y) {
+  const RrFrameGeometry* geom = &ob_rr_theme->frame_geom;
   ObFrame* self;
   ObWindow* obwin;
 
@@ -1336,22 +1339,22 @@ ObFrameContext frame_context(ObClient* client, Window win, gint x, gint y) {
       fx += self->bwidth;
     /* titletop is a bit to the right */
     else if (win == self->titletop)
-      fx += ob_rr_theme->grip_width + self->bwidth;
+      fx += geom->grip_width + self->bwidth;
     /* titletopright is way to the right edge */
     else if (win == self->titletopright)
-      fx += self->area.width - (ob_rr_theme->grip_width + self->bwidth);
+      fx += self->area.width - (geom->grip_width + self->bwidth);
     /* titleright is even more way to the right edge */
     else if (win == self->titleright)
       fx += self->area.width - self->bwidth;
 
     /* figure out if we're over the area that should be considered a
        button */
-    if (fy < self->bwidth + ob_rr_theme->paddingy + 1 + ob_rr_theme->button_size) {
-      if (fx < (self->bwidth + ob_rr_theme->paddingx + 1 + ob_rr_theme->button_size)) {
+    if (fy < self->bwidth + geom->paddingy + 1 + geom->button_size) {
+      if (fx < (self->bwidth + geom->paddingx + 1 + geom->button_size)) {
         if (self->leftmost != OB_FRAME_CONTEXT_NONE)
           return self->leftmost;
       }
-      else if (fx >= (self->area.width - (self->bwidth + ob_rr_theme->paddingx + 1 + ob_rr_theme->button_size))) {
+      else if (fx >= (self->area.width - (self->bwidth + geom->paddingx + 1 + geom->button_size))) {
         if (self->rightmost != OB_FRAME_CONTEXT_NONE)
           return self->rightmost;
       }

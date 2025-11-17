@@ -197,6 +197,13 @@ Use `TODO(owner|tracker-id): short description` only for work that is known, sco
 
 * XCB-first X11 path — replace `XPending`/`XNextEvent`/`XGetWindowProperty` use in `obt/xqueue.c`, `openbox/event.c`, and `obt/prop.c` with `xcb_poll_for_event` plus bounded property replies to cut round-trips and oversized allocations.
 * Event path profiling — add a small Xephyr-based perf harness under `tests/` to track event-to-frame latency and repaint batching, then use it to guide regression checks while pruning redundant buffering in `obt/xqueue`.
+* Headless CI coverage — wire `ninja -C build x11-regression-tests` plus Xephyr into CI so X11 paths and EWMH behavior are exercised automatically, and gate merges on it.
+* Keyboard stack refresh — port `obt/keyboard` to xkbcommon, drop xmodmap-style parsing, and harden layout change handling so focus and shortcuts survive VT and layout switches without Xlib round-trips.
+* Atom/property cache consolidation — centralize atom lookups and property validation in `openbox/x11` helpers to remove duplicated Xlib fallbacks and enforce length/type checks consistently.
+* HiDPI geometry audit — re-run frame/client conversions and theme metrics with DPI awareness, cleaning up pixel assumptions and adding regression coverage for high-scale setups.
+* Render cache hygiene — audit `obrender` pixmap lifetime and reuse to avoid per-expose allocations and ensure cache invalidation is tied to theme reloads and frame resizes.
+* Parser fuzzing — add libFuzzer harnesses for config/XML parsing and X11 property decode helpers to catch malformed input handling regressions early.
+* Transient tree invariants — build targeted tests for parent/transient updates (group vs direct), guarding against cycles and invalid adoption in `client_transient_*` paths.
 
 ---
 

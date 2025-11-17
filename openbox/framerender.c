@@ -34,6 +34,7 @@ static void framerender_close(ObFrame* self, RrAppearance* a);
 
 void framerender_frame(ObFrame* self) {
   const RrInstance* inst = ob_rr_theme->inst;
+  const RrFrameGeometry* geom = &ob_rr_theme->frame_geom;
 
   if (frame_iconify_animating(self))
     return; /* delay redrawing until the animation is done */
@@ -179,60 +180,60 @@ void framerender_frame(ObFrame* self) {
     }
     clear = ob_rr_theme->a_clear;
 
-    RrPaint(t, self->title, self->width, ob_rr_theme->title_height);
+    RrPaint(t, self->title, self->width, geom->title_height);
 
     clear->surface.parent = t;
     clear->surface.parenty = 0;
 
-    clear->surface.parentx = ob_rr_theme->grip_width;
+    clear->surface.parentx = geom->grip_width;
 
-    RrPaint(clear, self->topresize, self->width - ob_rr_theme->grip_width * 2, ob_rr_theme->paddingy + 1);
+    RrPaint(clear, self->topresize, self->width - geom->grip_width * 2, geom->paddingy + 1);
 
     clear->surface.parentx = 0;
 
-    if (ob_rr_theme->grip_width > 0)
-      RrPaint(clear, self->tltresize, ob_rr_theme->grip_width, ob_rr_theme->paddingy + 1);
-    if (ob_rr_theme->title_height > 0)
-      RrPaint(clear, self->tllresize, ob_rr_theme->paddingx + 1, ob_rr_theme->title_height);
+    if (geom->grip_width > 0)
+      RrPaint(clear, self->tltresize, geom->grip_width, geom->paddingy + 1);
+    if (geom->title_height > 0)
+      RrPaint(clear, self->tllresize, geom->paddingx + 1, geom->title_height);
 
-    clear->surface.parentx = self->width - ob_rr_theme->grip_width;
+    clear->surface.parentx = self->width - geom->grip_width;
 
-    if (ob_rr_theme->grip_width > 0)
-      RrPaint(clear, self->trtresize, ob_rr_theme->grip_width, ob_rr_theme->paddingy + 1);
+    if (geom->grip_width > 0)
+      RrPaint(clear, self->trtresize, geom->grip_width, geom->paddingy + 1);
 
-    clear->surface.parentx = self->width - (ob_rr_theme->paddingx + 1);
+    clear->surface.parentx = self->width - (geom->paddingx + 1);
 
-    if (ob_rr_theme->title_height > 0)
-      RrPaint(clear, self->trrresize, ob_rr_theme->paddingx + 1, ob_rr_theme->title_height);
+    if (geom->title_height > 0)
+      RrPaint(clear, self->trrresize, geom->paddingx + 1, geom->title_height);
 
     /* set parents for any parent relative guys */
     l->surface.parent = t;
     l->surface.parentx = self->label_x;
-    l->surface.parenty = ob_rr_theme->paddingy;
+    l->surface.parenty = geom->paddingy;
 
     m->surface.parent = t;
     m->surface.parentx = self->max_x;
-    m->surface.parenty = ob_rr_theme->paddingy + 1;
+    m->surface.parenty = geom->paddingy + 1;
 
     n->surface.parent = t;
     n->surface.parentx = self->icon_x;
-    n->surface.parenty = ob_rr_theme->paddingy;
+    n->surface.parenty = geom->paddingy;
 
     i->surface.parent = t;
     i->surface.parentx = self->iconify_x;
-    i->surface.parenty = ob_rr_theme->paddingy + 1;
+    i->surface.parenty = geom->paddingy + 1;
 
     d->surface.parent = t;
     d->surface.parentx = self->desk_x;
-    d->surface.parenty = ob_rr_theme->paddingy + 1;
+    d->surface.parenty = geom->paddingy + 1;
 
     s->surface.parent = t;
     s->surface.parentx = self->shade_x;
-    s->surface.parenty = ob_rr_theme->paddingy + 1;
+    s->surface.parenty = geom->paddingy + 1;
 
     c->surface.parent = t;
     c->surface.parentx = self->close_x;
-    c->surface.parenty = ob_rr_theme->paddingy + 1;
+    c->surface.parenty = geom->paddingy + 1;
 
     framerender_label(self, l);
     framerender_max(self, m);
@@ -243,12 +244,12 @@ void framerender_frame(ObFrame* self) {
     framerender_close(self, c);
   }
 
-  if (self->decorations & OB_FRAME_DECOR_HANDLE && ob_rr_theme->handle_height > 0) {
+  if (self->decorations & OB_FRAME_DECOR_HANDLE && geom->handle_height > 0) {
     RrAppearance *h, *g;
 
     h = (self->focused ? ob_rr_theme->a_focused_handle : ob_rr_theme->a_unfocused_handle);
 
-    RrPaint(h, self->handle, self->width, ob_rr_theme->handle_height);
+    RrPaint(h, self->handle, self->width, geom->handle_height);
 
     if (self->decorations & OB_FRAME_DECOR_GRIPS) {
       g = (self->focused ? ob_rr_theme->a_focused_grip : ob_rr_theme->a_unfocused_grip);
@@ -259,12 +260,12 @@ void framerender_frame(ObFrame* self) {
       g->surface.parentx = 0;
       g->surface.parenty = 0;
 
-      RrPaint(g, self->lgrip, ob_rr_theme->grip_width, ob_rr_theme->handle_height);
+      RrPaint(g, self->lgrip, geom->grip_width, geom->handle_height);
 
-      g->surface.parentx = self->width - ob_rr_theme->grip_width;
+      g->surface.parentx = self->width - geom->grip_width;
       g->surface.parenty = 0;
 
-      RrPaint(g, self->rgrip, ob_rr_theme->grip_width, ob_rr_theme->handle_height);
+      RrPaint(g, self->rgrip, geom->grip_width, geom->handle_height);
     }
   }
 
@@ -274,9 +275,10 @@ void framerender_frame(ObFrame* self) {
 static void framerender_label(ObFrame* self, RrAppearance* a) {
   if (!self->label_on)
     return;
+  const RrFrameGeometry* geom = &ob_rr_theme->frame_geom;
   /* set the texture's text! */
   a->texture[0].data.text.string = self->client->title;
-  RrPaint(a, self->label, self->label_width, ob_rr_theme->label_height);
+  RrPaint(a, self->label, self->label_width, geom->label_height);
 }
 
 static void framerender_icon(ObFrame* self, RrAppearance* a) {
@@ -284,6 +286,7 @@ static void framerender_icon(ObFrame* self, RrAppearance* a) {
 
   if (!self->icon_on)
     return;
+  const RrFrameGeometry* geom = &ob_rr_theme->frame_geom;
 
   icon = client_icon(self->client);
 
@@ -298,35 +301,40 @@ static void framerender_icon(ObFrame* self, RrAppearance* a) {
     a->texture[0].type = RR_TEXTURE_NONE;
   }
 
-  RrPaint(a, self->icon, ob_rr_theme->button_size + 2, ob_rr_theme->button_size + 2);
+  RrPaint(a, self->icon, geom->button_size + 2, geom->button_size + 2);
 }
 
 static void framerender_max(ObFrame* self, RrAppearance* a) {
   if (!self->max_on)
     return;
-  RrPaint(a, self->max, ob_rr_theme->button_size, ob_rr_theme->button_size);
+  const RrFrameGeometry* geom = &ob_rr_theme->frame_geom;
+  RrPaint(a, self->max, geom->button_size, geom->button_size);
 }
 
 static void framerender_iconify(ObFrame* self, RrAppearance* a) {
   if (!self->iconify_on)
     return;
-  RrPaint(a, self->iconify, ob_rr_theme->button_size, ob_rr_theme->button_size);
+  const RrFrameGeometry* geom = &ob_rr_theme->frame_geom;
+  RrPaint(a, self->iconify, geom->button_size, geom->button_size);
 }
 
 static void framerender_desk(ObFrame* self, RrAppearance* a) {
   if (!self->desk_on)
     return;
-  RrPaint(a, self->desk, ob_rr_theme->button_size, ob_rr_theme->button_size);
+  const RrFrameGeometry* geom = &ob_rr_theme->frame_geom;
+  RrPaint(a, self->desk, geom->button_size, geom->button_size);
 }
 
 static void framerender_shade(ObFrame* self, RrAppearance* a) {
   if (!self->shade_on)
     return;
-  RrPaint(a, self->shade, ob_rr_theme->button_size, ob_rr_theme->button_size);
+  const RrFrameGeometry* geom = &ob_rr_theme->frame_geom;
+  RrPaint(a, self->shade, geom->button_size, geom->button_size);
 }
 
 static void framerender_close(ObFrame* self, RrAppearance* a) {
   if (!self->close_on)
     return;
-  RrPaint(a, self->close, ob_rr_theme->button_size, ob_rr_theme->button_size);
+  const RrFrameGeometry* geom = &ob_rr_theme->frame_geom;
+  RrPaint(a, self->close, geom->button_size, geom->button_size);
 }

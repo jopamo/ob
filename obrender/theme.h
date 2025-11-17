@@ -26,6 +26,32 @@ G_BEGIN_DECLS
 
 typedef struct _RrTheme RrTheme;
 
+typedef struct {
+  gint paddingx;
+  gint paddingy;
+  gint handle_height;
+  gint fbwidth;
+  gint ubwidth;
+  gint cbwidthx;
+  gint cbwidthy;
+  gint label_height;
+  gint title_height;
+  gint button_size;
+  gint grip_width;
+  gint win_font_height;
+} RrFrameGeometry;
+
+typedef struct {
+  gint overlap_x;
+  gint overlap_y;
+  gint separator_width;
+  gint separator_paddingx;
+  gint separator_paddingy;
+  gint label_height;
+  gint title_height;
+  gint font_height;
+} RrMenuGeometry;
+
 struct _RrTheme {
   const RrInstance* inst;
 
@@ -174,6 +200,9 @@ struct _RrTheme {
   RrAppearance* osd_focused_button;
 
   gchar* name;
+
+  RrFrameGeometry frame_geom;
+  RrMenuGeometry menu_geom;
 };
 
 /*! The font values are all optional. If a NULL is used for any of them, then

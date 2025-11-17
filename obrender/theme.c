@@ -842,6 +842,28 @@ RrTheme* RrThemeNew(const RrInstance* inst,
   theme->button_size = theme->label_height - 2;
   theme->grip_width = 25;
 
+  theme->frame_geom.paddingx = theme->paddingx;
+  theme->frame_geom.paddingy = theme->paddingy;
+  theme->frame_geom.handle_height = theme->handle_height;
+  theme->frame_geom.fbwidth = theme->fbwidth;
+  theme->frame_geom.ubwidth = theme->ubwidth;
+  theme->frame_geom.cbwidthx = theme->cbwidthx;
+  theme->frame_geom.cbwidthy = theme->cbwidthy;
+  theme->frame_geom.label_height = theme->label_height;
+  theme->frame_geom.title_height = theme->title_height;
+  theme->frame_geom.button_size = theme->button_size;
+  theme->frame_geom.grip_width = theme->grip_width;
+  theme->frame_geom.win_font_height = theme->win_font_height;
+
+  theme->menu_geom.overlap_x = theme->menu_overlap_x;
+  theme->menu_geom.overlap_y = theme->menu_overlap_y;
+  theme->menu_geom.separator_width = theme->menu_sep_width;
+  theme->menu_geom.separator_paddingx = theme->menu_sep_paddingx;
+  theme->menu_geom.separator_paddingy = theme->menu_sep_paddingy;
+  theme->menu_geom.label_height = theme->menu_title_label_height;
+  theme->menu_geom.title_height = theme->menu_title_height;
+  theme->menu_geom.font_height = theme->menu_font_height;
+
   RrAppearanceFree(fbs.focused_disabled);
   RrAppearanceFree(fbs.unfocused_disabled);
   RrAppearanceFree(fbs.focused_hover);
