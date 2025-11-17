@@ -187,6 +187,23 @@ Include a simple test runner in `tests/` rather than scattering ad-hoc scripts, 
 
 ---
 
+## TODO Conventions
+
+Use `TODO(owner|tracker-id): short description` only for work that is known, scoped, and blocked on a follow-up. Prefer linking an issue (e.g. `TODO(#1234): handle transient loops`) over leaving the note anonymous. Avoid long-term TODOs; either fix the code or file an issue and remove the marker.
+
+---
+
+## Modernization TODO
+
+* XCB-first X11 path — replace `XPending`/`XNextEvent`/`XGetWindowProperty` use in `obt/xqueue.c`, `openbox/event.c`, and `obt/prop.c` with `xcb_poll_for_event` plus bounded property replies to cut round-trips and oversized allocations.
+* Tight property validation — cap sizes (no `G_MAXLONG` reads), verify types/lengths for every getter, and centralize the checks in `obt/prop.c` so mis-sized properties never reach window-management code.
+* Complete EWMH window-type coverage — add the missing spec types (`_NET_WM_WINDOW_TYPE_POPUP_MENU`, `_NET_WM_WINDOW_TYPE_TOOLTIP`, notification/combo/dnd) to `_NET_SUPPORTED` in `openbox/screen.c` and teach `openbox/client.c`/`frame.c` to honor their focus/placement rules.
+* Virtual roots support — either implement `_NET_VIRTUAL_ROOTS` handling (root redirection, focus gating) or explicitly document the unsupported status in `_NET_SUPPORTED` and client handling.
+* Modern toolchain defaults — bump Meson to `c_std=c17`, enable the existing optional features by default when headers are present (`xsync`, `xrandr`, `xinerama`, `xshape`, `xkb`), and fix resulting warnings so hardened builds stay clean.
+* Event path profiling — add a small Xephyr-based perf harness under `tests/` to track event-to-frame latency and repaint batching, then use it to guide regression checks while pruning redundant buffering in `obt/xqueue`.
+
+---
+
 ## Contributor Workflow
 
 * Keep each commit scoped and readable  
@@ -199,7 +216,7 @@ Include a simple test runner in `tests/` rather than scattering ad-hoc scripts, 
 
 ---
 
-## Authors and Contributors
+## Original Authors and Contributors
 
 | Name                                                                       | Role                                           | Notes |
 | -------------------------------------------------------------------------- | ---------------------------------------------- | ----- |
@@ -209,9 +226,7 @@ Include a simple test runner in `tests/` rather than scattering ad-hoc scripts, 
 | **Tore Anderson** [tore@linpro.no](mailto:tore@linpro.no)                  | Directional focus, edge moving/growing actions |       |
 | **Audun Hove** [audun@nlc.no](mailto:audun@nlc.no)                         | Actions code, move window to edge actions      |       |
 | **Marius Nita** [marius@cs.pdx.edu](mailto:marius@cs.pdx.edu)              | Otk prototype code, design ideas               |       |
-| **John McKnight** [jmcknight@gmail.com](mailto:jmcknight@gmail.com)        | Clearlooks themes                              |       |
-| **David Barr** [david@chalkskeletons.com](mailto:david@chalkskeletons.com) | Bear2 & Clearlooks themes, icon                |       |
-| **Brandon Cash**                                                           | SplitVertical gradient style                   |       |
-| **Dan Rise**                                                               | Natura theme                                   |       |
+
+
 
 ---
