@@ -18,6 +18,7 @@
 
 #include "obt/display.h"
 #include "obt/keyboard.h"
+#include "openbox/x11/x11.h"
 
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
@@ -75,44 +76,36 @@ static XIM xim = NULL;
 static XIMStyle xim_style = 0;
 static GSList* xic_all = NULL;
 static gboolean keyboard_load_rule_names(struct xkb_rule_names* names) {
+  ObX11PropertyValue prop_value = {0};
+  ObX11StringList fields = {0};
   Atom prop;
-  Atom type;
-  gint format;
-  gulong nitems, bytes_after;
-  guchar* data = NULL;
+  Window root;
   gboolean ret = FALSE;
 
   memset(names, 0, sizeof(*names));
 
-  prop = XInternAtom(obt_display, "_XKB_RULES_NAMES", True);
+  prop = ob_x11_atom_if_exists("_XKB_RULES_NAMES");
   if (!prop)
     return FALSE;
 
-  if (XGetWindowProperty(obt_display, obt_root(DefaultScreen(obt_display)), prop, 0, 1024, False, XA_STRING, &type,
-                         &format, &nitems, &bytes_after, &data) != Success)
+  root = obt_root(DefaultScreen(obt_display));
+  if (!ob_x11_get_property(root, prop, XA_STRING, 8, 1, 0, &prop_value))
     goto done;
 
-  if (type != XA_STRING || format != 8 || !data)
+  if (!ob_x11_property_to_string_list(&prop_value, 1, 5, &fields))
     goto done;
 
-  char* fields[5] = {0};
-  char* cursor = (char*)data;
-  for (gint i = 0; i < 5 && cursor < (char*)data + nitems; ++i) {
-    fields[i] = cursor;
-    cursor += strlen(cursor) + 1;
-  }
-
-  names->rules = fields[0] && *fields[0] ? g_strdup(fields[0]) : NULL;
-  names->model = fields[1] && *fields[1] ? g_strdup(fields[1]) : NULL;
-  names->layout = fields[2] && *fields[2] ? g_strdup(fields[2]) : NULL;
-  names->variant = fields[3] && *fields[3] ? g_strdup(fields[3]) : NULL;
-  names->options = fields[4] && *fields[4] ? g_strdup(fields[4]) : NULL;
+  names->rules = (fields.n_items > 0 && fields.items[0] && *fields.items[0]) ? g_strdup(fields.items[0]) : NULL;
+  names->model = (fields.n_items > 1 && fields.items[1] && *fields.items[1]) ? g_strdup(fields.items[1]) : NULL;
+  names->layout = (fields.n_items > 2 && fields.items[2] && *fields.items[2]) ? g_strdup(fields.items[2]) : NULL;
+  names->variant = (fields.n_items > 3 && fields.items[3] && *fields.items[3]) ? g_strdup(fields.items[3]) : NULL;
+  names->options = (fields.n_items > 4 && fields.items[4] && *fields.items[4]) ? g_strdup(fields.items[4]) : NULL;
 
   ret = TRUE;
 
 done:
-  if (data)
-    XFree(data);
+  ob_x11_string_list_clear(&fields);
+  ob_x11_property_value_clear(&prop_value);
   return ret;
 }
 

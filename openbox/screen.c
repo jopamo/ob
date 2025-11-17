@@ -38,6 +38,7 @@
 #include "obt/display.h"
 #include "obt/xqueue.h"
 #include "obt/prop.h"
+#include "openbox/x11/x11.h"
 
 #include <X11/Xlib.h>
 #ifdef HAVE_UNISTD_H
@@ -93,7 +94,7 @@ static gboolean replace_wm(void) {
   Time timestamp;
 
   wm_sn = g_strdup_printf("WM_S%d", ob_screen);
-  wm_sn_atom = XInternAtom(obt_display, wm_sn, FALSE);
+  wm_sn_atom = ob_x11_atom(wm_sn);
   g_free(wm_sn);
 
   current_wm_sn_owner = XGetSelectionOwner(obt_display, wm_sn_atom);
@@ -341,7 +342,7 @@ static void screen_tell_ksplash(void) {
   e.xclient.type = ClientMessage;
   e.xclient.display = obt_display;
   e.xclient.window = obt_root(ob_screen);
-  e.xclient.message_type = XInternAtom(obt_display, "_KDE_SPLASH_PROGRESS", False);
+  e.xclient.message_type = ob_x11_atom("_KDE_SPLASH_PROGRESS");
   e.xclient.format = 8;
   strcpy(e.xclient.data.b, "wm started");
   XSendEvent(obt_display, obt_root(ob_screen), False, SubstructureNotifyMask, &e);

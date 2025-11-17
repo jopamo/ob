@@ -11,7 +11,7 @@ obt_sources = files(
 )
 
 obt_cargs = common_defines + feature_defines + ['-DG_LOG_DOMAIN="Obt"']
-obt_deps = [glib_dep, xml_dep, x11_dep, xext_dep]
+obt_deps = [glib_dep, xml_dep, x11_dep, xext_dep, obx11_dep]
 obt_deps += xkbcommon_deps
 if have_xinerama
   obt_deps += xinerama_dep

@@ -203,6 +203,7 @@ Use `TODO(owner|tracker-id): short description` only for work that is known, sco
 * Render cache hygiene — audit `obrender` pixmap lifetime and reuse to avoid per-expose allocations and ensure cache invalidation is tied to theme reloads and frame resizes.
 * Parser fuzzing — add libFuzzer harnesses for config/XML parsing and X11 property decode helpers to catch malformed input handling regressions early.
 * Transient tree invariants — build targeted tests for parent/transient updates (group vs direct), guarding against cycles and invalid adoption in `client_transient_*` paths.
+* Atom helper adoption — migrate remaining `XInternAtom`/`XGetWindowProperty` callers (tests/tools) onto the consolidated helpers for consistent validation.
 
 ---
 

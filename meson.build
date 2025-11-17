@@ -270,6 +270,7 @@ top_version_h = configure_file(
 # ---------------------------------------------------------------------------
 # Build subdirectories
 # ---------------------------------------------------------------------------
+subdir('openbox/x11')
 subdir('obt')
 subdir('obrender')
 subdir('openbox')
