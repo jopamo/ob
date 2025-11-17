@@ -25,6 +25,7 @@
 #include "stacking.h"
 #include "event.h"
 #include "screen.h"
+#include "obt/prop.h"
 #include "obrender/render.h"
 #include "obrender/theme.h"
 
@@ -42,6 +43,7 @@ ObPopup* popup_new(void) {
   attrib.override_redirect = True;
   self->bg = XCreateWindow(obt_display, obt_root(ob_screen), 0, 0, 1, 1, 0, RrDepth(ob_rr_inst), InputOutput,
                            RrVisual(ob_rr_inst), CWOverrideRedirect, &attrib);
+  OBT_PROP_SET32(self->bg, NET_WM_WINDOW_TYPE, ATOM, OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_TOOLTIP));
 
   self->text = XCreateWindow(obt_display, self->bg, 0, 0, 1, 1, 0, RrDepth(ob_rr_inst), InputOutput,
                              RrVisual(ob_rr_inst), 0, NULL);
