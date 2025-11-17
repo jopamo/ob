@@ -58,6 +58,16 @@ foreach src : test_sources
   test_targets += exe
 endforeach
 
+hidpi_test = executable(
+  'test-hidpi',
+  'hidpi.c',
+  include_directories: [common_includes],
+  dependencies: [glib_dep, pango_dep, pangoxft_dep, xml_dep, x11_dep, xext_dep, xrender_dep],
+  link_with: [libobrender, libobt],
+  install: false,
+  build_by_default: false)
+test_targets += hidpi_test
+
 if test_targets.length() > 0
   alias_target('x11-regression-tests', test_targets)
 endif

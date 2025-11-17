@@ -70,6 +70,7 @@ static void read_button_styles(XrmDatabase db,
                                struct fallbacks* fbs,
                                guchar* normal_mask,
                                guchar* toggled_mask);
+static void scale_text_shadow_offsets(const RrInstance* inst, RrAppearance* appearance);
 
 static RrFont* get_font(RrFont* target, RrFont** default_font, const RrInstance* inst) {
   if (target) {
@@ -85,6 +86,20 @@ static RrFont* get_font(RrFont* target, RrFont** default_font, const RrInstance*
       *default_font = RrFontOpenDefault(inst);
     }
     return *default_font;
+  }
+}
+
+static void scale_text_shadow_offsets(const RrInstance* inst, RrAppearance* appearance) {
+  if (!appearance)
+    return;
+
+  for (gint i = 0; i < appearance->textures; ++i) {
+    if (appearance->texture[i].type != RR_TEXTURE_TEXT)
+      continue;
+
+    RrTextureText* text = &appearance->texture[i].data.text;
+    text->shadow_offset_x = RrScaleValue(inst, text->shadow_offset_x);
+    text->shadow_offset_y = RrScaleValue(inst, text->shadow_offset_y);
   }
 }
 
@@ -274,6 +289,21 @@ RrTheme* RrThemeNew(const RrInstance* inst,
   READ_INT("menu.separator.padding.height", theme->menu_sep_paddingy, 0, 100, 3);
   READ_INT("window.client.padding.width", theme->cbwidthx, 0, 100, theme->paddingx);
   READ_INT("window.client.padding.height", theme->cbwidthy, 0, 100, theme->cbwidthx);
+
+  theme->menu_overlap_x = RrScaleValue(inst, theme->menu_overlap_x);
+  theme->menu_overlap_y = RrScaleValue(inst, theme->menu_overlap_y);
+  theme->handle_height = RrScaleValue(inst, theme->handle_height);
+  theme->paddingx = RrScaleValue(inst, theme->paddingx);
+  theme->paddingy = RrScaleValue(inst, theme->paddingy);
+  theme->fbwidth = RrScaleValue(inst, theme->fbwidth);
+  theme->mbwidth = RrScaleValue(inst, theme->mbwidth);
+  theme->obwidth = RrScaleValue(inst, theme->obwidth);
+  theme->ubwidth = RrScaleValue(inst, theme->ubwidth);
+  theme->menu_sep_width = RrScaleValue(inst, theme->menu_sep_width);
+  theme->menu_sep_paddingx = RrScaleValue(inst, theme->menu_sep_paddingx);
+  theme->menu_sep_paddingy = RrScaleValue(inst, theme->menu_sep_paddingy);
+  theme->cbwidthx = RrScaleValue(inst, theme->cbwidthx);
+  theme->cbwidthy = RrScaleValue(inst, theme->cbwidthy);
 
   /* load colors */
   READ_COLOR_("window.active.border.color", "border.color", theme->frame_focused_border_color,
@@ -802,6 +832,16 @@ RrTheme* RrThemeNew(const RrInstance* inst,
   g_free(path);
   XrmDestroyDatabase(db);
 
+  scale_text_shadow_offsets(inst, theme->a_focused_label);
+  scale_text_shadow_offsets(inst, theme->a_unfocused_label);
+  scale_text_shadow_offsets(inst, theme->osd_hilite_label);
+  scale_text_shadow_offsets(inst, theme->osd_unhilite_label);
+  scale_text_shadow_offsets(inst, theme->a_menu_text_title);
+  scale_text_shadow_offsets(inst, theme->a_menu_text_normal);
+  scale_text_shadow_offsets(inst, theme->a_menu_text_selected);
+  scale_text_shadow_offsets(inst, theme->a_menu_text_disabled);
+  scale_text_shadow_offsets(inst, theme->a_menu_text_disabled_selected);
+
   /* set the font heights */
   theme->win_font_height =
       RrFontHeight(theme->win_font_focused, theme->a_focused_label->texture[0].data.text.shadow_offset_y);
@@ -839,8 +879,8 @@ RrTheme* RrThemeNew(const RrInstance* inst,
     theme->menu_title_label_height = theme->menu_title_font_height + ut + ub;
     theme->menu_title_height = theme->menu_title_label_height + theme->paddingy * 2;
   }
-  theme->button_size = theme->label_height - 2;
-  theme->grip_width = 25;
+  theme->button_size = MAX(1, theme->label_height - RrScaleValue(inst, 2));
+  theme->grip_width = RrScaleValue(inst, 25);
 
   theme->frame_geom.paddingx = theme->paddingx;
   theme->frame_geom.paddingy = theme->paddingy;

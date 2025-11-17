@@ -19,6 +19,7 @@
 
 #include "render.h"
 #include "instance.h"
+#include <X11/Xresource.h>
 
 static RrInstance* definst = NULL;
 
@@ -37,6 +38,95 @@ static void dest(gpointer data) {
         "leftover references",
         c->id, RrColorRed(c), RrColorGreen(c), RrColorBlue(c), c->refcount);
 #endif
+}
+
+#define DEFAULT_DPI 96.0
+
+static gdouble parse_env_double(const gchar* name) {
+  const gchar* val = g_getenv(name);
+  if (!val || *val == '\0')
+    return -1.0;
+
+  gchar* end = NULL;
+  const gdouble parsed = g_ascii_strtod(val, &end);
+  if (val != end && parsed > 0)
+    return parsed;
+  return -1.0;
+}
+
+static gdouble screen_dpi(Display* display, gint screen, gboolean vertical) {
+  const gint px = vertical ? DisplayHeight(display, screen) : DisplayWidth(display, screen);
+  const gint mm = vertical ? DisplayHeightMM(display, screen) : DisplayWidthMM(display, screen);
+
+  if (px <= 0 || mm <= 0)
+    return -1.0;
+
+  return (gdouble)px * 25.4 / (gdouble)mm;
+}
+
+static gdouble resource_dpi(Display* display) {
+  const char* rms = XResourceManagerString(display);
+  if (!rms)
+    return -1.0;
+
+  XrmInitialize();
+  XrmDatabase db = XrmGetStringDatabase(rms);
+  if (!db)
+    return -1.0;
+
+  XrmValue value;
+  gchar* type = NULL;
+  gdouble dpi = -1.0;
+
+  if (XrmGetResource(db, "Xft.dpi", "Xft.dpi", &type, &value) && value.addr) {
+    gchar* end = NULL;
+    dpi = g_ascii_strtod(value.addr, &end);
+    if (value.addr == end || dpi <= 0)
+      dpi = -1.0;
+  }
+
+  XrmDestroyDatabase(db);
+  return dpi;
+}
+
+static void init_display_metrics(RrInstance* inst) {
+  const gdouble env_scale = parse_env_double("OPENBOX_SCALE");
+  const gdouble env_dpi = parse_env_double("OPENBOX_DPI");
+  gdouble dpi_x = DEFAULT_DPI;
+  gdouble dpi_y = DEFAULT_DPI;
+
+  if (env_dpi > 0) {
+    dpi_x = dpi_y = env_dpi;
+  }
+  else {
+    const gdouble res_dpi = resource_dpi(inst->display);
+    if (res_dpi > 0) {
+      dpi_x = dpi_y = res_dpi;
+    }
+    else {
+      const gdouble screen_x = screen_dpi(inst->display, inst->screen, FALSE);
+      const gdouble screen_y = screen_dpi(inst->display, inst->screen, TRUE);
+
+      if (screen_x > 0)
+        dpi_x = screen_x;
+      if (screen_y > 0)
+        dpi_y = screen_y;
+    }
+  }
+
+  inst->dpi_x = dpi_x;
+  inst->dpi_y = dpi_y;
+
+  if (env_scale > 0)
+    inst->scale = env_scale;
+  else {
+    inst->scale = MAX(inst->dpi_x, inst->dpi_y) / DEFAULT_DPI;
+    if (inst->scale < 1.0)
+      inst->scale = 1.0;
+  }
+
+  if (inst->scale <= 0)
+    inst->scale = 1.0;
 }
 
 #if 0
@@ -69,6 +159,7 @@ RrInstance* RrInstanceNew(Display* display, gint screen) {
   definst->pseudo_colors = NULL;
 
   definst->color_hash = g_hash_table_new_full(g_int_hash, g_int_equal, NULL, dest);
+  init_display_metrics(definst);
 
   switch (definst->visual->class) {
     case TrueColor:
@@ -286,6 +377,32 @@ gint RrGreenMask(const RrInstance* inst) {
 
 gint RrBlueMask(const RrInstance* inst) {
   return (inst ? inst : definst)->blue_mask;
+}
+
+gdouble RrDpiX(const RrInstance* inst) {
+  return (inst ? inst : definst)->dpi_x;
+}
+
+gdouble RrDpiY(const RrInstance* inst) {
+  return (inst ? inst : definst)->dpi_y;
+}
+
+gdouble RrScale(const RrInstance* inst) {
+  return (inst ? inst : definst)->scale;
+}
+
+gint RrScaleValue(const RrInstance* inst, gint value) {
+  const gdouble scale = (inst ? inst : definst)->scale;
+
+  if (value == 0 || scale <= 0 || scale == 1.0)
+    return value;
+
+  const gdouble scaled = value * scale;
+  const gint rounded = (gint)(scaled > 0 ? scaled + 0.5 : scaled - 0.5);
+
+  if (value > 0)
+    return MAX(1, rounded);
+  return MIN(-1, rounded);
 }
 
 guint RrPseudoBPC(const RrInstance* inst) {

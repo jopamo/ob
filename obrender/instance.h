@@ -48,6 +48,11 @@ struct _RrInstance {
   XColor* pseudo_colors;
 
   GHashTable* color_hash;
+
+  /* Display metrics */
+  gdouble dpi_x;
+  gdouble dpi_y;
+  gdouble scale;
 };
 
 guint RrPseudoBPC(const RrInstance* inst);

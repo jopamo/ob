@@ -342,6 +342,10 @@ gint RrBlueShift(const RrInstance* inst);
 gint RrRedMask(const RrInstance* inst);
 gint RrGreenMask(const RrInstance* inst);
 gint RrBlueMask(const RrInstance* inst);
+gdouble RrDpiX(const RrInstance* inst);
+gdouble RrDpiY(const RrInstance* inst);
+gdouble RrScale(const RrInstance* inst);
+gint RrScaleValue(const RrInstance* inst, gint value);
 
 RrColor* RrColorNew(const RrInstance* inst, gint r, gint g, gint b);
 RrColor* RrColorCopy(RrColor* c);
