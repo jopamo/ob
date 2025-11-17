@@ -1,10 +1,21 @@
 // fallback.c for the Openbox window manager
+#define _POSIX_C_SOURCE 200809L
 
+#include <errno.h>
 #include <stdio.h>
+#include <time.h>
 #include <unistd.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
+
+static void sleep_for_ms(long ms) {
+  struct timespec ts;
+  ts.tv_sec = ms / 1000;
+  ts.tv_nsec = (ms % 1000) * 1000000L;
+  while (nanosleep(&ts, &ts) == -1 && errno == EINTR) {
+  }
+}
 
 int main() {
   Display* display;
@@ -54,7 +65,7 @@ int main() {
   // Destroy the second window
   XDestroyWindow(display, two);
   XFlush(display);
-  usleep(1000);
+  sleep_for_ms(1);
 
   // Destroy the first window
   XDestroyWindow(display, one);

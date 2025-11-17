@@ -16,10 +16,22 @@
    See the COPYING file for a copy of the GNU General Public License.
 */
 
+#define _POSIX_C_SOURCE 200809L
+
+#include <errno.h>
 #include <stdio.h>
+#include <time.h>
 #include <unistd.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+
+static void sleep_for_ms(long ms) {
+  struct timespec ts;
+  ts.tv_sec = ms / 1000;
+  ts.tv_nsec = (ms % 1000) * 1000000L;
+  while (nanosleep(&ts, &ts) == -1 && errno == EINTR) {
+  }
+}
 
 int main() {
   Display* display;
@@ -39,10 +51,10 @@ int main() {
                       CopyFromParent, CopyFromParent, 0, NULL);
   XSetWindowBackground(display, win, WhitePixel(display, DefaultScreen(display)));
 
-  usleep(1000000);
+  sleep_for_ms(1000);
   XMapWindow(display, win);
   XFlush(display);
-  usleep(1000000);
+  sleep_for_ms(1000);
 
   msg.xclient.type = ClientMessage;
   msg.xclient.message_type = XInternAtom(display, "WM_CHANGE_STATE", False);

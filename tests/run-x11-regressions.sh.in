@@ -1,0 +1,87 @@
+#!/bin/sh
+
+set -eu
+
+builddir='@TEST_BUILD_DIR@'
+timeout_s='@TEST_TIMEOUT_S@'
+openbox_bin="${OPENBOX_TEST_BINARY:-@OPENBOX_BIN@}"
+
+if [ -z "${DISPLAY:-}" ]; then
+  echo "Skipping X11 regression tests: DISPLAY is not set."
+  exit 77
+fi
+
+if ! command -v xprop >/dev/null 2>&1; then
+  echo "Skipping X11 regression tests: xprop is not available."
+  exit 77
+fi
+
+cleanup() {
+  if [ -n "${ob_pid:-}" ] && kill -0 "$ob_pid" 2>/dev/null; then
+    kill "$ob_pid" 2>/dev/null || true
+    wait "$ob_pid" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT INT TERM
+
+startup_openbox() {
+  "${openbox_bin}" --replace --sm-disable >"$builddir/openbox-test.log" 2>&1 &
+  ob_pid=$!
+
+  for _ in $(seq 1 50); do
+    if xprop -root _NET_SUPPORTING_WM_CHECK >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 0.1
+  done
+
+  echo "Openbox did not signal readiness via _NET_SUPPORTING_WM_CHECK" >&2
+  return 1
+}
+
+run_one() {
+  bin="$1"
+  name="$(basename "$bin")"
+  echo "[x11] $name"
+
+  if [ -n "${OPENBOX_TEST_WRAPPER:-}" ]; then
+    set -- $OPENBOX_TEST_WRAPPER "$bin"
+  else
+    set -- "$bin"
+  fi
+
+  if timeout "$timeout_s" "$@"; then
+    return 0
+  fi
+
+  status=$?
+  if [ "$status" -eq 124 ]; then
+    echo "[timeout] $name exceeded ${timeout_s}s"
+    return 0
+  fi
+
+  echo "[fail] $name exited with status $status" >&2
+  return 1
+}
+
+startup_openbox
+
+found_any=0
+failed=0
+
+for bin in "$builddir"/test-*; do
+  if [ ! -x "$bin" ]; then
+    continue
+  fi
+  found_any=1
+  if ! run_one "$bin"; then
+    failed=1
+  fi
+done
+
+if [ "$found_any" -eq 0 ]; then
+  echo "No X11 regression test binaries found in $builddir" >&2
+  exit 1
+fi
+
+exit "$failed"

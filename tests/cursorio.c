@@ -1,11 +1,22 @@
 /* cursorio.c for Openbox window manager */
+#define _POSIX_C_SOURCE 200809L
 
+#include <errno.h>
 #include <stdio.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/cursorfont.h>
 #include <stdlib.h>
+#include <time.h>
 #include <unistd.h>
+
+static void sleep_for_ms(long ms) {
+  struct timespec ts;
+  ts.tv_sec = ms / 1000;
+  ts.tv_nsec = (ms % 1000) * 1000000L;
+  while (nanosleep(&ts, &ts) == -1 && errno == EINTR) {
+  }
+}
 
 void test_window(Display* display, Window win, int expected_x, int expected_y, int expected_w, int expected_h) {
   XWindowAttributes attr;
@@ -70,7 +81,7 @@ int main() {
                 report.xconfigure.height);
 
     // Sleep to simulate time between events
-    usleep(500000);  // Sleep for 0.5 seconds
+    sleep_for_ms(500);  // Sleep for 0.5 seconds
   }
 
   XCloseDisplay(display);  // Ensure the display is closed properly

@@ -63,3 +63,24 @@ endforeach
 if test_targets.length() > 0
   alias_target('x11-regression-tests', test_targets)
 endif
+
+test_timeout_s = 5
+test_runner = configure_file(
+  input: 'run-x11-regressions.sh.in',
+  output: 'run-x11-regressions.sh',
+  configuration: {
+    'TEST_BUILD_DIR': meson.current_build_dir(),
+    'TEST_TIMEOUT_S': test_timeout_s,
+    'OPENBOX_BIN': join_paths(meson.project_build_root(), 'openbox', 'openbox'),
+  })
+
+sh = find_program('sh')
+test(
+  'x11-regressions',
+  sh,
+  args: [test_runner],
+  workdir: meson.current_build_dir(),
+  suite: ['x11'],
+  timeout: 300,
+  is_parallel: false,
+  depends: test_targets)

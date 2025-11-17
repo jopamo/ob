@@ -1,5 +1,7 @@
 /* aspect.c for Openbox window manager */
+#define _POSIX_C_SOURCE 200809L
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -9,6 +11,14 @@
 #include <X11/Xutil.h>
 
 #define TOLERANCE 10  // tolerance for position check
+
+static void sleep_for_ms(long ms) {
+  struct timespec ts;
+  ts.tv_sec = ms / 1000;
+  ts.tv_nsec = (ms % 1000) * 1000000L;
+  while (nanosleep(&ts, &ts) == -1 && errno == EINTR) {
+  }
+}
 
 // helper to check window position and size
 static void test_window(Display* dpy, Window win, int exp_x, int exp_y, int exp_w, int exp_h) {
@@ -87,7 +97,7 @@ int main(void) {
     XIfEvent(dpy, &ev, is_configure_for_window, (XPointer)(uintptr_t)win);
     printf("confignotify %d,%d-%ix%i\n", ev.xconfigure.x, ev.xconfigure.y, ev.xconfigure.width, ev.xconfigure.height);
     test_window(dpy, win, rx, ry, w, h);
-    usleep(200000);
+    sleep_for_ms(200);
   }
 
   // clean up client resources and quiesce the connection
