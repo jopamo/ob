@@ -119,6 +119,7 @@ static void client_setup_default_decor_and_functions(ObClient* self);
 static void client_setup_decor_undecorated(ObClient* self);
 static gboolean client_dim_supported(ObClient* self);
 static gboolean client_dim_blocked(ObClient* self);
+static gboolean client_dim_skip_class(ObClient* self);
 static guint32 client_dim_unfocused_opacity(guint32 value);
 static void client_apply_frame_opacity(ObClient* self, gboolean apply, guint32 value);
 
@@ -1712,11 +1713,30 @@ static gboolean client_dim_supported(ObClient* self) {
   return client_normal(self) && !client_helper(self);
 }
 
+static gboolean client_dim_skip_class(ObClient* self);
+
 static gboolean client_dim_blocked(ObClient* self) {
   /* Each condition below intentionally stands alone to make future
      exemptions easy to add. */
   if (self->bypass_compositor)
     return TRUE;
+
+  if (client_dim_skip_class(self))
+    return TRUE;
+
+  return FALSE;
+}
+
+static gboolean client_dim_skip_class(ObClient* self) {
+  static const gchar* const skip_classes[] = {"mpv", NULL};
+  guint i;
+
+  if (!self->class)
+    return FALSE;
+
+  for (i = 0; skip_classes[i]; ++i)
+    if (g_ascii_strcasecmp(self->class, skip_classes[i]) == 0)
+      return TRUE;
 
   return FALSE;
 }
