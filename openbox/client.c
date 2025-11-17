@@ -65,7 +65,7 @@
 
 #define OB_OPACITY_OPAQUE 0xffffffffu
 /* Dim unfocused windows to roughly 90% opacity */
-#define OB_INACTIVE_OPACITY_NUM 230u
+#define OB_INACTIVE_OPACITY_NUM 179u
 #define OB_INACTIVE_OPACITY_DEN 255u
 
 typedef struct {
