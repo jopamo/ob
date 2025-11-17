@@ -24,6 +24,7 @@
 #ifdef HAVE_STRING_H
 #include <string.h>
 #endif
+#include <limits.h>
 
 Atom prop_atoms[OBT_PROP_NUM_ATOMS];
 gboolean prop_started = FALSE;
@@ -31,6 +32,41 @@ gboolean prop_started = FALSE;
 #define CREATE_NAME(var, name) (prop_atoms[OBT_PROP_##var] = XInternAtom((obt_display), (name), FALSE))
 #define CREATE(var) CREATE_NAME(var, #var)
 #define CREATE_(var) CREATE_NAME(var, "_" #var)
+#define MAX_PROP_BYTES (8 * 1024 * 1024) /* hard cap to avoid oversized allocations */
+
+static gulong max_items_for_size(gint size) {
+  const gulong element_bytes = size / 8;
+  g_assert(element_bytes);
+  return MAX_PROP_BYTES / element_bytes;
+}
+
+static glong prop_request_len(gint size) {
+  const gulong max_items = max_items_for_size(size);
+  const gulong request_32 = (max_items * size + 31) / 32; /* number of 32-bit multiples */
+  g_assert(request_32 <= LONG_MAX);
+  return (glong)request_32;
+}
+
+static gboolean reply_matches(Atom expected_type,
+                              Atom ret_type,
+                              gint expected_size,
+                              gint ret_size,
+                              gulong ret_items,
+                              gulong bytes_left,
+                              gulong min_items,
+                              gulong max_items) {
+  if (ret_type != expected_type)
+    return FALSE;
+  if (ret_size != expected_size)
+    return FALSE;
+  if (bytes_left)
+    return FALSE;
+  if (ret_items < min_items)
+    return FALSE;
+  if (ret_items > max_items)
+    return FALSE;
+  return TRUE;
+}
 
 void obt_prop_startup(void) {
   if (prop_started)
@@ -219,10 +255,12 @@ static gboolean get_prealloc(Window win, Atom prop, Atom type, gint size, guchar
   gulong ret_items, bytes_left;
   glong num32 = 32 / size * num; /* num in 32-bit elements */
 
+  if ((gulong)num > max_items_for_size(size))
+    return FALSE;
   res = XGetWindowProperty(obt_display, win, prop, 0l, num32, FALSE, type, &ret_type, &ret_size, &ret_items,
                            &bytes_left, &xdata);
   if (res == Success && ret_items && xdata) {
-    if (ret_size == size && ret_items >= num) {
+    if (reply_matches(type, ret_type, size, ret_size, ret_items, bytes_left, num, num)) {
       guint i;
       for (i = 0; i < num; ++i)
         switch (size) {
@@ -253,13 +291,14 @@ static gboolean get_all(Window win, Atom prop, Atom type, gint size, guchar** da
   gint ret_size;
   gulong ret_items, bytes_left;
 
-  res = XGetWindowProperty(obt_display, win, prop, 0l, G_MAXLONG, FALSE, type, &ret_type, &ret_size, &ret_items,
-                           &bytes_left, &xdata);
+  res = XGetWindowProperty(obt_display, win, prop, 0l, prop_request_len(size), FALSE, type, &ret_type, &ret_size,
+                           &ret_items, &bytes_left, &xdata);
   if (res == Success) {
-    if (ret_size == size && ret_items > 0) {
+    if (reply_matches(type, ret_type, size, ret_size, ret_items, bytes_left, 1, max_items_for_size(size))) {
       guint i;
+      const gulong element_bytes = size / 8;
 
-      *data = g_malloc(ret_items * (size / 8));
+      *data = g_malloc(ret_items * element_bytes);
       for (i = 0; i < ret_items; ++i)
         switch (size) {
           case 8:
@@ -294,6 +333,11 @@ static gboolean get_all(Window win, Atom prop, Atom type, gint size, guchar** da
 static gboolean get_text_property(Window win, Atom prop, XTextProperty* tprop, ObtPropTextType type) {
   if (!(XGetTextProperty(obt_display, win, tprop, prop) && tprop->nitems))
     return FALSE;
+  if (tprop->nitems > MAX_PROP_BYTES || tprop->format != 8) {
+    XFree(tprop->value);
+    tprop->value = NULL;
+    return FALSE;
+  }
   if (!type)
     return TRUE; /* no type checking */
   switch (type) {
@@ -474,7 +518,8 @@ gboolean obt_prop_get_text(Window win, Atom prop, ObtPropTextType type, gchar** 
       ret = TRUE;
     }
   }
-  XFree(tprop.value);
+  if (tprop.value)
+    XFree(tprop.value);
   return ret;
 }
 
@@ -491,7 +536,8 @@ gboolean obt_prop_get_array_text(Window win, Atom prop, ObtPropTextType type, gc
       ret = TRUE;
     }
   }
-  XFree(tprop.value);
+  if (tprop.value)
+    XFree(tprop.value);
   return ret;
 }
 
