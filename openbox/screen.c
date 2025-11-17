@@ -196,6 +196,9 @@ gboolean screen_annex(void) {
   OBT_PROP_SETS(screen_support_win, NET_WM_NAME, "Openbox");
   OBT_PROP_SET32(screen_support_win, NET_SUPPORTING_WM_CHECK, WINDOW, screen_support_win);
 
+  /* Tell clients that Openbox shows icons for iconic windows itself */
+  OBT_PROP_SET32(obt_root(ob_screen), NET_WM_HANDLED_ICONS, CARDINAL, 1);
+
   /* set the _NET_SUPPORTED_ATOMS hint */
 
   /* this is all the atoms after NET_SUPPORTED in the ObtPropAtoms enum */
@@ -216,6 +219,7 @@ gboolean screen_annex(void) {
   supported[i++] = OBT_PROP_ATOM(NET_CLOSE_WINDOW);
   supported[i++] = OBT_PROP_ATOM(NET_DESKTOP_LAYOUT);
   supported[i++] = OBT_PROP_ATOM(NET_SHOWING_DESKTOP);
+  supported[i++] = OBT_PROP_ATOM(NET_WM_HANDLED_ICONS);
   supported[i++] = OBT_PROP_ATOM(NET_WM_NAME);
   supported[i++] = OBT_PROP_ATOM(NET_WM_VISIBLE_NAME);
   supported[i++] = OBT_PROP_ATOM(NET_WM_ICON_NAME);
@@ -442,6 +446,7 @@ void screen_shutdown(gboolean reconfig) {
   OBT_PROP_ERASE(obt_root(ob_screen), NET_SUPPORTED);
   /* don't keep this mode */
   OBT_PROP_ERASE(obt_root(ob_screen), NET_SHOWING_DESKTOP);
+  OBT_PROP_ERASE(obt_root(ob_screen), NET_WM_HANDLED_ICONS);
 
   XDestroyWindow(obt_display, screen_support_win);
 
