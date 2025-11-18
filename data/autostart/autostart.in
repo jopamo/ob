@@ -2,12 +2,10 @@ DESKTOP_ENV="OPENBOX"
 
 picom \
   --backend glx \
-  --no-fading-destroyed-argb \
   --shadow \
   --shadow-radius 20 \
   --fading \
   --fade-delta 1 \
-  --xrender-sync-fence \
   --corner-radius 15 \
   --vsync \
   --use-damage \
