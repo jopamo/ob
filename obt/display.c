@@ -78,31 +78,26 @@ gboolean obt_display_open(const char* display_name) {
     if (!obt_display_extension_xkb)
       g_error("XKB extension is not present on the server or too old");
 
-#ifdef SHAPE
-    obt_display_extension_shape = XShapeQueryExtension(d, &obt_display_extension_shape_basep, &junk);
-    if (!obt_display_extension_shape)
-      g_message("X Shape extension is not present on the server");
-#endif
 #ifdef DAMAGE
     obt_display_extension_damage = XDamageQueryExtension(d, &obt_display_extension_damage_basep, &junk);
     if (!obt_display_extension_damage)
       g_message("X Damage extension is not present on the server");
 #endif
 
-#ifdef XRANDR
+    obt_display_extension_shape = XShapeQueryExtension(d, &obt_display_extension_shape_basep, &junk);
+    if (!obt_display_extension_shape)
+      g_error("X Shape extension is not present on the server");
+
     obt_display_extension_randr = XRRQueryExtension(d, &obt_display_extension_randr_basep, &junk);
     if (!obt_display_extension_randr)
-      g_message("XRandR extension is not present on the server");
-#endif
+      g_error("XRandR extension is not present on the server");
 
-#ifdef SYNC
     obt_display_extension_sync =
         XSyncQueryExtension(d, &obt_display_extension_sync_basep, &junk) && XSyncInitialize(d, &junk, &junk);
     if (!obt_display_extension_sync)
-      g_message(
+      g_error(
           "X Sync extension is not present on the server or is an "
           "incompatible version");
-#endif
 
     obt_prop_startup();
     obt_keyboard_reload();

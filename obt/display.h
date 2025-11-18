@@ -24,18 +24,12 @@
 
 #include <X11/Xutil.h> /* shape.h uses Region which is in here */
 #include <X11/XKBlib.h>
-#ifdef SHAPE
 #include <X11/extensions/shape.h>
-#endif
 #ifdef DAMAGE
 #include <X11/extensions/Xdamage.h>
 #endif
-#ifdef XRANDR
 #include <X11/extensions/Xrandr.h>
-#endif
-#ifdef SYNC
 #include <X11/extensions/sync.h>
-#endif
 
 G_BEGIN_DECLS
 

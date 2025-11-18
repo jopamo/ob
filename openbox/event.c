@@ -46,6 +46,7 @@
 
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
+#include <X11/extensions/Xrandr.h>
 #include <glib.h>
 
 #ifdef HAVE_SYS_SELECT_H
@@ -885,9 +886,7 @@ static void event_handle_root(XEvent* e) {
         screen_update_layout();
       break;
     case ConfigureNotify:
-#ifdef XRANDR
       XRRUpdateConfiguration(e);
-#endif
       screen_resize();
       break;
     default:;
