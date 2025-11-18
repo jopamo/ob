@@ -18,11 +18,11 @@
 #endif
 
 static void pixel_data_to_pixmap(RrAppearance* l, gint x, gint y, gint w, gint h);
-static Pixmap ensure_pixmap(RrAppearance* a, gint w, gint h);
+static Pixmap ensure_pixmap(RrAppearance* a, Window win, gint w, gint h);
 
-static Pixmap ensure_pixmap(RrAppearance* a, gint w, gint h) {
+static Pixmap ensure_pixmap(RrAppearance* a, Window win, gint w, gint h) {
   Pixmap oldp = None;
-  gboolean resized = (a->w != w || a->h != h);
+  const gboolean resized = (a->w != w || a->h != h || a->pixmap_win != win);
   const gboolean need_pixmap = (a->pixmap == None || resized);
 
   if (need_pixmap) {
@@ -46,11 +46,12 @@ static Pixmap ensure_pixmap(RrAppearance* a, gint w, gint h) {
 
   a->w = w;
   a->h = h;
+  a->pixmap_win = win;
 
   return oldp;
 }
 
-Pixmap RrPaintPixmap(RrAppearance* a, gint w, gint h) {
+Pixmap RrPaintPixmap(RrAppearance* a, Window win, gint w, gint h) {
   gint i, transferred = 0, force_transfer = 0;
   Pixmap oldp = None;
   RrRect tarea; /* area in which to draw textures */
@@ -68,7 +69,7 @@ Pixmap RrPaintPixmap(RrAppearance* a, gint w, gint h) {
     return None;
   }
 
-  oldp = ensure_pixmap(a, w, h);
+  oldp = ensure_pixmap(a, win, w, h);
 
   RrRender(a, w, h);
 
@@ -163,7 +164,7 @@ Pixmap RrPaintPixmap(RrAppearance* a, gint w, gint h) {
 void RrPaint(RrAppearance* a, Window win, gint w, gint h) {
   Pixmap oldp;
 
-  oldp = RrPaintPixmap(a, w, h);
+  oldp = RrPaintPixmap(a, win, w, h);
   XSetWindowBackgroundPixmap(RrDisplay(a->inst), win, a->pixmap);
   XClearWindow(RrDisplay(a->inst), win);
   /* free this after changing the visible pixmap */
@@ -301,6 +302,7 @@ RrAppearance* RrAppearanceCopy(RrAppearance* orig) {
   copy->textures = orig->textures;
   copy->texture = (RrTexture*)g_memdup2(orig->texture, (gsize)orig->textures * sizeof(RrTexture));
   copy->pixmap = None;
+  copy->pixmap_win = None;
   copy->xftdraw = NULL;
   copy->w = copy->h = 0;
   return copy;

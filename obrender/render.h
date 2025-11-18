@@ -208,6 +208,7 @@ struct _RrAppearance {
   gint textures;
   RrTexture* texture;
   Pixmap pixmap;
+  Window pixmap_win;
   XftDraw* xftdraw;
 
   /* cached for internal use */
@@ -385,8 +386,9 @@ gint RrFontMaxCharWidth(const RrFont* f);
 
 /* Paint into the appearance. When a new backing pixmap must be created, the
    previous one is returned so the caller can XFreePixmap() it after the window
-   has been updated. If the cached pixmap is reused, None is returned. */
-Pixmap RrPaintPixmap(RrAppearance* a, gint w, gint h);
+   has been updated. If the cached pixmap for this window is reused, None is
+   returned. */
+Pixmap RrPaintPixmap(RrAppearance* a, Window win, gint w, gint h);
 void RrPaint(RrAppearance* a, Window win, gint w, gint h);
 void RrClearWindowColor(const RrInstance* inst, Window win, const RrColor* color);
 void RrSetWindowBorderColor(const RrInstance* inst, Window win, const RrColor* color);
