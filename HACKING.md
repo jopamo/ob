@@ -200,7 +200,6 @@ Use `TODO(owner|tracker-id): short description` only for work that is known, sco
 * Headless CI coverage — wire `ninja -C build x11-regression-tests` plus Xephyr into CI so X11 paths and EWMH behavior are exercised automatically, and gate merges on it.
 * Atom/property cache consolidation — centralize atom lookups and property validation in `openbox/x11` helpers to remove duplicated Xlib fallbacks and enforce length/type checks consistently.
 * HiDPI geometry audit — re-run frame/client conversions and theme metrics with DPI awareness, cleaning up pixel assumptions and adding regression coverage for high-scale setups.
-* Render cache hygiene — audit `obrender` pixmap lifetime and reuse to avoid per-expose allocations and ensure cache invalidation is tied to theme reloads and frame resizes.
 * Parser fuzzing — add libFuzzer harnesses for config/XML parsing and X11 property decode helpers to catch malformed input handling regressions early.
 * Transient tree invariants — build targeted tests for parent/transient updates (group vs direct), guarding against cycles and invalid adoption in `client_transient_*` paths.
 * Atom helper adoption — migrate remaining `XInternAtom`/`XGetWindowProperty` callers (tests/tools) onto the consolidated helpers for consistent validation.
