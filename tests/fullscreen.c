@@ -1,74 +1,93 @@
 /* fullscreen.c for the Openbox window manager */
 
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <X11/Xlib.h>
+#include <X11/Xlib-xcb.h>
+#include <xcb/xcb.h>
+
+static xcb_atom_t intern_atom(xcb_connection_t* conn, const char* name) {
+  xcb_intern_atom_cookie_t cookie = xcb_intern_atom(conn, 0, strlen(name), name);
+  xcb_intern_atom_reply_t* reply = xcb_intern_atom_reply(conn, cookie, NULL);
+  xcb_atom_t atom = reply ? reply->atom : XCB_ATOM_NONE;
+  free(reply);
+  return atom;
+}
+
+static void send_state(xcb_connection_t* conn,
+                       xcb_window_t root,
+                       xcb_window_t win,
+                       xcb_atom_t state_atom,
+                       xcb_atom_t value_atom) {
+  xcb_client_message_event_t ev = {
+      .response_type = XCB_CLIENT_MESSAGE,
+      .format = 32,
+      .window = win,
+      .type = state_atom,
+  };
+
+  ev.data.data32[0] = 2;  // toggle
+  ev.data.data32[1] = value_atom;
+
+  xcb_send_event(conn, 0, root, XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY | XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT,
+                 (const char*)&ev);
+  xcb_flush(conn);
+}
 
 int main() {
-  Display* display;
-  Window win;
+  Display* display = NULL;
+  xcb_connection_t* conn = NULL;
+  Window win = None;
   XEvent report;
-  Atom _net_fs, _net_state;
-  XEvent msg;
+  xcb_atom_t _net_fs, _net_state;
+  xcb_window_t root = XCB_WINDOW_NONE;
   int x = 10, y = 10, h = 100, w = 400;
+  int ret = 1;
 
-  // Open the X display
   display = XOpenDisplay(NULL);
   if (display == NULL) {
     fprintf(stderr, "couldn't connect to X server :0\n");
-    return 1;  // Return 1 if the display can't be opened
+    return 1;
+  }
+  conn = XGetXCBConnection(display);
+  if (conn == NULL) {
+    fprintf(stderr, "couldn't get XCB connection\n");
+    goto out;
+  }
+  root = RootWindow(display, DefaultScreen(display));
+
+  _net_state = intern_atom(conn, "_NET_WM_STATE");
+  _net_fs = intern_atom(conn, "_NET_WM_STATE_FULLSCREEN");
+  if (_net_state == XCB_ATOM_NONE || _net_fs == XCB_ATOM_NONE) {
+    fprintf(stderr, "failed to intern fullscreen atoms\n");
+    goto out;
   }
 
-  // Intern atoms for window state
-  _net_state = XInternAtom(display, "_NET_WM_STATE", False);
-  _net_fs = XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", False);
-
-  // Create a window
   win = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 10, CopyFromParent, CopyFromParent, CopyFromParent,
                       0, NULL);
+  if (win == None) {
+    fprintf(stderr, "failed to create window\n");
+    goto out;
+  }
 
-  // Set the background color for the window
   XSetWindowBackground(display, win, WhitePixel(display, 0));
 
-  // Map the window and flush the display
   XMapWindow(display, win);
   XFlush(display);
   sleep(2);
 
-  // Send a message to toggle fullscreen state
   printf("fullscreen\n");
-  msg.xclient.type = ClientMessage;
-  msg.xclient.message_type = _net_state;
-  msg.xclient.display = display;
-  msg.xclient.window = win;
-  msg.xclient.format = 32;
-  msg.xclient.data.l[0] = 2;  // toggle
-  msg.xclient.data.l[1] = _net_fs;
-  msg.xclient.data.l[2] = 0l;
-  msg.xclient.data.l[3] = 0l;
-  msg.xclient.data.l[4] = 0l;
-  XSendEvent(display, RootWindow(display, 0), False, SubstructureNotifyMask | SubstructureRedirectMask, &msg);
-  XFlush(display);
+  send_state(conn, root, win, _net_state, _net_fs);
   sleep(2);
 
-  // Send a message to restore the window
   printf("restore\n");
-  msg.xclient.type = ClientMessage;
-  msg.xclient.message_type = _net_state;
-  msg.xclient.display = display;
-  msg.xclient.window = win;
-  msg.xclient.format = 32;
-  msg.xclient.data.l[0] = 2;  // toggle
-  msg.xclient.data.l[1] = _net_fs;
-  msg.xclient.data.l[2] = 0l;
-  msg.xclient.data.l[3] = 0l;
-  msg.xclient.data.l[4] = 0l;
-  XSendEvent(display, RootWindow(display, 0), False, SubstructureNotifyMask | SubstructureRedirectMask, &msg);
+  send_state(conn, root, win, _net_state, _net_fs);
 
-  // Select input events to listen for
   XSelectInput(display, win, ExposureMask | StructureNotifyMask);
 
-  // Event loop to process events
   while (1) {
     XNextEvent(display, &report);
 
@@ -92,9 +111,12 @@ int main() {
     }
   }
 
-  // Clean up and close the display connection
-  XDestroyWindow(display, win);
-  XCloseDisplay(display);
+  ret = 0;
 
-  return 0;  // Return 0 to indicate success
+out:
+  if (win != None)
+    XDestroyWindow(display, win);
+  if (display)
+    XCloseDisplay(display);
+  return ret;
 }

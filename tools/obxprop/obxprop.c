@@ -1,10 +1,23 @@
 #include <X11/Xlib.h>
+#include <X11/Xlib-xcb.h>
 #include <X11/cursorfont.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
 #include <assert.h>
 #include <glib.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <xcb/xcb.h>
+
+#define PROP_MAX_BYTES (8 * 1024 * 1024)
+
+static gboolean get_all(xcb_connection_t* conn,
+                        xcb_window_t win,
+                        xcb_atom_t prop,
+                        xcb_atom_t* type,
+                        gint* size,
+                        guchar** data,
+                        guint* num);
 
 gint fail(const gchar* s) {
   if (s)
@@ -40,62 +53,111 @@ gint parse_hex(gchar* s) {
   return result;
 }
 
-Window find_client(Display* d, Window win) {
+static xcb_atom_t intern_atom(xcb_connection_t* conn, const char* name, gboolean only_if_exists) {
+  xcb_intern_atom_cookie_t cookie = xcb_intern_atom(conn, only_if_exists, strlen(name), name);
+  xcb_intern_atom_reply_t* reply = xcb_intern_atom_reply(conn, cookie, NULL);
+  xcb_atom_t atom = reply ? reply->atom : XCB_ATOM_NONE;
+  free(reply);
+  return atom;
+}
+
+static gchar* atom_name_dup(xcb_connection_t* conn, xcb_atom_t atom) {
+  xcb_get_atom_name_cookie_t cookie = xcb_get_atom_name(conn, atom);
+  xcb_get_atom_name_reply_t* reply = xcb_get_atom_name_reply(conn, cookie, NULL);
+  gchar* name = NULL;
+
+  if (reply) {
+    const int len = xcb_get_atom_name_name_length(reply);
+    name = g_strndup(xcb_get_atom_name_name(reply), len);
+  }
+
+  free(reply);
+  return name;
+}
+
+Window find_client(Display* d, xcb_connection_t* conn, Window win, xcb_atom_t state) {
   Window r, *children;
   guint n, i;
-  Atom state = XInternAtom(d, "WM_STATE", True);
-  Atom ret_type;
-  gint ret_format, res;
-  gulong ret_items, ret_bytesleft, *xdata;
+  Window found = None;
 
   XQueryTree(d, win, &r, &r, &children, &n);
   for (i = 0; i < n; ++i) {
-    Window w = find_client(d, children[i]);
-    if (w)
-      return w;
+    found = find_client(d, conn, children[i], state);
+    if (found)
+      break;
   }
+  if (children)
+    XFree(children);
+  if (found)
+    return found;
 
-  // try me
-  res = XGetWindowProperty(d, win, state, 0, 1, False, state, &ret_type, &ret_format, &ret_items, &ret_bytesleft,
-                           (unsigned char**)&xdata);
-  XFree(xdata);
-  if (res != Success || ret_type == None || ret_items < 1)
-    return None;
-  return win;  // found it!
+  {
+    xcb_atom_t ret_type = XCB_ATOM_NONE;
+    guchar* data = NULL;
+    guint items = 0;
+    gint format = 0;
+
+    if (state != XCB_ATOM_NONE && get_all(conn, win, state, &ret_type, &format, &data, &items)) {
+      g_free(data);
+      if (ret_type == state && items >= 1)
+        return win;
+    }
+  }
+  return None;
 }
 
-static gboolean get_all(Display* d, Window win, Atom prop, Atom* type, gint* size, guchar** data, guint* num) {
+static gboolean get_all(xcb_connection_t* conn,
+                        xcb_window_t win,
+                        xcb_atom_t prop,
+                        xcb_atom_t* type,
+                        gint* size,
+                        guchar** data,
+                        guint* num) {
   gboolean ret = FALSE;
-  gint res;
-  guchar* xdata = NULL;
-  gulong ret_items, bytes_left;
+  xcb_get_property_cookie_t cookie;
+  xcb_get_property_reply_t* reply = NULL;
+  const uint8_t* raw;
+  gsize bytes;
 
-  res = XGetWindowProperty(d, win, prop, 0l, G_MAXLONG, FALSE, AnyPropertyType, type, size, &ret_items, &bytes_left,
-                           &xdata);
-  if (res == Success) {
-    if (ret_items > 0) {
-      guint i;
+  g_return_val_if_fail(conn != NULL, FALSE);
+  g_return_val_if_fail(type != NULL, FALSE);
+  g_return_val_if_fail(size != NULL, FALSE);
+  g_return_val_if_fail(data != NULL, FALSE);
+  g_return_val_if_fail(num != NULL, FALSE);
 
-      *data = g_malloc(ret_items * (*size / 8));
-      for (i = 0; i < ret_items; ++i)
-        switch (*size) {
-          case 8:
-            (*data)[i] = xdata[i];
-            break;
-          case 16:
-            ((guint16*)*data)[i] = ((gushort*)xdata)[i];
-            break;
-          case 32:
-            ((guint32*)*data)[i] = ((gulong*)xdata)[i];
-            break;
-          default:
-            g_assert_not_reached(); /* unhandled size */
-        }
-    }
-    *num = ret_items;
-    ret = TRUE;
-    XFree(xdata);
+  *data = NULL;
+  *num = 0;
+  *type = XCB_ATOM_NONE;
+  *size = 0;
+
+  cookie = xcb_get_property(conn, 0, win, prop, XCB_GET_PROPERTY_TYPE_ANY, 0, PROP_MAX_BYTES / 4);
+  reply = xcb_get_property_reply(conn, cookie, NULL);
+  if (!reply)
+    return FALSE;
+
+  if (reply->bytes_after)
+    goto out;
+  if (reply->format != 8 && reply->format != 16 && reply->format != 32)
+    goto out;
+
+  *type = reply->type;
+  *size = reply->format;
+  *num = reply->value_len;
+  bytes = reply->value_len * (reply->format / 8);
+
+  if (bytes) {
+    raw = xcb_get_property_value(reply);
+    if (!raw)
+      goto out;
+
+    *data = g_malloc(bytes);
+    memcpy(*data, raw, bytes);
   }
+
+  ret = TRUE;
+
+out:
+  free(reply);
   return ret;
 }
 
@@ -154,13 +216,16 @@ gchar* read_strings(gchar* val, guint n, gboolean utf8) {
   return NULL;
 }
 
-gchar* read_atoms(Display* d, guchar* val, guint n) {
+gchar* read_atoms(xcb_connection_t* conn, guchar* val, guint n) {
   GString* ret;
   guint i;
 
   ret = NULL;
-  for (i = 0; i < n; ++i)
-    ret = append_string(ret, XGetAtomName(d, ((guint32*)val)[i]), FALSE);
+  for (i = 0; i < n; ++i) {
+    gchar* name = atom_name_dup(conn, ((guint32*)val)[i]);
+    ret = append_string(ret, name ? name : "(unknown)", FALSE);
+    g_free(name);
+  }
   if (ret)
     return g_string_free(ret, FALSE);
   return NULL;
@@ -191,66 +256,74 @@ gchar* read_numbers(guchar* val, guint n, guint size) {
   return NULL;
 }
 
-gboolean read_prop(Display* d, Window w, Atom prop, const gchar** type, gchar** val) {
-  guchar* ret;
-  guint nret;
-  gint size;
-  Atom ret_type;
+gboolean read_prop(xcb_connection_t* conn, Window w, xcb_atom_t prop, gchar** type, gchar** val) {
+  guchar* ret = NULL;
+  guint nret = 0;
+  gint size = 0;
+  xcb_atom_t ret_type = XCB_ATOM_NONE;
 
-  ret = NULL;
-  if (get_all(d, w, prop, &ret_type, &size, &ret, &nret)) {
-    *type = XGetAtomName(d, ret_type);
+  if (!get_all(conn, w, prop, &ret_type, &size, &ret, &nret))
+    return FALSE;
 
-    if (strcmp(*type, "STRING") == 0)
-      *val = read_strings((gchar*)ret, nret, FALSE);
-    else if (strcmp(*type, "UTF8_STRING") == 0)
-      *val = read_strings((gchar*)ret, nret, TRUE);
-    else if (strcmp(*type, "ATOM") == 0) {
-      g_assert(size == 32);
-      *val = read_atoms(d, ret, nret);
-    }
-    else
-      *val = read_numbers(ret, nret, size);
+  *type = atom_name_dup(conn, ret_type);
+  if (!*type)
+    *type = g_strdup("(unknown)");
 
+  if (!ret || nret == 0) {
+    *val = NULL;
     g_free(ret);
     return TRUE;
   }
-  return FALSE;
+
+  if (g_strcmp0(*type, "STRING") == 0)
+    *val = read_strings((gchar*)ret, nret, FALSE);
+  else if (g_strcmp0(*type, "UTF8_STRING") == 0)
+    *val = read_strings((gchar*)ret, nret, TRUE);
+  else if (g_strcmp0(*type, "ATOM") == 0) {
+    g_assert(size == 32);
+    *val = read_atoms(conn, ret, nret);
+  }
+  else
+    *val = read_numbers(ret, nret, size);
+
+  g_free(ret);
+  return TRUE;
 }
 
-void show_properties(Display* d, Window w, int argc, char** argv) {
-  Atom* props;
-  int i, n;
+void show_properties(xcb_connection_t* conn, Window w, int argc, char** argv) {
+  xcb_list_properties_cookie_t cookie = xcb_list_properties(conn, w);
+  xcb_list_properties_reply_t* reply = xcb_list_properties_reply(conn, cookie, NULL);
 
-  props = XListProperties(d, w, &n);
+  if (!reply)
+    return;
 
-  for (i = 0; i < n; ++i) {
-    const char* type;
-    char *name, *val;
+  int n = xcb_list_properties_atoms_length(reply);
+  xcb_atom_t* props = xcb_list_properties_atoms(reply);
 
-    name = XGetAtomName(d, props[i]);
+  for (int i = 0; i < n; ++i) {
+    gchar *type = NULL, *val = NULL;
+    gchar* name = atom_name_dup(conn, props[i]);
 
-    if (read_prop(d, w, props[i], &type, &val)) {
-      int found = 1;
-      if (argc) {
-        int i;
-
-        found = 0;
-        for (i = 0; i < argc; i++)
-          if (!strcmp(name, argv[i])) {
-            found = 1;
+    if (read_prop(conn, w, props[i], &type, &val)) {
+      gboolean found = (argc == 0);
+      if (!found && name) {
+        for (int j = 0; j < argc; j++) {
+          if (!strcmp(name, argv[j])) {
+            found = TRUE;
             break;
           }
+        }
       }
       if (found)
-        g_print("%s(%s) = %s\n", name, type, (val ? val : ""));
-      g_free(val);
+        g_print("%s(%s) = %s\n", name ? name : "(unknown)", type ? type : "(unknown)", val ? val : "");
     }
 
-    XFree(name);
+    g_free(type);
+    g_free(val);
+    g_free(name);
   }
 
-  XFree(props);
+  free(reply);
 }
 
 int main(int argc, char** argv) {
@@ -301,6 +374,12 @@ int main(int argc, char** argv) {
         "Unable to find an X display. "
         "Ensure you have permission to connect to the display.");
   }
+  xcb_connection_t* conn = XGetXCBConnection(d);
+  if (!conn) {
+    XCloseDisplay(d);
+    return fail("Unable to obtain XCB connection");
+  }
+  xcb_atom_t state_atom = intern_atom(conn, "WM_STATE", True);
 
   if (root)
     userid = RootWindow(d, DefaultScreen(d));
@@ -321,7 +400,7 @@ int main(int argc, char** argv) {
         break;
       }
     }
-    id = find_client(d, userid);
+    id = find_client(d, conn, userid, state_atom);
   }
   else
     id = userid; /* they picked this one */
@@ -329,7 +408,7 @@ int main(int argc, char** argv) {
   if (id == None)
     return fail("Unable to find window with the requested ID");
 
-  show_properties(d, id, argc - i, &argv[i]);
+  show_properties(conn, id, argc - i, &argv[i]);
 
   XCloseDisplay(d);
 

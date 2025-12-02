@@ -1,10 +1,22 @@
 /* extentsrequest.c for the Openbox window manager */
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
 #include <unistd.h>
 #include <X11/Xlib.h>
+#include <X11/Xlib-xcb.h>
 #include <X11/Xatom.h>
-#include <stdlib.h>
+#include <xcb/xcb.h>
+
+static xcb_atom_t intern_atom(xcb_connection_t* conn, const char* name) {
+  xcb_intern_atom_cookie_t cookie = xcb_intern_atom(conn, 0, strlen(name), name);
+  xcb_intern_atom_reply_t* reply = xcb_intern_atom_reply(conn, cookie, NULL);
+  xcb_atom_t atom = reply ? reply->atom : XCB_ATOM_NONE;
+  free(reply);
+  return atom;
+}
 
 void request(Display* display, Atom _request, Atom _extents, Window win) {
   XEvent msg;
@@ -22,48 +34,49 @@ void request(Display* display, Atom _request, Atom _extents, Window win) {
   XFlush(display);
 }
 
-void reply(Display* display, Atom _extents) {
+void reply(Display* display, xcb_connection_t* conn, xcb_atom_t _extents) {
   printf("  waiting for extents\n");
   while (1) {
     XEvent report;
     XNextEvent(display, &report);
 
-    if (report.type == PropertyNotify && report.xproperty.atom == _extents) {
-      Atom ret_type;
-      int ret_format;
-      unsigned long ret_items, ret_bytesleft;
-      unsigned long* prop_return;
-      XGetWindowProperty(display, report.xproperty.window, _extents, 0, 4, False, XA_CARDINAL, &ret_type, &ret_format,
-                         &ret_items, &ret_bytesleft, (unsigned char**)&prop_return);
-      if (ret_type == XA_CARDINAL && ret_format == 32 && ret_items == 4) {
-        printf("  got new extents %lu, %lu, %lu, %lu\n", prop_return[0], prop_return[1], prop_return[2],
-               prop_return[3]);
+    if (report.type == PropertyNotify && report.xproperty.atom == (Atom)_extents) {
+      xcb_get_property_cookie_t cookie =
+          xcb_get_property(conn, 0, report.xproperty.window, _extents, XCB_ATOM_CARDINAL, 0, 4);
+      xcb_get_property_reply_t* r = xcb_get_property_reply(conn, cookie, NULL);
+      if (r && r->type == XCB_ATOM_CARDINAL && r->format == 32 && r->value_len == 4) {
+        const uint32_t* values = (const uint32_t*)xcb_get_property_value(r);
+        printf("  got new extents %u, %u, %u, %u\n", values[0], values[1], values[2], values[3]);
       }
+      free(r);
       break;
     }
   }
 }
 
 void test_request(Display* display,
+                  xcb_connection_t* conn,
                   Window win,
-                  Atom _request,
-                  Atom _extents,
-                  Atom _type,
-                  Atom _state,
-                  Atom state_value,
+                  xcb_atom_t request_atom,
+                  xcb_atom_t extents_atom,
+                  xcb_atom_t type_prop,
+                  xcb_atom_t type_value,
+                  xcb_atom_t state_prop,
+                  xcb_atom_t state_value,
                   const char* state_name) {
   printf("requesting for type %s\n", state_name);
-  XChangeProperty(display, win, _type, XA_ATOM, 32, PropModeReplace, (unsigned char*)&_type, 1);
-  XChangeProperty(display, win, _state, XA_ATOM, 32, PropModeReplace, (unsigned char*)&state_value, 1);
-  request(display, _request, _extents, win);
-  reply(display, _extents);
+  xcb_change_property(conn, XCB_PROP_MODE_REPLACE, win, type_prop, XCB_ATOM_ATOM, 32, 1, &type_value);
+  xcb_change_property(conn, XCB_PROP_MODE_REPLACE, win, state_prop, XCB_ATOM_ATOM, 32, 1, &state_value);
+  xcb_flush(conn);
+  request(display, request_atom, extents_atom, win);
+  reply(display, conn, extents_atom);
 }
 
 int main() {
   Display* display;
   Window win;
-  Atom _request, _extents, _type, _normal, _desktop, _state;
-  Atom _state_fs, _state_mh, _state_mv;
+  xcb_atom_t _request, _extents, _type, _normal, _desktop, _state;
+  xcb_atom_t _state_fs, _state_mh, _state_mv;
   int x = 10, y = 10, h = 100, w = 400;
 
   display = XOpenDisplay(NULL);
@@ -73,25 +86,26 @@ int main() {
     return 1;
   }
 
-  _type = XInternAtom(display, "_NET_WM_WINDOW_TYPE", False);
-  _normal = XInternAtom(display, "_NET_WM_WINDOW_TYPE_NORMAL", False);
-  _desktop = XInternAtom(display, "_NET_WM_WINDOW_TYPE_DESKTOP", False);
-  _request = XInternAtom(display, "_NET_REQUEST_FRAME_EXTENTS", False);
-  _extents = XInternAtom(display, "_NET_FRAME_EXTENTS", False);
-  _state = XInternAtom(display, "_NET_WM_STATE", False);
-  _state_fs = XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", False);
-  _state_mh = XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_HORZ", False);
-  _state_mv = XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_VERT", False);
+  xcb_connection_t* conn = XGetXCBConnection(display);
+  _type = intern_atom(conn, "_NET_WM_WINDOW_TYPE");
+  _normal = intern_atom(conn, "_NET_WM_WINDOW_TYPE_NORMAL");
+  _desktop = intern_atom(conn, "_NET_WM_WINDOW_TYPE_DESKTOP");
+  _request = intern_atom(conn, "_NET_REQUEST_FRAME_EXTENTS");
+  _extents = intern_atom(conn, "_NET_FRAME_EXTENTS");
+  _state = intern_atom(conn, "_NET_WM_STATE");
+  _state_fs = intern_atom(conn, "_NET_WM_STATE_FULLSCREEN");
+  _state_mh = intern_atom(conn, "_NET_WM_STATE_MAXIMIZED_HORZ");
+  _state_mv = intern_atom(conn, "_NET_WM_STATE_MAXIMIZED_VERT");
 
   win = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 10, CopyFromParent, CopyFromParent, CopyFromParent,
                       0, NULL);
   XSelectInput(display, win, PropertyChangeMask);
 
   // Test all the states
-  test_request(display, win, _request, _extents, _normal, _state, _state_fs, "normal+fullscreen");
-  test_request(display, win, _request, _extents, _normal, _state, _state_mv, "normal+maximized_vert");
-  test_request(display, win, _request, _extents, _normal, _state, _state_mh, "normal+maximized_horz");
-  test_request(display, win, _request, _extents, _normal, _state, _desktop, "desktop");
+  test_request(display, conn, win, _request, _extents, _type, _normal, _state, _state_fs, "normal+fullscreen");
+  test_request(display, conn, win, _request, _extents, _type, _normal, _state, _state_mv, "normal+maximized_vert");
+  test_request(display, conn, win, _request, _extents, _type, _normal, _state, _state_mh, "normal+maximized_horz");
+  test_request(display, conn, win, _request, _extents, _type, _desktop, _state, _desktop, "desktop");
 
   XCloseDisplay(display);  // Close the display properly
 

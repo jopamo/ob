@@ -45,7 +45,7 @@ test_sources = [
 
 test_sources += ['shape.c']
 
-test_deps = [x11_dep, xext_dep, glib_dep]
+test_deps = [x11_dep, x11_xcb_dep, xcb_dep, xext_dep, glib_dep]
 test_targets = []
 foreach src : test_sources
   name = '@0@-@1@'.format('test', src.split('.')[0])

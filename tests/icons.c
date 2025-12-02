@@ -1,58 +1,92 @@
 // icons.c for the Openbox window manager
 
 #include <X11/Xlib.h>
+#include <X11/Xlib-xcb.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
 #include <X11/cursorfont.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
 #include <assert.h>
 #include <glib.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <xcb/xcb.h>
 
-Window findClient(Display* d, Window win) {
+static xcb_atom_t intern_atom(xcb_connection_t* conn, const char* name, gboolean only_if_exists) {
+  xcb_intern_atom_cookie_t cookie = xcb_intern_atom(conn, only_if_exists, strlen(name), name);
+  xcb_intern_atom_reply_t* reply = xcb_intern_atom_reply(conn, cookie, NULL);
+  xcb_atom_t atom = reply ? reply->atom : XCB_ATOM_NONE;
+  free(reply);
+  return atom;
+}
+
+static gboolean window_has_wm_state(xcb_connection_t* conn, Window win, xcb_atom_t state_atom) {
+  xcb_get_property_cookie_t cookie = xcb_get_property(conn, 0, win, state_atom, state_atom, 0, 1);
+  xcb_get_property_reply_t* reply = xcb_get_property_reply(conn, cookie, NULL);
+  gboolean found = FALSE;
+
+  if (reply && reply->type == state_atom && reply->format == 32 && reply->value_len >= 1)
+    found = TRUE;
+
+  free(reply);
+  return found;
+}
+
+Window findClient(Display* d, xcb_connection_t* conn, Window win, xcb_atom_t state_atom) {
   Window r, *children;
   unsigned int n, i;
-  Atom state = XInternAtom(d, "WM_STATE", True);
-  Atom ret_type;
-  int ret_format;
-  unsigned long ret_items, ret_bytesleft;
-  unsigned long* prop_return;
+  Window found = None;
 
   XQueryTree(d, win, &r, &r, &children, &n);
   for (i = 0; i < n; ++i) {
-    Window w = findClient(d, children[i]);
-    if (w)
-      return w;
+    found = findClient(d, conn, children[i], state_atom);
+    if (found)
+      break;
   }
+  if (children)
+    XFree(children);
 
-  // try me
-  XGetWindowProperty(d, win, state, 0, 1, False, state, &ret_type, &ret_format, &ret_items, &ret_bytesleft,
-                     (unsigned char**)&prop_return);
-  if (ret_type == None || ret_items < 1)
-    return None;
-  return win;  // found it!
+  if (found)
+    return found;
+  if (state_atom != XCB_ATOM_NONE && window_has_wm_state(conn, win, state_atom))
+    return win;
+
+  return None;
 }
 
 int main(int argc, char** argv) {
   Display* d = XOpenDisplay(NULL);
+  if (!d) {
+    fprintf(stderr, "couldn't connect to X server\n");
+    return 1;
+  }
+  xcb_connection_t* conn = XGetXCBConnection(d);
+  if (!conn) {
+    fprintf(stderr, "failed to acquire XCB connection\n");
+    return 1;
+  }
   int s = DefaultScreen(d);
-  Atom net_wm_icon = XInternAtom(d, "_NET_WM_ICON", True);
-  Atom ret_type;
+  xcb_atom_t net_wm_icon = intern_atom(conn, "_NET_WM_ICON", True);
+  xcb_atom_t wm_state = intern_atom(conn, "WM_STATE", True);
+  if (net_wm_icon == XCB_ATOM_NONE) {
+    fprintf(stderr, "_NET_WM_ICON not available\n");
+    return 1;
+  }
   unsigned int winw = 0, winh = 0;
-  int ret_format;
-  unsigned long ret_items, ret_bytesleft;
   const int MAX_IMAGES = 10;
-  unsigned long* prop_return[MAX_IMAGES];
+  uint32_t* prop_return[MAX_IMAGES];
   XImage* i[MAX_IMAGES];
-  long offset = 0;
+  uint32_t offset = 0;
+  uint32_t bytes_left = 0;
   unsigned int image = 0;
   unsigned int j;  // loop counter
   Window id, win;
   Pixmap p;
   Cursor cur;
   XEvent ev;
-  unsigned int bs = sizeof(long);
+  const unsigned int bs = sizeof(uint32_t);
 
   printf("Click on a window with an icon...\n");
 
@@ -64,7 +98,7 @@ int main(int argc, char** argv) {
     XNextEvent(d, &ev);
     if (ev.type == ButtonPress) {
       XUngrabPointer(d, CurrentTime);
-      id = findClient(d, ev.xbutton.subwindow);
+      id = findClient(d, conn, ev.xbutton.subwindow, wm_state);
       break;
     }
   }
@@ -72,35 +106,69 @@ int main(int argc, char** argv) {
   printf("Using window 0x%lx\n", id);
 
   do {
-    unsigned int w, h;
+    uint32_t w, h;
+    xcb_get_property_cookie_t cookie;
+    xcb_get_property_reply_t* reply = NULL;
+    const uint32_t* values;
 
-    XGetWindowProperty(d, id, net_wm_icon, offset++, 1, False, XA_CARDINAL, &ret_type, &ret_format, &ret_items,
-                       &ret_bytesleft, (unsigned char**)&prop_return[image]);
-    if (ret_type == None || ret_items < 1) {
+    cookie = xcb_get_property(conn, 0, id, net_wm_icon, XCB_ATOM_CARDINAL, offset, 1);
+    reply = xcb_get_property_reply(conn, cookie, NULL);
+    if (!reply || reply->type == XCB_ATOM_NONE || reply->format != 32 || reply->value_len < 1) {
+      printf("No icon found\n");
+      free(reply);
+      return 1;
+    }
+    values = (const uint32_t*)xcb_get_property_value(reply);
+    if (!values) {
+      free(reply);
       printf("No icon found\n");
       return 1;
     }
-    w = prop_return[image][0];
-    XFree(prop_return[image]);
+    w = values[0];
+    offset += reply->value_len;
+    free(reply);
 
-    XGetWindowProperty(d, id, net_wm_icon, offset++, 1, False, XA_CARDINAL, &ret_type, &ret_format, &ret_items,
-                       &ret_bytesleft, (unsigned char**)&prop_return[image]);
-    if (ret_type == None || ret_items < 1) {
+    cookie = xcb_get_property(conn, 0, id, net_wm_icon, XCB_ATOM_CARDINAL, offset, 1);
+    reply = xcb_get_property_reply(conn, cookie, NULL);
+    if (!reply || reply->type == XCB_ATOM_NONE || reply->format != 32 || reply->value_len < 1) {
+      printf("Failed to get height\n");
+      free(reply);
+      return 1;
+    }
+    values = (const uint32_t*)xcb_get_property_value(reply);
+    if (!values) {
+      free(reply);
       printf("Failed to get height\n");
       return 1;
     }
-    h = prop_return[image][0];
-    XFree(prop_return[image]);
+    h = values[0];
+    offset += reply->value_len;
+    free(reply);
 
-    XGetWindowProperty(d, id, net_wm_icon, offset, w * h, False, XA_CARDINAL, &ret_type, &ret_format, &ret_items,
-                       &ret_bytesleft, (unsigned char**)&prop_return[image]);
-    if (ret_type == None || ret_items < w * h) {
+    if (w == 0 || h == 0) {
+      printf("Invalid icon size\n");
+      return 1;
+    }
+
+    cookie = xcb_get_property(conn, 0, id, net_wm_icon, XCB_ATOM_CARDINAL, offset, w * h);
+    reply = xcb_get_property_reply(conn, cookie, NULL);
+    if (!reply || reply->type == XCB_ATOM_NONE || reply->format != 32 || reply->value_len < w * h) {
+      printf("Failed to get image data\n");
+      free(reply);
+      return 1;
+    }
+    bytes_left = reply->bytes_after;
+    values = (const uint32_t*)xcb_get_property_value(reply);
+    if (!values) {
+      free(reply);
       printf("Failed to get image data\n");
       return 1;
     }
-    offset += w * h;
+    prop_return[image] = g_memdup2(values, reply->value_len * sizeof(uint32_t));
+    offset += reply->value_len;
+    free(reply);
 
-    printf("Found icon with size %dx%d\n", w, h);
+    printf("Found icon with size %ux%u\n", w, h);
 
     i[image] = XCreateImage(d, DefaultVisual(d, s), DefaultDepth(d, s), ZPixmap, 0, NULL, w, h, 32, 0);
     assert(i[image]);
@@ -131,7 +199,7 @@ int main(int argc, char** argv) {
       winh = h;
 
     ++image;
-  } while (ret_bytesleft > 0 && image < MAX_IMAGES);
+  } while (bytes_left > 0 && image < (unsigned int)MAX_IMAGES);
 
 #define hashsize(n) ((guint32)1 << (n))
 #define hashmask(n) (hashsize(n) - 1)
@@ -206,11 +274,14 @@ int main(int argc, char** argv) {
     {
       case 3:
         c += k[2];
+        /* fall through */
       case 2:
         b += k[1];
+        /* fall through */
       case 1:
         a += k[0];
         final(a, b, c);
+        /* fall through */
       case 0: /* case 0: nothing left to add */
         break;
     }

@@ -1,67 +1,88 @@
 /* oldfullscreen.c for the Openbox window manager */
 
-#include <string.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <X11/Xlib.h>
+#include <X11/Xlib-xcb.h>
 #include <X11/Xutil.h>
+#include <xcb/xcb.h>
 
 typedef struct {
-  unsigned long flags;
-  unsigned long functions;
-  unsigned long decorations;
-  long inputMode;
-  unsigned long status;
+  uint32_t flags;
+  uint32_t functions;
+  uint32_t decorations;
+  int32_t inputMode;
+  uint32_t status;
 } Hints;
 
+static xcb_atom_t intern_atom(xcb_connection_t* conn, const char* name) {
+  xcb_intern_atom_cookie_t cookie = xcb_intern_atom(conn, 0, strlen(name), name);
+  xcb_intern_atom_reply_t* reply = xcb_intern_atom_reply(conn, cookie, NULL);
+  xcb_atom_t atom = reply ? reply->atom : XCB_ATOM_NONE;
+  free(reply);
+  return atom;
+}
+
 int main(int argc, char** argv) {
-  Display* display;
-  Window win;
+  Display* display = NULL;
+  xcb_connection_t* conn = NULL;
+  Window win = None;
   XEvent report;
-  int x = 200, y = 200, h = 100, w = 400, s;
+  int x = 200, y = 200;
+  unsigned int w = 400, h = 100, s = 0, depth = 0;
   XSizeHints* size;
   Hints hints;
-  Atom prop;
+  xcb_atom_t prop = XCB_ATOM_NONE;
+  int ret = 1;
 
-  // Open X display
   display = XOpenDisplay(NULL);
   if (display == NULL) {
     fprintf(stderr, "couldn't connect to X server :0\n");
     return 1;
   }
+  conn = XGetXCBConnection(display);
+  if (conn == NULL) {
+    fprintf(stderr, "couldn't get XCB connection\n");
+    goto out;
+  }
 
-  // Get geometry of root window (default screen)
-  XGetGeometry(display, RootWindow(display, DefaultScreen(display)), &win, &x, &y, &w, &h, &s, &s);
+  XGetGeometry(display, RootWindow(display, DefaultScreen(display)), &win, &x, &y, &w, &h, &s, &depth);
 
-  // Create a new window
   win = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 0, CopyFromParent, CopyFromParent, CopyFromParent, 0,
                       NULL);
+  if (win == None) {
+    fprintf(stderr, "failed to create window\n");
+    goto out;
+  }
   XSetWindowBackground(display, win, WhitePixel(display, 0));
 
-  // Set window size hints
   size = XAllocSizeHints();
   size->flags = PPosition;
   XSetWMNormalHints(display, win, size);
   XFree(size);
 
-  // Set _MOTIF_WM_HINTS property
+  prop = intern_atom(conn, "_MOTIF_WM_HINTS");
+  if (prop == XCB_ATOM_NONE) {
+    fprintf(stderr, "failed to intern _MOTIF_WM_HINTS\n");
+    goto out;
+  }
   hints.flags = 2;
   hints.decorations = 0;
-  prop = XInternAtom(display, "_MOTIF_WM_HINTS", False);
-  XChangeProperty(display, win, prop, prop, 32, PropModeReplace, (unsigned char*)&hints, 5);
+  xcb_change_property(conn, XCB_PROP_MODE_REPLACE, win, prop, prop, 32, 5, &hints);
+  xcb_flush(conn);
 
   XFlush(display);
   XMapWindow(display, win);
 
-  // Listen for events
   XSelectInput(display, win, StructureNotifyMask | ButtonPressMask);
 
-  // Simulate resizing and moving the window
   sleep(1);
   XResizeWindow(display, win, w + 5, h + 5);
   XMoveWindow(display, win, x, y);
 
-  // Event loop to handle ButtonPress and ConfigureNotify events
   while (1) {
     XNextEvent(display, &report);
 
@@ -75,10 +96,10 @@ int main(int argc, char** argv) {
       case ConfigureNotify:
         x = report.xconfigure.x;
         y = report.xconfigure.y;
-        w = report.xconfigure.width;
-        h = report.xconfigure.height;
-        s = report.xconfigure.send_event;
-        printf("confignotify %i,%i-%ix%i (send: %d)\n", x, y, w, h, s);
+        w = (unsigned int)report.xconfigure.width;
+        h = (unsigned int)report.xconfigure.height;
+        s = (unsigned int)report.xconfigure.send_event;
+        printf("confignotify %i,%i-%ux%u (send: %u)\n", x, y, w, h, s);
         break;
     }
 
@@ -89,9 +110,12 @@ int main(int argc, char** argv) {
     }
   }
 
-  // Clean up and close the display connection
-  XDestroyWindow(display, win);
-  XCloseDisplay(display);
+  ret = 0;
 
-  return 0;
+out:
+  if (win != None)
+    XDestroyWindow(display, win);
+  if (display)
+    XCloseDisplay(display);
+  return ret;
 }
