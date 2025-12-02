@@ -143,14 +143,18 @@ static gboolean load_menu_file_with_fallbacks(const gchar* name, struct ob_confi
   if (ok)
     return TRUE;
 
-  /* allow running uninstalled from the source tree */
-  gchar* cwd = g_get_current_dir();
-  path = g_build_filename(cwd ? cwd : ".", "data", name, NULL);
-  ok = try_menu_path(path, conf);
-  g_free(path);
-  g_free(cwd);
-  if (ok)
-    return TRUE;
+  /* allow running uninstalled from the build tree (binary in build*/openbox/) */
+  gchar* exe_path = g_file_read_link("/proc/self/exe", NULL);
+  if (exe_path) {
+    gchar* exe_dir = g_path_get_dirname(exe_path);
+    path = g_build_filename(exe_dir, "..", "..", "data", name, NULL);
+    ok = try_menu_path(path, conf);
+    g_free(path);
+    g_free(exe_dir);
+    g_free(exe_path);
+    if (ok)
+      return TRUE;
+  }
 
   /* system config dirs */
   const gchar* const* cfg_dirs = g_get_system_config_dirs();
