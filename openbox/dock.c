@@ -26,6 +26,9 @@
 #include "obrender/theme.h"
 #include "obt/prop.h"
 
+#include <X11/Xlib-xcb.h>
+#include <xcb/xcb.h>
+
 #define DOCK_EVENT_MASK (ButtonPressMask | ButtonReleaseMask | EnterWindowMask | LeaveWindowMask)
 #define DOCKAPP_EVENT_MASK (StructureNotifyMask)
 #define DOCK_NOPROPAGATEMASK (ButtonPressMask | ButtonReleaseMask | ButtonMotionMask)
@@ -51,6 +54,32 @@ static guint window_hash(Window* w) {
 }
 static gboolean window_comp(Window* w1, Window* w2) {
   return *w1 == *w2;
+}
+
+static xcb_connection_t* dock_xcb(void) {
+  return XGetXCBConnection(obt_display);
+}
+
+static gboolean dock_query_size(Window win, guint* width, guint* height) {
+  xcb_connection_t* conn = dock_xcb();
+  xcb_get_geometry_cookie_t cookie;
+  xcb_get_geometry_reply_t* reply;
+
+  if (!conn)
+    return FALSE;
+
+  cookie = xcb_get_geometry(conn, win);
+  reply = xcb_get_geometry_reply(conn, cookie, NULL);
+  if (!reply)
+    return FALSE;
+
+  if (width)
+    *width = reply->width;
+  if (height)
+    *height = reply->height;
+
+  free(reply);
+  return TRUE;
 }
 
 void dock_startup(gboolean reconfig) {
@@ -121,7 +150,7 @@ void dock_shutdown(gboolean reconfig) {
 
 void dock_manage(Window icon_win, Window name_win) {
   ObDockApp* app;
-  XWindowAttributes attrib;
+  guint width = 0, height = 0;
   gchar** data;
 
   app = g_slice_new0(ObDockApp);
@@ -142,19 +171,19 @@ void dock_manage(Window icon_win, Window name_win) {
   if (app->class == NULL)
     app->class = g_strdup("");
 
-  if (XGetWindowAttributes(obt_display, app->icon_win, &attrib)) {
-    app->w = attrib.width;
-    app->h = attrib.height;
-  }
-  else {
-    app->w = app->h = 64;
-  }
+  if (!dock_query_size(app->icon_win, &width, &height))
+    width = height = 64;
+  app->w = (gint)width;
+  app->h = (gint)height;
 
   dock->dock_apps = g_list_append(dock->dock_apps, app);
   g_hash_table_insert(dock->dock_map, &app->icon_win, app);
   dock_configure();
 
-  XReparentWindow(obt_display, app->icon_win, dock->frame, app->x, app->y);
+  xcb_connection_t* conn = dock_xcb();
+  g_return_if_fail(conn != NULL);
+
+  xcb_reparent_window(conn, app->icon_win, dock->frame, app->x, app->y);
   /*
     This is the same case as in frame.c for client windows. When Openbox is
     starting, the window is already mapped so we see unmap events occur for
@@ -164,18 +193,20 @@ void dock_manage(Window icon_win, Window name_win) {
   */
   if (ob_state() == OB_STATE_STARTING)
     app->ignore_unmaps += 2;
-  XChangeSaveSet(obt_display, app->icon_win, SetModeInsert);
-  XMapWindow(obt_display, app->icon_win);
+  xcb_change_save_set(conn, XCB_SET_MODE_INSERT, app->icon_win);
+  xcb_map_window(conn, app->icon_win);
 
   if (app->name_win != app->icon_win) {
-    XReparentWindow(obt_display, app->name_win, dock->frame, -1000, -1000);
-    XChangeSaveSet(obt_display, app->name_win, SetModeInsert);
-    XMapWindow(obt_display, app->name_win);
+    xcb_reparent_window(conn, app->name_win, dock->frame, -1000, -1000);
+    xcb_change_save_set(conn, XCB_SET_MODE_INSERT, app->name_win);
+    xcb_map_window(conn, app->name_win);
   }
 
-  XSync(obt_display, False);
-
-  XSelectInput(obt_display, app->icon_win, DOCKAPP_EVENT_MASK);
+  {
+    const uint32_t mask = DOCKAPP_EVENT_MASK;
+    xcb_change_window_attributes(conn, app->icon_win, XCB_CW_EVENT_MASK, &mask);
+  }
+  xcb_flush(conn);
 
   dock_app_grab_button(app, TRUE);
 
@@ -191,15 +222,20 @@ void dock_unmanage_all(void) {
 
 void dock_unmanage(ObDockApp* app, gboolean reparent) {
   dock_app_grab_button(app, FALSE);
-  XSelectInput(obt_display, app->icon_win, NoEventMask);
+  xcb_connection_t* conn = dock_xcb();
+  g_return_if_fail(conn != NULL);
+
+  {
+    const uint32_t mask = 0;
+    xcb_change_window_attributes(conn, app->icon_win, XCB_CW_EVENT_MASK, &mask);
+  }
   /* remove the window from our save set */
-  XChangeSaveSet(obt_display, app->icon_win, SetModeDelete);
-  XSync(obt_display, False);
+  xcb_change_save_set(conn, XCB_SET_MODE_DELETE, app->icon_win);
 
   if (reparent) {
-    XReparentWindow(obt_display, app->icon_win, obt_root(ob_screen), 0, 0);
+    xcb_reparent_window(conn, app->icon_win, obt_root(ob_screen), 0, 0);
     if (app->name_win != app->icon_win)
-      XReparentWindow(obt_display, app->name_win, obt_root(ob_screen), 0, 0);
+      xcb_reparent_window(conn, app->name_win, obt_root(ob_screen), 0, 0);
   }
 
   dock->dock_apps = g_list_remove(dock->dock_apps, app);
@@ -211,6 +247,7 @@ void dock_unmanage(ObDockApp* app, gboolean reparent) {
   g_free(app->name);
   g_free(app->class);
   g_slice_free(ObDockApp, app);
+  xcb_flush(conn);
 }
 
 void dock_configure(void) {
