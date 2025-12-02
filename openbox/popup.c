@@ -29,9 +29,15 @@
 #include "obrender/render.h"
 #include "obrender/theme.h"
 
+#include <xcb/xcb.h>
+#include <X11/Xlib.h>
+#include <X11/Xlib-xcb.h>
+
 ObPopup* popup_new(void) {
-  XSetWindowAttributes attrib;
   ObPopup* self = g_slice_new0(ObPopup);
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
+  uint32_t mask;
+  uint32_t val[3];
 
   self->obwin.type = OB_WINDOW_CLASS_INTERNAL;
   self->gravity = NorthWestGravity;
@@ -40,17 +46,39 @@ ObPopup* popup_new(void) {
   self->a_text = RrAppearanceCopy(ob_rr_theme->osd_hilite_label);
   self->iconwm = self->iconhm = 1;
 
-  attrib.override_redirect = True;
-  self->bg = XCreateWindow(obt_display, obt_root(ob_screen), 0, 0, 1, 1, 0, RrDepth(ob_rr_inst), InputOutput,
-                           RrVisual(ob_rr_inst), CWOverrideRedirect, &attrib);
+  mask = XCB_CW_BACK_PIXEL | XCB_CW_BORDER_PIXEL | XCB_CW_OVERRIDE_REDIRECT | XCB_CW_COLORMAP;
+  val[0] = BlackPixel(obt_display, ob_screen);
+  val[1] = BlackPixel(obt_display, ob_screen);
+  val[2] = 1;
+  val[3] = RrColormap(ob_rr_theme->inst);
+
+  /* Wait, RrDepth and RrVisual returns from Xlib.
+     I need visual ID. */
+  /* RrVisual returns Visual*. Visual->visualid is what we need. */
+  xcb_visualid_t visual = RrVisual(ob_rr_inst)->visualid;
+  uint8_t depth = RrDepth(ob_rr_inst);
+
+  self->bg = xcb_generate_id(conn);
+  xcb_create_window(conn, depth, self->bg, obt_root(ob_screen), 0, 0, 1, 1, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT, visual,
+                    mask, val);
+
   OBT_PROP_SET32(self->bg, NET_WM_WINDOW_TYPE, ATOM, OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_TOOLTIP));
 
-  self->text = XCreateWindow(obt_display, self->bg, 0, 0, 1, 1, 0, RrDepth(ob_rr_inst), InputOutput,
-                             RrVisual(ob_rr_inst), 0, NULL);
+  self->text = xcb_generate_id(conn);
+  /* mask and val are reused but override_redirect is not needed for child?
+     Actually XCreateWindow takes mask/attrib.
+     For self->text: 0, NULL was passed. So mask=0.
+  */
+  mask = XCB_CW_BACK_PIXEL | XCB_CW_BORDER_PIXEL | XCB_CW_COLORMAP;
+  /* val[0], val[1], val[3] (now val[2]) are valid for this mask. val[2] was override_redirect. */
+  /* Need to repack val */
+  val[2] = val[3];
+
+  xcb_create_window(conn, depth, self->text, self->bg, 0, 0, 1, 1, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT, visual, mask, val);
 
   RrConfigureWindowBorder(ob_rr_theme->inst, self->bg, ob_rr_theme->obwidth, ob_rr_theme->osd_border_color);
 
-  XMapWindow(obt_display, self->text);
+  xcb_map_window(conn, self->text);
 
   stacking_add(INTERNAL_AS_WINDOW(self));
   window_add(&self->bg, INTERNAL_AS_WINDOW(self));
@@ -61,8 +89,9 @@ void popup_free(ObPopup* self) {
   if (self) {
     popup_hide(self); /* make sure it's not showing or is being delayed and
                          will be shown */
-    XDestroyWindow(obt_display, self->bg);
-    XDestroyWindow(obt_display, self->text);
+    xcb_connection_t* conn = XGetXCBConnection(obt_display);
+    xcb_destroy_window(conn, self->bg);
+    xcb_destroy_window(conn, self->text);
     RrAppearanceFree(self->a_bg);
     RrAppearanceFree(self->a_text);
     window_remove(self->bg);
@@ -128,7 +157,7 @@ void popup_set_text_align(ObPopup* self, RrJustify align) {
 static gboolean popup_show_timeout(gpointer data) {
   ObPopup* self = data;
 
-  XMapWindow(obt_display, self->bg);
+  xcb_map_window(XGetXCBConnection(obt_display), self->bg);
   stacking_raise(INTERNAL_AS_WINDOW(self));
   self->mapped = TRUE;
   self->delay_mapped = FALSE;
@@ -147,6 +176,9 @@ void popup_delay_show(ObPopup* self, gulong msec, gchar* text) {
   const Rect* area;
   Rect mon;
   gboolean hasicon = self->hasicon;
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
+  uint32_t mask = XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y | XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT;
+  uint32_t val[4];
 
   /* when there is no icon and the text is not parent relative, then
      fill the whole dialog with the text appearance, don't use the bg at all
@@ -279,7 +311,12 @@ void popup_delay_show(ObPopup* self, gulong msec, gchar* text) {
   }
 
   /* set the windows/appearances up */
-  XMoveResizeWindow(obt_display, self->bg, x, y, w, h);
+  val[0] = x;
+  val[1] = y;
+  val[2] = w;
+  val[3] = h;
+  xcb_configure_window(conn, self->bg, mask, val);
+
   /* when there is no icon and the text is not parent relative, then
      fill the whole dialog with the text appearance, don't use the bg at all
   */
@@ -290,7 +327,11 @@ void popup_delay_show(ObPopup* self, gulong msec, gchar* text) {
     self->a_text->surface.parent = self->a_bg;
     self->a_text->surface.parentx = textx;
     self->a_text->surface.parenty = texty;
-    XMoveResizeWindow(obt_display, self->text, textx, texty, textw, texth);
+    val[0] = textx;
+    val[1] = texty;
+    val[2] = textw;
+    val[3] = texth;
+    xcb_configure_window(conn, self->text, mask, val);
     RrPaint(self->a_text, self->text, textw, texth);
   }
 
@@ -319,7 +360,7 @@ void popup_hide(ObPopup* self) {
     /* kill enter events cause by this unmapping */
     ignore_start = event_start_ignore_all_enters();
 
-    XUnmapWindow(obt_display, self->bg);
+    xcb_unmap_window(XGetXCBConnection(obt_display), self->bg);
     self->mapped = FALSE;
 
     event_end_ignore_all_enters(ignore_start);
@@ -333,23 +374,34 @@ void popup_hide(ObPopup* self) {
 
 static void icon_popup_draw_icon(gint x, gint y, gint w, gint h, gpointer data) {
   ObIconPopup* self = data;
+  uint32_t mask = XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y | XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT;
+  uint32_t val[4] = {x, y, w, h};
 
   self->a_icon->surface.parent = self->popup->a_bg;
   self->a_icon->surface.parentx = x;
   self->a_icon->surface.parenty = y;
-  XMoveResizeWindow(obt_display, self->icon, x, y, w, h);
+  xcb_configure_window(XGetXCBConnection(obt_display), self->icon, mask, val);
   RrPaint(self->a_icon, self->icon, w, h);
 }
 
 ObIconPopup* icon_popup_new(void) {
   ObIconPopup* self;
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
+  uint32_t mask = XCB_CW_BACK_PIXEL | XCB_CW_BORDER_PIXEL | XCB_CW_COLORMAP;
+  uint32_t val[3];
 
   self = g_slice_new0(ObIconPopup);
   self->popup = popup_new();
   self->a_icon = RrAppearanceCopy(ob_rr_theme->a_clear_tex);
-  self->icon = XCreateWindow(obt_display, self->popup->bg, 0, 0, 1, 1, 0, RrDepth(ob_rr_inst), InputOutput,
-                             RrVisual(ob_rr_inst), 0, NULL);
-  XMapWindow(obt_display, self->icon);
+
+  val[0] = BlackPixel(obt_display, ob_screen);
+  val[1] = BlackPixel(obt_display, ob_screen);
+  val[2] = RrColormap(ob_rr_inst);
+
+  self->icon = xcb_generate_id(conn);
+  xcb_create_window(conn, RrDepth(ob_rr_inst), self->icon, self->popup->bg, 0, 0, 1, 1, 0,
+                    XCB_WINDOW_CLASS_INPUT_OUTPUT, RrVisual(ob_rr_inst)->visualid, mask, val);
+  xcb_map_window(conn, self->icon);
 
   self->popup->hasicon = TRUE;
   self->popup->draw_icon = icon_popup_draw_icon;
@@ -360,7 +412,7 @@ ObIconPopup* icon_popup_new(void) {
 
 void icon_popup_free(ObIconPopup* self) {
   if (self) {
-    XDestroyWindow(obt_display, self->icon);
+    xcb_destroy_window(XGetXCBConnection(obt_display), self->icon);
     RrAppearanceFree(self->a_icon);
     popup_free(self->popup);
     g_slice_free(ObIconPopup, self);
@@ -399,6 +451,9 @@ static void pager_popup_draw_icon(gint px, gint py, gint w, gint h, gpointer dat
   const guint cols = screen_desktop_layout.columns;
   const guint rows = screen_desktop_layout.rows;
   const gint linewidth = ob_rr_theme->obwidth;
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
+  uint32_t mask = XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y | XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT;
+  uint32_t val[4];
 
   eachw = (w - ((cols + 1) * linewidth)) / cols;
   eachh = (h - ((rows + 1) * linewidth)) / rows;
@@ -480,7 +535,11 @@ static void pager_popup_draw_icon(gint px, gint py, gint w, gint h, gpointer dat
         a->surface.parent = self->popup->a_bg;
         a->surface.parentx = x + px;
         a->surface.parenty = y + py;
-        XMoveResizeWindow(obt_display, self->wins[n], x + px, y + py, eachw, eachh);
+        val[0] = x + px;
+        val[1] = y + py;
+        val[2] = eachw;
+        val[3] = eachh;
+        xcb_configure_window(conn, self->wins[n], mask, val);
         RrPaint(a, self->wins[n], eachw, eachh);
       }
       n += horz_inc;
@@ -510,9 +569,10 @@ ObPagerPopup* pager_popup_new(void) {
 void pager_popup_free(ObPagerPopup* self) {
   if (self) {
     guint i;
+    xcb_connection_t* conn = XGetXCBConnection(obt_display);
 
     for (i = 0; i < self->desks; ++i)
-      XDestroyWindow(obt_display, self->wins[i]);
+      xcb_destroy_window(conn, self->wins[i]);
     g_free(self->wins);
     RrAppearanceFree(self->hilight);
     RrAppearanceFree(self->unhilight);
@@ -523,22 +583,28 @@ void pager_popup_free(ObPagerPopup* self) {
 
 void pager_popup_delay_show(ObPagerPopup* self, gulong msec, gchar* text, guint desk) {
   guint i;
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
 
   if (screen_num_desktops < self->desks)
     for (i = screen_num_desktops; i < self->desks; ++i)
-      XDestroyWindow(obt_display, self->wins[i]);
+      xcb_destroy_window(conn, self->wins[i]);
 
   if (screen_num_desktops != self->desks)
     self->wins = g_renew(Window, self->wins, screen_num_desktops);
 
   if (screen_num_desktops > self->desks)
     for (i = self->desks; i < screen_num_desktops; ++i) {
-      XSetWindowAttributes attr;
+      uint32_t mask = XCB_CW_BACK_PIXEL | XCB_CW_BORDER_PIXEL | XCB_CW_COLORMAP;
+      uint32_t val[3];
 
-      attr.border_pixel = RrColorPixel(ob_rr_theme->osd_border_color);
-      self->wins[i] = XCreateWindow(obt_display, self->popup->bg, 0, 0, 1, 1, ob_rr_theme->obwidth, RrDepth(ob_rr_inst),
-                                    InputOutput, RrVisual(ob_rr_inst), CWBorderPixel, &attr);
-      XMapWindow(obt_display, self->wins[i]);
+      val[0] = BlackPixel(obt_display, ob_screen);
+      val[1] = RrColorPixel(ob_rr_theme->osd_border_color);
+      val[2] = RrColormap(ob_rr_inst);
+
+      self->wins[i] = xcb_generate_id(conn);
+      xcb_create_window(conn, RrDepth(ob_rr_inst), self->wins[i], self->popup->bg, 0, 0, 1, 1, ob_rr_theme->obwidth,
+                        XCB_WINDOW_CLASS_INPUT_OUTPUT, RrVisual(ob_rr_inst)->visualid, mask, val);
+      xcb_map_window(conn, self->wins[i]);
     }
 
   self->desks = screen_num_desktops;
