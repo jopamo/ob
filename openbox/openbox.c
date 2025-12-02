@@ -138,9 +138,11 @@ static gboolean load_menu_file_with_fallbacks(const gchar* name, struct ob_confi
     return TRUE;
 
   /* allow running uninstalled from the source tree */
-  path = g_build_filename(g_get_current_dir(), "data", name, NULL);
+  gchar* cwd = g_get_current_dir();
+  path = g_build_filename(cwd ? cwd : ".", "data", name, NULL);
   ok = try_menu_path(path, conf);
   g_free(path);
+  g_free(cwd);
   if (ok)
     return TRUE;
 
@@ -536,6 +538,7 @@ gint main(gint argc, gchar** argv) {
 
   obt_display_close();
 
+  gchar** restart_argv = NULL;
   if (restart) {
     ob_debug_shutdown();
     obt_signal_stop();
@@ -567,16 +570,17 @@ gint main(gint argc, gchar** argv) {
         nargv[i] = argv[i];
 
       if (ob_sm_save_file != NULL) {
-        nargv[i++] = g_strdup("--sm-save-file");
+        nargv[i++] = (gchar*)"--sm-save-file";
         nargv[i++] = ob_sm_save_file;
       }
       if (ob_sm_id != NULL) {
-        nargv[i++] = g_strdup("--sm-client-id");
+        nargv[i++] = (gchar*)"--sm-client-id";
         nargv[i++] = ob_sm_id;
       }
-      nargv[i++] = g_strdup("--sm-no-load");
+      nargv[i++] = (gchar*)"--sm-no-load";
       g_assert(i == l);
       argv = nargv;
+      restart_argv = nargv;
     }
 
     /* re-run me */
@@ -585,6 +589,8 @@ gint main(gint argc, gchar** argv) {
   }
 
   /* free stuff passed in from the command line or environment */
+  if (restart_argv)
+    g_free(restart_argv);
   g_free(ob_sm_save_file);
   g_free(ob_sm_id);
   g_free(program_name);
