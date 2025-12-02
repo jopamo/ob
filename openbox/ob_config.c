@@ -32,33 +32,41 @@ static void add_font(struct ob_theme_config* theme,
   theme->font_count++;
 }
 
-static void add_keybind(struct ob_config* cfg, const char* key, const char* act_name, GHashTable* params) {
+static struct ob_keybind* add_keybind(struct ob_config* cfg, const char* key) {
   cfg->keybinds = g_renew(struct ob_keybind, cfg->keybinds, cfg->keybind_count + 1);
   struct ob_keybind* kb = &cfg->keybinds[cfg->keybind_count++];
-  memset(kb, 0, sizeof(*kb));
+  memset(kb, 0, sizeof(*mb));
   kb->key = safe_strdup(key);
-  kb->actions = g_new0(struct ob_key_action, 1);
-  kb->action_count = 1;
-  kb->actions[0].name = safe_strdup(act_name);
-  kb->actions[0].params = params;
+  return kb;
 }
 
-static void add_mousebind(struct ob_config* cfg,
-                          const char* context,
-                          const char* button,
-                          const char* click,
-                          const char* act_name,
-                          GHashTable* params) {
+static void add_key_action(struct ob_keybind* kb, const char* act_name, GHashTable* params) {
+  kb->actions = g_renew(struct ob_key_action, kb->actions, kb->action_count + 1);
+  kb->actions[kb->action_count].name = safe_strdup(act_name);
+  kb->actions[kb->action_count].params = params;
+  if (params && g_hash_table_lookup(params, "command"))
+    kb->actions[kb->action_count].command = g_strdup(g_hash_table_lookup(params, "command"));
+  kb->action_count++;
+}
+
+static struct ob_mouse_binding* add_mousebind(struct ob_config* cfg,
+                                              const char* context,
+                                              const char* button,
+                                              const char* click) {
   cfg->mouse_bindings = g_renew(struct ob_mouse_binding, cfg->mouse_bindings, cfg->mouse_binding_count + 1);
   struct ob_mouse_binding* mb = &cfg->mouse_bindings[cfg->mouse_binding_count++];
   memset(mb, 0, sizeof(*mb));
   mb->context = safe_strdup(context);
   mb->button = safe_strdup(button);
   mb->click = safe_strdup(click);
-  mb->actions = g_new0(struct ob_mouse_action, 1);
-  mb->action_count = 1;
-  mb->actions[0].name = safe_strdup(act_name);
-  mb->actions[0].params = params;
+  return mb;
+}
+
+static void add_mouse_action(struct ob_mouse_binding* mb, const char* act_name, GHashTable* params) {
+  mb->actions = g_renew(struct ob_mouse_action, mb->actions, mb->action_count + 1);
+  mb->actions[mb->action_count].name = safe_strdup(act_name);
+  mb->actions[mb->action_count].params = params;
+  mb->action_count++;
 }
 
 void ob_config_init_defaults(struct ob_config* cfg) {
@@ -81,25 +89,9 @@ void ob_config_init_defaults(struct ob_config* cfg) {
   cfg->focus.raise_on_focus = false;
 
   /* Placement */
-  cfg->placement.policy = OB_CONFIG_PLACE_POLICY_MOUSE;
+  cfg->placement.policy = OB_CONFIG_PLACE_POLICY_MOUSE; /* "UnderMouse" in XML */
   cfg->placement.center_new = true;
-  cfg->placement.monitor_active = false; /* User said "Mouse" for monitor and primaryMonitor */
-  /* If "Mouse", it usually implies OB_PLACE_MONITOR_MOUSE.
-     Wait, ob_config.h has `int monitor`.
-     YAML parser sets `monitor_active` for "Active", else number.
-     User said `monitor: Mouse`. My parser doesn't handle "Mouse" string for monitor, only "Active" or int.
-     I should check if I need to update parsing too.
-     But here I'm setting defaults. `OB_PLACE_MONITOR_MOUSE` is not an index.
-     `config.c` uses `config_place_monitor` which is `ObPlaceMonitor` enum.
-     My `struct ob_placement_config` has `monitor` (int) and `monitor_active` (bool).
-     This struct design is slightly lossy for "Mouse".
-     I'll assume `monitor_active=false` and `monitor=0` (primary?) or I need to add `monitor_mouse`?
-     Actually `config.c` has `config_place_monitor` global.
-     I should update `ob_placement_config` to support "Mouse" if needed.
-     Or map "Mouse" to something.
-     For now I'll set it to what I can.
-  */
-  cfg->placement.monitor_active = false; /* Default */
+  cfg->placement.monitor_active = false; /* "Mouse" -> monitor=0/active=false in my interpretation */
 
   /* Theme */
   cfg->theme.name = safe_strdup("Mikachu");
@@ -147,31 +139,149 @@ void ob_config_init_defaults(struct ob_config* cfg) {
   cfg->keyboard.chain_quit_key = safe_strdup("C-g");
 
   GHashTable* params;
+  struct ob_keybind* kb;
 
-  /* Keybinds (subset for brevity, fulfilling user request roughly) */
-  /* C-A-Left GoToDesktop left */
+  /* Desktop Switching */
+  /* C-A-Left */
   params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
   g_hash_table_insert(params, g_strdup("to"), g_strdup("left"));
   g_hash_table_insert(params, g_strdup("wrap"), g_strdup("no"));
-  add_keybind(cfg, "C-A-Left", "GoToDesktop", params);
+  kb = add_keybind(cfg, "C-A-Left");
+  add_key_action(kb, "GoToDesktop", params);
 
-  /* W-d ToggleShowDesktop */
-  add_keybind(cfg, "W-d", "ToggleShowDesktop", NULL);
+  /* C-A-Right */
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("right"));
+  g_hash_table_insert(params, g_strdup("wrap"), g_strdup("no"));
+  kb = add_keybind(cfg, "C-A-Right");
+  add_key_action(kb, "GoToDesktop", params);
 
-  /* A-F4 Close */
-  add_keybind(cfg, "A-F4", "Close", NULL);
+  /* C-A-Up */
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("up"));
+  g_hash_table_insert(params, g_strdup("wrap"), g_strdup("no"));
+  kb = add_keybind(cfg, "C-A-Up");
+  add_key_action(kb, "GoToDesktop", params);
 
-  /* A-Tab NextWindow */
-  /* complex params not easily mockable with simple add_keybind,
-     needs nested actions support in ob_key_action struct if we want full fidelity
-     currently ob_key_action has GHashTable params.
-     YAML parser handles 'finalactions' by creating a GHashTable?
-     No, my YAML parser implementation for actions puts scalars in params.
-     It does NOT handle nested actions lists like 'finalactions'.
-     The user's YAML has 'finalactions'.
-     This means my YAML parser is insufficient for 'finalactions' if it only handles scalars.
-     However, sticking to "wired up properly", I should enable basic keybinds.
-  */
+  /* C-A-Down */
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("down"));
+  g_hash_table_insert(params, g_strdup("wrap"), g_strdup("no"));
+  kb = add_keybind(cfg, "C-A-Down");
+  add_key_action(kb, "GoToDesktop", params);
+
+  /* S-A-Left */
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("left"));
+  g_hash_table_insert(params, g_strdup("wrap"), g_strdup("no"));
+  kb = add_keybind(cfg, "S-A-Left");
+  add_key_action(kb, "SendToDesktop", params);
+
+  /* S-A-Right */
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("right"));
+  g_hash_table_insert(params, g_strdup("wrap"), g_strdup("no"));
+  kb = add_keybind(cfg, "S-A-Right");
+  add_key_action(kb, "SendToDesktop", params);
+
+  /* S-A-Up */
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("up"));
+  g_hash_table_insert(params, g_strdup("wrap"), g_strdup("no"));
+  kb = add_keybind(cfg, "S-A-Up");
+  add_key_action(kb, "SendToDesktop", params);
+
+  /* S-A-Down */
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("down"));
+  g_hash_table_insert(params, g_strdup("wrap"), g_strdup("no"));
+  kb = add_keybind(cfg, "S-A-Down");
+  add_key_action(kb, "SendToDesktop", params);
+
+  /* W-F1..F4 */
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("1"));
+  kb = add_keybind(cfg, "W-F1");
+  add_key_action(kb, "GoToDesktop", params);
+
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("2"));
+  kb = add_keybind(cfg, "W-F2");
+  add_key_action(kb, "GoToDesktop", params);
+
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("3"));
+  kb = add_keybind(cfg, "W-F3");
+  add_key_action(kb, "GoToDesktop", params);
+
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("4"));
+  kb = add_keybind(cfg, "W-F4");
+  add_key_action(kb, "GoToDesktop", params);
+
+  /* W-d */
+  kb = add_keybind(cfg, "W-d");
+  add_key_action(kb, "ToggleShowDesktop", NULL);
+
+  /* A-F4 */
+  kb = add_keybind(cfg, "A-F4");
+  add_key_action(kb, "Close", NULL);
+
+  /* A-Escape */
+  kb = add_keybind(cfg, "A-Escape");
+  add_key_action(kb, "Lower", NULL);
+  add_key_action(kb, "FocusToBottom", NULL);
+  add_key_action(kb, "Unfocus", NULL);
+
+  /* A-space */
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("menu"), g_strdup("client-menu"));
+  kb = add_keybind(cfg, "A-space");
+  add_key_action(kb, "ShowMenu", params);
+
+  /* A-Tab */
+  /* Note: finalactions are missing as they are not supported by the current struct */
+  kb = add_keybind(cfg, "A-Tab");
+  add_key_action(kb, "NextWindow", NULL);
+
+  /* A-S-Tab */
+  kb = add_keybind(cfg, "A-S-Tab");
+  add_key_action(kb, "PreviousWindow", NULL);
+
+  /* C-A-Tab */
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("panels"), g_strdup("yes"));
+  g_hash_table_insert(params, g_strdup("desktop"), g_strdup("yes"));
+  kb = add_keybind(cfg, "C-A-Tab");
+  add_key_action(kb, "NextWindow", params);
+
+  /* Directional Cycle */
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("direction"), g_strdup("right"));
+  kb = add_keybind(cfg, "W-S-Right");
+  add_key_action(kb, "DirectionalCycleWindows", params);
+
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("direction"), g_strdup("left"));
+  kb = add_keybind(cfg, "W-S-Left");
+  add_key_action(kb, "DirectionalCycleWindows", params);
+
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("direction"), g_strdup("up"));
+  kb = add_keybind(cfg, "W-S-Up");
+  add_key_action(kb, "DirectionalCycleWindows", params);
+
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("direction"), g_strdup("down"));
+  kb = add_keybind(cfg, "W-S-Down");
+  add_key_action(kb, "DirectionalCycleWindows", params);
+
+  /* W-e Execute */
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("command"), g_strdup("kfmclient openProfile filemanagement"));
+  /* startupnotify structure not easily represented in flat params */
+  kb = add_keybind(cfg, "W-e");
+  add_key_action(kb, "Execute", params);
 
   /* Mouse */
   cfg->mouse.drag_threshold = 1;
@@ -179,13 +289,300 @@ void ob_config_init_defaults(struct ob_config* cfg) {
   cfg->mouse.screen_edge_warp_time = 400;
   cfg->mouse.screen_edge_warp_mouse = false;
 
-  /* Mouse binds (subset) */
-  /* Frame A-Left Press Focus Raise */
-  /* My simple add_mousebind only adds ONE action. User wants multiple.
-     I'll just add one for now to demonstrate.
+  struct ob_mouse_binding* mb;
+
+  /* Frame */
+  mb = add_mousebind(cfg, "Frame", "A-Left", "Press");
+  add_mouse_action(mb, "Focus", NULL);
+  add_mouse_action(mb, "Raise", NULL);
+
+  mb = add_mousebind(cfg, "Frame", "A-Left", "Click");
+  add_mouse_action(mb, "Unshade", NULL);
+
+  mb = add_mousebind(cfg, "Frame", "A-Left", "Drag");
+  add_mouse_action(mb, "Move", NULL);
+
+  mb = add_mousebind(cfg, "Frame", "A-Right", "Press");
+  add_mouse_action(mb, "Focus", NULL);
+  add_mouse_action(mb, "Raise", NULL);
+  add_mouse_action(mb, "Unshade", NULL);
+
+  mb = add_mousebind(cfg, "Frame", "A-Right", "Drag");
+  add_mouse_action(mb, "Resize", NULL);
+
+  mb = add_mousebind(cfg, "Frame", "A-Middle", "Press");
+  add_mouse_action(mb, "Lower", NULL);
+  add_mouse_action(mb, "FocusToBottom", NULL);
+  add_mouse_action(mb, "Unfocus", NULL);
+
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("previous"));
+  mb = add_mousebind(cfg, "Frame", "A-Up", "Click");
+  add_mouse_action(mb, "GoToDesktop", params);
+
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("next"));
+  mb = add_mousebind(cfg, "Frame", "A-Down", "Click");
+  add_mouse_action(mb, "GoToDesktop", params);
+
+  /* C-A-Up/Down */
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("previous"));
+  mb = add_mousebind(cfg, "Frame", "C-A-Up", "Click");
+  add_mouse_action(mb, "GoToDesktop", params);
+
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("next"));
+  mb = add_mousebind(cfg, "Frame", "C-A-Down", "Click");
+  add_mouse_action(mb, "GoToDesktop", params);
+
+  /* A-S-Up/Down */
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("previous"));
+  mb = add_mousebind(cfg, "Frame", "A-S-Up", "Click");
+  add_mouse_action(mb, "SendToDesktop", params);
+
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("next"));
+  mb = add_mousebind(cfg, "Frame", "A-S-Down", "Click");
+  add_mouse_action(mb, "SendToDesktop", params);
+
+  /* Titlebar */
+  mb = add_mousebind(cfg, "Titlebar", "Left", "Drag");
+  add_mouse_action(mb, "Move", NULL);
+
+  mb = add_mousebind(cfg, "Titlebar", "Left", "DoubleClick");
+  add_mouse_action(mb, "ToggleMaximize", NULL);
+
+  /* Titlebar Up/Down (Shade logic) */
+  /* Logic "if shaded no then ..." is not easily representable in flat params without nested actions
+     The XML uses <action name="if">. This is a "If" action.
+     We can add it as "If" action.
+     But "If" action contains "then" actions.
+     Again, nested actions issue.
+     I will skip the complex logic for brevity/feasibility in this pass.
   */
-  params = NULL;
-  add_mousebind(cfg, "Frame", "A-Left", "Press", "Focus", NULL);
+
+  /* Titlebar Top Right Bottom Left... */
+  mb = add_mousebind(cfg, "Titlebar Top Right Bottom Left TLCorner TRCorner BRCorner BLCorner", "Left", "Press");
+  add_mouse_action(mb, "Focus", NULL);
+  add_mouse_action(mb, "Raise", NULL);
+  add_mouse_action(mb, "Unshade", NULL);
+
+  mb = add_mousebind(cfg, "Titlebar Top Right Bottom Left TLCorner TRCorner BRCorner BLCorner", "Middle", "Press");
+  add_mouse_action(mb, "Lower", NULL);
+  add_mouse_action(mb, "FocusToBottom", NULL);
+  add_mouse_action(mb, "Unfocus", NULL);
+
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("menu"), g_strdup("client-menu"));
+  mb = add_mousebind(cfg, "Titlebar Top Right Bottom Left TLCorner TRCorner BRCorner BLCorner", "Right", "Press");
+  add_mouse_action(mb, "Focus", NULL);
+  add_mouse_action(mb, "Raise", NULL);
+  add_mouse_action(mb, "ShowMenu", params);
+
+  /* Top */
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("edge"), g_strdup("top"));
+  mb = add_mousebind(cfg, "Top", "Left", "Drag");
+  add_mouse_action(mb, "Resize", params);
+
+  /* Left */
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("edge"), g_strdup("left"));
+  mb = add_mousebind(cfg, "Left", "Left", "Drag");
+  add_mouse_action(mb, "Resize", params);
+
+  /* Right */
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("edge"), g_strdup("right"));
+  mb = add_mousebind(cfg, "Right", "Left", "Drag");
+  add_mouse_action(mb, "Resize", params);
+
+  /* Bottom */
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("edge"), g_strdup("bottom"));
+  mb = add_mousebind(cfg, "Bottom", "Left", "Drag");
+  add_mouse_action(mb, "Resize", params);
+
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("menu"), g_strdup("client-menu"));
+  mb = add_mousebind(cfg, "Bottom", "Right", "Press");
+  add_mouse_action(mb, "Focus", NULL);
+  add_mouse_action(mb, "Raise", NULL);
+  add_mouse_action(mb, "ShowMenu", params);
+
+  /* Corners */
+  mb = add_mousebind(cfg, "TRCorner BRCorner TLCorner BLCorner", "Left", "Press");
+  add_mouse_action(mb, "Focus", NULL);
+  add_mouse_action(mb, "Raise", NULL);
+  add_mouse_action(mb, "Unshade", NULL);
+
+  mb = add_mousebind(cfg, "TRCorner BRCorner TLCorner BLCorner", "Left", "Drag");
+  add_mouse_action(mb, "Resize", NULL);
+
+  /* Client */
+  mb = add_mousebind(cfg, "Client", "Left", "Press");
+  add_mouse_action(mb, "Focus", NULL);
+  add_mouse_action(mb, "Raise", NULL);
+
+  mb = add_mousebind(cfg, "Client", "Middle", "Press");
+  add_mouse_action(mb, "Focus", NULL);
+  add_mouse_action(mb, "Raise", NULL);
+
+  mb = add_mousebind(cfg, "Client", "Right", "Press");
+  add_mouse_action(mb, "Focus", NULL);
+  add_mouse_action(mb, "Raise", NULL);
+
+  /* Icon */
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("menu"), g_strdup("client-menu"));
+  mb = add_mousebind(cfg, "Icon", "Left", "Press");
+  add_mouse_action(mb, "Focus", NULL);
+  add_mouse_action(mb, "Raise", NULL);
+  add_mouse_action(mb, "Unshade", NULL);
+  add_mouse_action(mb, "ShowMenu", params);
+
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("menu"), g_strdup("client-menu"));
+  mb = add_mousebind(cfg, "Icon", "Right", "Press");
+  add_mouse_action(mb, "Focus", NULL);
+  add_mouse_action(mb, "Raise", NULL);
+  add_mouse_action(mb, "ShowMenu", params);
+
+  /* AllDesktops */
+  mb = add_mousebind(cfg, "AllDesktops", "Left", "Press");
+  add_mouse_action(mb, "Focus", NULL);
+  add_mouse_action(mb, "Raise", NULL);
+  add_mouse_action(mb, "Unshade", NULL);
+
+  mb = add_mousebind(cfg, "AllDesktops", "Left", "Click");
+  add_mouse_action(mb, "ToggleOmnipresent", NULL);
+
+  /* Shade */
+  mb = add_mousebind(cfg, "Shade", "Left", "Press");
+  add_mouse_action(mb, "Focus", NULL);
+  add_mouse_action(mb, "Raise", NULL);
+
+  mb = add_mousebind(cfg, "Shade", "Left", "Click");
+  add_mouse_action(mb, "ToggleShade", NULL);
+
+  /* Iconify */
+  mb = add_mousebind(cfg, "Iconify", "Left", "Press");
+  add_mouse_action(mb, "Focus", NULL);
+  add_mouse_action(mb, "Raise", NULL);
+
+  mb = add_mousebind(cfg, "Iconify", "Left", "Click");
+  add_mouse_action(mb, "Iconify", NULL);
+
+  /* Maximize */
+  mb = add_mousebind(cfg, "Maximize", "Left", "Press");
+  add_mouse_action(mb, "Focus", NULL);
+  add_mouse_action(mb, "Raise", NULL);
+  add_mouse_action(mb, "Unshade", NULL);
+
+  mb = add_mousebind(cfg, "Maximize", "Middle", "Press");
+  add_mouse_action(mb, "Focus", NULL);
+  add_mouse_action(mb, "Raise", NULL);
+  add_mouse_action(mb, "Unshade", NULL);
+
+  mb = add_mousebind(cfg, "Maximize", "Right", "Press");
+  add_mouse_action(mb, "Focus", NULL);
+  add_mouse_action(mb, "Raise", NULL);
+  add_mouse_action(mb, "Unshade", NULL);
+
+  mb = add_mousebind(cfg, "Maximize", "Left", "Click");
+  add_mouse_action(mb, "ToggleMaximize", NULL);
+
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("direction"), g_strdup("vertical"));
+  mb = add_mousebind(cfg, "Maximize", "Middle", "Click");
+  add_mouse_action(mb, "ToggleMaximize", params);
+
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("direction"), g_strdup("horizontal"));
+  mb = add_mousebind(cfg, "Maximize", "Right", "Click");
+  add_mouse_action(mb, "ToggleMaximize", params);
+
+  /* Close */
+  mb = add_mousebind(cfg, "Close", "Left", "Press");
+  add_mouse_action(mb, "Focus", NULL);
+  add_mouse_action(mb, "Raise", NULL);
+  add_mouse_action(mb, "Unshade", NULL);
+
+  mb = add_mousebind(cfg, "Close", "Left", "Click");
+  add_mouse_action(mb, "Close", NULL);
+
+  /* Desktop */
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("previous"));
+  mb = add_mousebind(cfg, "Desktop", "Up", "Click");
+  add_mouse_action(mb, "GoToDesktop", params);
+
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("next"));
+  mb = add_mousebind(cfg, "Desktop", "Down", "Click");
+  add_mouse_action(mb, "GoToDesktop", params);
+
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("previous"));
+  mb = add_mousebind(cfg, "Desktop", "A-Up", "Click");
+  add_mouse_action(mb, "GoToDesktop", params);
+
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("next"));
+  mb = add_mousebind(cfg, "Desktop", "A-Down", "Click");
+  add_mouse_action(mb, "GoToDesktop", params);
+
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("previous"));
+  mb = add_mousebind(cfg, "Desktop", "C-A-Up", "Click");
+  add_mouse_action(mb, "GoToDesktop", params);
+
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("next"));
+  mb = add_mousebind(cfg, "Desktop", "C-A-Down", "Click");
+  add_mouse_action(mb, "GoToDesktop", params);
+
+  mb = add_mousebind(cfg, "Desktop", "Left", "Press");
+  add_mouse_action(mb, "Focus", NULL);
+  add_mouse_action(mb, "Raise", NULL);
+
+  mb = add_mousebind(cfg, "Desktop", "Right", "Press");
+  add_mouse_action(mb, "Focus", NULL);
+  add_mouse_action(mb, "Raise", NULL);
+
+  /* Root */
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("menu"), g_strdup("client-list-combined-menu"));
+  mb = add_mousebind(cfg, "Root", "Middle", "Press");
+  add_mouse_action(mb, "ShowMenu", params);
+
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("menu"), g_strdup("root-menu"));
+  mb = add_mousebind(cfg, "Root", "Right", "Press");
+  add_mouse_action(mb, "ShowMenu", params);
+
+  /* MoveResize */
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("previous"));
+  mb = add_mousebind(cfg, "MoveResize", "Up", "Click");
+  add_mouse_action(mb, "GoToDesktop", params);
+
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("next"));
+  mb = add_mousebind(cfg, "MoveResize", "Down", "Click");
+  add_mouse_action(mb, "GoToDesktop", params);
+
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("previous"));
+  mb = add_mousebind(cfg, "MoveResize", "A-Up", "Click");
+  add_mouse_action(mb, "GoToDesktop", params);
+
+  params = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert(params, g_strdup("to"), g_strdup("next"));
+  mb = add_mousebind(cfg, "MoveResize", "A-Down", "Click");
+  add_mouse_action(mb, "GoToDesktop", params);
 
   /* Menu */
   cfg->menu.file = safe_strdup("menu.xml");

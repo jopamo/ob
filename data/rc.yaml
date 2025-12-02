@@ -1,0 +1,518 @@
+resistance:
+  strength: 10
+  screen_edge_strength: 20
+focus:
+  focusNew: yes
+  followMouse: no
+  focusLast: yes
+  underMouse: no
+  focusDelay: 200
+  raiseOnFocus: no
+placement:
+  policy: UnderMouse
+  center: yes
+  monitor: Mouse
+  primaryMonitor: Mouse
+theme:
+  name: Mikachu
+  titleLayout: NLIMC
+  keepBorder: yes
+  animateIconify: yes
+  font:
+    - place: ActiveWindow
+      name: Fira Code Retina
+      size: 12
+      weight: Normal
+      slant: Normal
+    - place: InactiveWindow
+      name: Fira Code Retina
+      size: 12
+      weight: Normal
+      slant: Normal
+    - place: MenuHeader
+      name: Fira Code Retina
+      size: 12
+      weight: Normal
+      slant: Normal
+    - place: MenuItem
+      name: Fira Code Retina
+      size: 12
+      weight: Normal
+      slant: Normal
+    - place: ActiveOnScreenDisplay
+      name: Fira Code Retina
+      size: 12
+      weight: Normal
+      slant: Normal
+    - place: InactiveOnScreenDisplay
+      name: Fira Code Retina
+      size: 12
+      weight: Normal
+      slant: Normal
+desktops:
+  number: 1
+  firstdesk: 1
+  names: []
+  popupTime: 875
+resize:
+  drawContents: yes
+  popupShow: Nonpixel
+  popupPosition: Center
+  popupFixedPosition:
+    x: 10
+    y: 10
+margins:
+  top: 0
+  bottom: 0
+  left: 0
+  right: 0
+dock:
+  position: TopLeft
+  floatingX: 0
+  floatingY: 0
+  noStrut: no
+  stacking: Above
+  direction: Vertical
+  autoHide: no
+  hideDelay: 300
+  showDelay: 300
+  moveButton: Middle
+keyboard:
+  chainQuitKey: C-g
+  keybind:
+    - key: C-A-Left
+      action:
+        - name: GoToDesktop
+          to: left
+          wrap: no
+    - key: C-A-Right
+      action:
+        - name: GoToDesktop
+          to: right
+          wrap: no
+    - key: C-A-Up
+      action:
+        - name: GoToDesktop
+          to: up
+          wrap: no
+    - key: C-A-Down
+      action:
+        - name: GoToDesktop
+          to: down
+          wrap: no
+    - key: S-A-Left
+      action:
+        - name: SendToDesktop
+          to: left
+          wrap: no
+    - key: S-A-Right
+      action:
+        - name: SendToDesktop
+          to: right
+          wrap: no
+    - key: S-A-Up
+      action:
+        - name: SendToDesktop
+          to: up
+          wrap: no
+    - key: S-A-Down
+      action:
+        - name: SendToDesktop
+          to: down
+          wrap: no
+    - key: W-F1
+      action:
+        - name: GoToDesktop
+          to: 1
+    - key: W-F2
+      action:
+        - name: GoToDesktop
+          to: 2
+    - key: W-F3
+      action:
+        - name: GoToDesktop
+          to: 3
+    - key: W-F4
+      action:
+        - name: GoToDesktop
+          to: 4
+    - key: W-d
+      action:
+        - name: ToggleShowDesktop
+    - key: A-F4
+      action:
+        - name: Close
+    - key: A-Escape
+      action:
+        - name: Lower
+        - name: FocusToBottom
+        - name: Unfocus
+    - key: A-space
+      action:
+        - name: ShowMenu
+          menu: client-menu
+    - key: A-Tab
+      action:
+        - name: NextWindow
+    - key: A-S-Tab
+      action:
+        - name: PreviousWindow
+    - key: C-A-Tab
+      action:
+        - name: NextWindow
+          panels: yes
+          desktop: yes
+    - key: W-S-Right
+      action:
+        - name: DirectionalCycleWindows
+          direction: right
+    - key: W-S-Left
+      action:
+        - name: DirectionalCycleWindows
+          direction: left
+    - key: W-S-Up
+      action:
+        - name: DirectionalCycleWindows
+          direction: up
+    - key: W-S-Down
+      action:
+        - name: DirectionalCycleWindows
+          direction: down
+    - key: W-e
+      action:
+        - name: Execute
+          command: kfmclient openProfile filemanagement
+mouse:
+  dragThreshold: 1
+  doubleClickTime: 500
+  screenEdgeWarpTime: 400
+  screenEdgeWarpMouse: false
+  context:
+    - name: Frame
+      mousebind:
+        - button: A-Left
+          action: Press
+          do:
+            - Focus
+            - Raise
+        - button: A-Left
+          action: Click
+          do:
+            - Unshade
+        - button: A-Left
+          action: Drag
+          do:
+            - Move
+        - button: A-Right
+          action: Press
+          do:
+            - Focus
+            - Raise
+            - Unshade
+        - button: A-Right
+          action: Drag
+          do:
+            - Resize
+        - button: A-Middle
+          action: Press
+          do:
+            - Lower
+            - FocusToBottom
+            - Unfocus
+        - button: A-Up
+          action: Click
+          do:
+            - GoToDesktop
+        - button: A-Down
+          action: Click
+          do:
+            - GoToDesktop
+        - button: C-A-Up
+          action: Click
+          do:
+            - GoToDesktop
+        - button: C-A-Down
+          action: Click
+          do:
+            - GoToDesktop
+        - button: A-S-Up
+          action: Click
+          do:
+            - SendToDesktop
+        - button: A-S-Down
+          action: Click
+          do:
+            - SendToDesktop
+    - name: Titlebar
+      mousebind:
+        - button: Left
+          action: Drag
+          do:
+            - Move
+        - button: Left
+          action: DoubleClick
+          do:
+            - ToggleMaximize
+        - button: Up
+          action: Click
+          do:
+            - Shade
+            - FocusToBottom
+            - Unfocus
+            - Lower
+        - button: Down
+          action: Click
+          do:
+            - Unshade
+            - Raise
+    - name: Titlebar Top Right Bottom Left TLCorner TRCorner BRCorner BLCorner
+      mousebind:
+        - button: Left
+          action: Press
+          do:
+            - Focus
+            - Raise
+            - Unshade
+        - button: Middle
+          action: Press
+          do:
+            - Lower
+            - FocusToBottom
+            - Unfocus
+        - button: Right
+          action: Press
+          do:
+            - Focus
+            - Raise
+            - ShowMenu
+    - name: Top
+      mousebind:
+        - button: Left
+          action: Drag
+          do:
+            - Resize
+    - name: Left
+      mousebind:
+        - button: Left
+          action: Drag
+          do:
+            - Resize
+    - name: Right
+      mousebind:
+        - button: Left
+          action: Drag
+          do:
+            - Resize
+    - name: Bottom
+      mousebind:
+        - button: Left
+          action: Drag
+          do:
+            - Resize
+        - button: Right
+          action: Press
+          do:
+            - Focus
+            - Raise
+            - ShowMenu
+    - name: TRCorner BRCorner TLCorner BLCorner
+      mousebind:
+        - button: Left
+          action: Press
+          do:
+            - Focus
+            - Raise
+            - Unshade
+        - button: Left
+          action: Drag
+          do:
+            - Resize
+    - name: Client
+      mousebind:
+        - button: Left
+          action: Press
+          do:
+            - Focus
+            - Raise
+        - button: Middle
+          action: Press
+          do:
+            - Focus
+            - Raise
+        - button: Right
+          action: Press
+          do:
+            - Focus
+            - Raise
+    - name: Icon
+      mousebind:
+        - button: Left
+          action: Press
+          do:
+            - Focus
+            - Raise
+            - Unshade
+            - ShowMenu
+        - button: Right
+          action: Press
+          do:
+            - Focus
+            - Raise
+            - ShowMenu
+    - name: AllDesktops
+      mousebind:
+        - button: Left
+          action: Press
+          do:
+            - Focus
+            - Raise
+            - Unshade
+        - button: Left
+          action: Click
+          do:
+            - ToggleOmnipresent
+    - name: Shade
+      mousebind:
+        - button: Left
+          action: Press
+          do:
+            - Focus
+            - Raise
+        - button: Left
+          action: Click
+          do:
+            - ToggleShade
+    - name: Iconify
+      mousebind:
+        - button: Left
+          action: Press
+          do:
+            - Focus
+            - Raise
+        - button: Left
+          action: Click
+          do:
+            - Iconify
+    - name: Maximize
+      mousebind:
+        - button: Left
+          action: Press
+          do:
+            - Focus
+            - Raise
+            - Unshade
+        - button: Middle
+          action: Press
+          do:
+            - Focus
+            - Raise
+            - Unshade
+        - button: Right
+          action: Press
+          do:
+            - Focus
+            - Raise
+            - Unshade
+        - button: Left
+          action: Click
+          do:
+            - ToggleMaximize
+        - button: Middle
+          action: Click
+          do:
+            - ToggleMaximize
+        - button: Right
+          action: Click
+          do:
+            - ToggleMaximize
+    - name: Close
+      mousebind:
+        - button: Left
+          action: Press
+          do:
+            - Focus
+            - Raise
+            - Unshade
+        - button: Left
+          action: Click
+          do:
+            - Close
+    - name: Desktop
+      mousebind:
+        - button: Up
+          action: Click
+          do:
+            - GoToDesktop
+        - button: Down
+          action: Click
+          do:
+            - GoToDesktop
+        - button: A-Up
+          action: Click
+          do:
+            - GoToDesktop
+        - button: A-Down
+          action: Click
+          do:
+            - GoToDesktop
+        - button: C-A-Up
+          action: Click
+          do:
+            - GoToDesktop
+        - button: C-A-Down
+          action: Click
+          do:
+            - GoToDesktop
+        - button: Left
+          action: Press
+          do:
+            - Focus
+            - Raise
+        - button: Right
+          action: Press
+          do:
+            - Focus
+            - Raise
+    - name: Root
+      mousebind:
+        - button: Middle
+          action: Press
+          do:
+            - ShowMenu
+        - button: Right
+          action: Press
+          do:
+            - ShowMenu
+    - name: MoveResize
+      mousebind:
+        - button: Up
+          action: Click
+          do:
+            - GoToDesktop
+        - button: Down
+          action: Click
+          do:
+            - GoToDesktop
+        - button: A-Up
+          action: Click
+          do:
+            - GoToDesktop
+        - button: A-Down
+          action: Click
+          do:
+            - GoToDesktop
+menu:
+  file: menu.xml
+  hideDelay: 200
+  middle: no
+  submenuShowDelay: 100
+  submenuHideDelay: 400
+  showIcons: yes
+  manageDesktops: yes
+applications:
+  - application:
+      name: Firefox Nightly
+      decor: no
+  - application:
+      name: firefox-nightly-bin
+      decor: no
