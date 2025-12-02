@@ -7,7 +7,7 @@
 - [ ] `openbox/client.c`, `openbox/window.c` — window attribute/query, save-set, event mask changes via Xlib; move to XCB variants.
 - [ ] `openbox/frame.c`, `openbox/popup.c`, `openbox/prompt.c`, `openbox/focus_cycle_popup.c`, `openbox/focus_cycle_indicator.c`, `openbox/menuframe.c` — frame/popup creation, map/moveresize, cursor attributes via Xlib; map to XCB.
 - [x] `openbox/dock.c` — dockapp save-set, attribute queries, map/select via Xlib.
-- [ ] `openbox/screen.c` — support window setup and root selections via Xlib; convert to XCB.
+- [x] `openbox/screen.c` — support window setup and root selections via Xlib; convert to XCB.
 - [ ] `openbox/moveresize.c` — XSync alarms/events; evaluate XCB sync extension path or keep minimal Xlib interop.
 
 ## Tools using Xlib atoms/properties

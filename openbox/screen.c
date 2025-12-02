@@ -41,20 +41,29 @@
 #include "openbox/x11/x11.h"
 
 #include <X11/Xlib.h>
+#include <X11/Xlib-xcb.h>
+#include <xcb/xcb.h>
 #ifdef HAVE_UNISTD_H
 #include <sys/types.h>
 #include <unistd.h>
 #endif
+#include <stdlib.h>
 #include <assert.h>
 
 /*! The event mask to grab on the root window */
-#define ROOT_EVENTMASK                                                                                       \
-  (StructureNotifyMask | PropertyChangeMask | EnterWindowMask | LeaveWindowMask | SubstructureRedirectMask | \
-   FocusChangeMask | ButtonPressMask | ButtonReleaseMask)
+static const uint32_t ROOT_EVENT_MASK = XCB_EVENT_MASK_STRUCTURE_NOTIFY | XCB_EVENT_MASK_PROPERTY_CHANGE |
+                                        XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_LEAVE_WINDOW |
+                                        XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT | XCB_EVENT_MASK_FOCUS_CHANGE |
+                                        XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE;
 
 static gboolean screen_validate_layout(ObDesktopLayout* l);
 static gboolean replace_wm(void);
 static void screen_fallback_focus(void);
+
+static xcb_connection_t* screen_xcb(void) {
+  g_return_val_if_fail(obt_display != NULL, NULL);
+  return XGetXCBConnection(obt_display);
+}
 
 guint screen_num_desktops;
 guint screen_num_monitors;
@@ -89,39 +98,54 @@ static gboolean desktop_popup_perm;
 static gboolean replace_wm(void) {
   gchar* wm_sn;
   Atom wm_sn_atom;
-  Window current_wm_sn_owner;
+  xcb_window_t current_wm_sn_owner = XCB_WINDOW_NONE;
   Time timestamp;
+  xcb_connection_t* conn;
+  xcb_get_selection_owner_reply_t* owner_reply = NULL;
+  xcb_get_selection_owner_reply_t* verify_reply = NULL;
+  gboolean ret = FALSE;
+
+  conn = screen_xcb();
+  if (!conn)
+    return FALSE;
 
   wm_sn = g_strdup_printf("WM_S%d", ob_screen);
   wm_sn_atom = ob_x11_atom(wm_sn);
   g_free(wm_sn);
 
-  current_wm_sn_owner = XGetSelectionOwner(obt_display, wm_sn_atom);
+  if (wm_sn_atom == None)
+    return FALSE;
+
+  owner_reply = xcb_get_selection_owner_reply(conn, xcb_get_selection_owner(conn, wm_sn_atom), NULL);
+  if (owner_reply)
+    current_wm_sn_owner = owner_reply->owner;
+
   if (current_wm_sn_owner == screen_support_win)
-    current_wm_sn_owner = None;
+    current_wm_sn_owner = XCB_WINDOW_NONE;
   if (current_wm_sn_owner) {
     if (!ob_replace_wm) {
       g_message(_("A window manager is already running on screen %d"), ob_screen);
-      return FALSE;
+      goto done;
     }
-    obt_display_ignore_errors(TRUE);
 
     /* We want to find out when the current selection owner dies */
-    XSelectInput(obt_display, current_wm_sn_owner, StructureNotifyMask);
-    XSync(obt_display, FALSE);
-
-    obt_display_ignore_errors(FALSE);
-    if (obt_display_error_occured)
-      current_wm_sn_owner = None;
+    uint32_t mask = XCB_EVENT_MASK_STRUCTURE_NOTIFY;
+    xcb_generic_error_t* err = xcb_request_check(
+        conn, xcb_change_window_attributes_checked(conn, current_wm_sn_owner, XCB_CW_EVENT_MASK, &mask));
+    if (err) {
+      current_wm_sn_owner = XCB_WINDOW_NONE;
+      free(err);
+    }
   }
 
   timestamp = event_time();
 
-  XSetSelectionOwner(obt_display, wm_sn_atom, screen_support_win, timestamp);
+  xcb_set_selection_owner(conn, screen_support_win, wm_sn_atom, timestamp);
 
-  if (XGetSelectionOwner(obt_display, wm_sn_atom) != screen_support_win) {
+  verify_reply = xcb_get_selection_owner_reply(conn, xcb_get_selection_owner(conn, wm_sn_atom), NULL);
+  if (!verify_reply || verify_reply->owner != screen_support_win) {
     g_message(_("Could not acquire window manager selection on screen %d"), ob_screen);
-    return FALSE;
+    goto done;
   }
 
   /* Wait for old window manager to go away */
@@ -130,7 +154,7 @@ static gboolean replace_wm(void) {
     const gulong timeout = G_USEC_PER_SEC * 15; /* wait for 15s max */
     ObtXQueueWindowType wt;
 
-    wt.window = current_wm_sn_owner;
+    wt.window = (Window)current_wm_sn_owner;
     wt.type = DestroyNotify;
 
     while (wait < timeout) {
@@ -143,7 +167,7 @@ static gboolean replace_wm(void) {
 
     if (wait >= timeout) {
       g_message(_("The WM on screen %d is not exiting"), ob_screen);
-      return FALSE;
+      goto done;
     }
   }
 
@@ -151,35 +175,56 @@ static gboolean replace_wm(void) {
   obt_prop_message(ob_screen, obt_root(ob_screen), OBT_PROP_ATOM(MANAGER), timestamp, wm_sn_atom, screen_support_win, 0,
                    0, SubstructureNotifyMask);
 
-  return TRUE;
+  xcb_flush(conn);
+  ret = TRUE;
+
+done:
+  free(owner_reply);
+  free(verify_reply);
+  return ret;
 }
 
 gboolean screen_annex(void) {
-  XSetWindowAttributes attrib;
   pid_t pid;
   gint i, num_support;
   gulong* supported;
+  xcb_connection_t* conn;
+  xcb_generic_error_t* err;
+  uint32_t root_event_mask;
+  xcb_window_t support_win;
+
+  conn = screen_xcb();
+  if (!conn)
+    return FALSE;
 
   /* create the netwm support window */
-  attrib.override_redirect = TRUE;
-  attrib.event_mask = PropertyChangeMask;
-  screen_support_win = XCreateWindow(obt_display, obt_root(ob_screen), -100, -100, 1, 1, 0, CopyFromParent, InputOutput,
-                                     CopyFromParent, CWEventMask | CWOverrideRedirect, &attrib);
-  XMapWindow(obt_display, screen_support_win);
-  XLowerWindow(obt_display, screen_support_win);
+  support_win = xcb_generate_id(conn);
+  if (support_win == XCB_WINDOW_NONE)
+    return FALSE;
+  uint32_t values[] = {XCB_EVENT_MASK_PROPERTY_CHANGE, 1};
+  xcb_create_window(conn, XCB_COPY_FROM_PARENT, support_win, obt_root(ob_screen), -100, -100, 1, 1, 0,
+                    XCB_WINDOW_CLASS_INPUT_OUTPUT, XCB_COPY_FROM_PARENT, XCB_CW_EVENT_MASK | XCB_CW_OVERRIDE_REDIRECT,
+                    values);
+  xcb_map_window(conn, support_win);
+  uint32_t stack_mode = XCB_STACK_MODE_BELOW;
+  xcb_configure_window(conn, support_win, XCB_CONFIG_WINDOW_STACK_MODE, &stack_mode);
+  screen_support_win = support_win;
 
   if (!replace_wm()) {
-    XDestroyWindow(obt_display, screen_support_win);
+    xcb_destroy_window(conn, screen_support_win);
+    xcb_flush(conn);
     return FALSE;
   }
 
-  obt_display_ignore_errors(TRUE);
-  XSelectInput(obt_display, obt_root(ob_screen), ROOT_EVENTMASK);
-  obt_display_ignore_errors(FALSE);
-  if (obt_display_error_occured) {
+  root_event_mask = ROOT_EVENT_MASK;
+  err = xcb_request_check(
+      conn, xcb_change_window_attributes_checked(conn, obt_root(ob_screen), XCB_CW_EVENT_MASK, &root_event_mask));
+  if (err) {
     g_message(_("A window manager is already running on screen %d"), ob_screen);
 
-    XDestroyWindow(obt_display, screen_support_win);
+    xcb_destroy_window(conn, screen_support_win);
+    free(err);
+    xcb_flush(conn);
     return FALSE;
   }
 
@@ -409,7 +454,13 @@ void screen_shutdown(gboolean reconfig) {
   if (reconfig)
     return;
 
-  XSelectInput(obt_display, obt_root(ob_screen), NoEventMask);
+  xcb_connection_t* conn = screen_xcb();
+  if (conn) {
+    uint32_t mask = XCB_EVENT_MASK_NO_EVENT;
+    xcb_change_window_attributes(conn, obt_root(ob_screen), XCB_CW_EVENT_MASK, &mask);
+    xcb_destroy_window(conn, screen_support_win);
+    xcb_flush(conn);
+  }
 
   /* we're not running here no more! */
   OBT_PROP_ERASE(obt_root(ob_screen), OPENBOX_PID);
@@ -418,8 +469,6 @@ void screen_shutdown(gboolean reconfig) {
   /* don't keep this mode */
   OBT_PROP_ERASE(obt_root(ob_screen), NET_SHOWING_DESKTOP);
   OBT_PROP_ERASE(obt_root(ob_screen), NET_WM_HANDLED_ICONS);
-
-  XDestroyWindow(obt_display, screen_support_win);
 
   g_strfreev(screen_desktop_names);
   screen_desktop_names = NULL;
