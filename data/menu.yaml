@@ -1,0 +1,100 @@
+- label: qterminal
+  icon: /usr/share/icons/hicolor/64x64/apps/qterminal.png
+  action: Execute
+  command: qterminal
+- label: firefox-nightly-bin
+  icon: /usr/share/pixmaps/firefox.svg
+  action: Execute
+  command: firefox-nightly-bin
+- label: brave-nightly-bin
+  icon: /usr/share/pixmaps/brave.svg
+  action: Execute
+  command: brave-nightly-bin
+- label: google-chrome-unstable
+  icon: /usr/share/pixmaps/chrome.svg
+  action: Execute
+  command: google-chrome-unstable
+- label: chromium
+  icon: /usr/share/pixmaps/chromium.png
+  action: Execute
+  command: chromium
+- label: pcmanfm-qt
+  icon: /usr/share/icons/hicolor/scalable/apps/pcmanfm-qt.svg
+  action: Execute
+  command: pcmanfm-qt
+- label: lxqt-config
+  icon: /usr/share/icons/hicolor/scalable/apps/lxqt.svg
+  action: Execute
+  command: lxqt-config
+- label: featherpad
+  icon: /usr/share/icons/hicolor/scalable/apps/featherpad.svg
+  action: Execute
+  command: featherpad
+- label: keepassxc
+  icon: /usr/share/icons/hicolor/256x256/apps/keepassxc.png
+  action: Execute
+  command: env QT_STYLE_OVERRIDE=Adwaita-Dark keepassxc
+- label: wireshark
+  icon: /usr/share/icons/hicolor/128x128/apps/org.wireshark.Wireshark.png
+  action: Execute
+  command: env QT_STYLE_OVERRIDE=Adwaita-Dark wireshark
+- label: qalculate-gtk
+  icon: /usr/share/icons/hicolor/128x128/apps/qalculate.png
+  action: Execute
+  command: qalculate-gtk
+- label: qbittorrent
+  icon: /usr/share/icons/hicolor/128x128/apps/qbittorrent.png
+  action: Execute
+  command: qbittorrent
+- label: pavucontrol-qt
+  icon: /usr/share/pixmaps/coolspeaker.svg
+  action: Execute
+  command: pavucontrol-qt
+- label: flameshot
+  icon: /usr/share/icons/hicolor/48x48/apps/flameshot.png
+  action: Execute
+  command: flameshot
+- label: texxy
+  icon: /usr/share/icons/hicolor/256x256/apps/texxy.png
+  action: Execute
+  command: texxy
+- label: 1term
+  icon: /usr/share/icons/hicolor/256x256/apps/1term.png
+  action: Execute
+  command: 1term
+- label: libreoffice-bin
+  icon: /usr/share/icons/hicolor/scalable/apps/libreoffice-main.svg
+  action: Execute
+  command: libreoffice-bin
+- label: 1t
+  icon: /usr/share/icons/hicolor/256x256/apps/1t.png
+  action: Execute
+  command: 1t
+- label: st
+  icon: /usr/share/icons/hicolor/256x256/apps/1term.png
+  action: Execute
+  command: st
+- separator: yes
+- label: Preferences
+  submenu:
+    - label: Reconfigure
+      action: Reconfigure
+    - label: Restart
+      action: Restart
+- label: Monitor Control
+  submenu:
+    - label: Disable eDP-1
+      action: Execute
+      command: xrandr --output eDP-1 --off
+    - label: Enable eDP-1
+      action: Execute
+      command: xrandr --output eDP-1 --auto
+    - label: Disable DP-1
+      action: Execute
+      command: xrandr --output DP-1 --off
+    - label: Enable DP-1
+      action: Execute
+      command: xrandr --output DP-1 --auto
+- label: Exit
+  action: Execute
+  command: openbox --exit

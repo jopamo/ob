@@ -334,6 +334,21 @@ gint main(gint argc, gchar** argv) {
         ob_keyboard_apply(conf.keybinds, conf.keybind_count);
         ob_mouse_apply(conf.mouse_bindings, conf.mouse_binding_count);
         ob_rules_apply(conf.window_rules, conf.window_rule_count);
+
+        if (conf.menu.file) {
+          gchar* menu_path;
+          if (g_path_is_absolute(conf.menu.file))
+            menu_path = g_strdup(conf.menu.file);
+          else
+            menu_path = g_build_filename(g_get_user_config_dir(), "openbox", conf.menu.file, NULL);
+
+          if (!ob_config_load_menu_file(menu_path, &conf)) {
+            /* Try system config dir? Or just warn. For now just warn. */
+            g_message("Failed to load menu file %s", menu_path);
+          }
+          g_free(menu_path);
+        }
+
         ob_menu_apply(&conf.menu);
 
         ob_config_free(&conf);

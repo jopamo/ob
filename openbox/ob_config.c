@@ -35,17 +35,19 @@ static void add_font(struct ob_theme_config* theme,
 static struct ob_keybind* add_keybind(struct ob_config* cfg, const char* key) {
   cfg->keybinds = g_renew(struct ob_keybind, cfg->keybinds, cfg->keybind_count + 1);
   struct ob_keybind* kb = &cfg->keybinds[cfg->keybind_count++];
-  memset(kb, 0, sizeof(*mb));
+  memset(kb, 0, sizeof(*kb));
   kb->key = safe_strdup(key);
   return kb;
 }
 
 static void add_key_action(struct ob_keybind* kb, const char* act_name, GHashTable* params) {
   kb->actions = g_renew(struct ob_key_action, kb->actions, kb->action_count + 1);
-  kb->actions[kb->action_count].name = safe_strdup(act_name);
-  kb->actions[kb->action_count].params = params;
+  struct ob_key_action* action = &kb->actions[kb->action_count];
+  memset(action, 0, sizeof(*action));
+  action->name = safe_strdup(act_name);
+  action->params = params;
   if (params && g_hash_table_lookup(params, "command"))
-    kb->actions[kb->action_count].command = g_strdup(g_hash_table_lookup(params, "command"));
+    action->command = g_strdup(g_hash_table_lookup(params, "command"));
   kb->action_count++;
 }
 
@@ -64,8 +66,10 @@ static struct ob_mouse_binding* add_mousebind(struct ob_config* cfg,
 
 static void add_mouse_action(struct ob_mouse_binding* mb, const char* act_name, GHashTable* params) {
   mb->actions = g_renew(struct ob_mouse_action, mb->actions, mb->action_count + 1);
-  mb->actions[mb->action_count].name = safe_strdup(act_name);
-  mb->actions[mb->action_count].params = params;
+  struct ob_mouse_action* action = &mb->actions[mb->action_count];
+  memset(action, 0, sizeof(*action));
+  action->name = safe_strdup(act_name);
+  action->params = params;
   mb->action_count++;
 }
 
@@ -585,7 +589,7 @@ void ob_config_init_defaults(struct ob_config* cfg) {
   add_mouse_action(mb, "GoToDesktop", params);
 
   /* Menu */
-  cfg->menu.file = safe_strdup("menu.xml");
+  cfg->menu.file = safe_strdup("menu.yaml");
   cfg->menu.hide_delay = 200;
   cfg->menu.middle = false;
   cfg->menu.submenu_show_delay = 100;

@@ -188,6 +188,7 @@ void ob_config_init_defaults(struct ob_config* cfg);
 void ob_config_free(struct ob_config* cfg);
 bool ob_config_validate(const struct ob_config* cfg, FILE* log_fp);
 bool ob_config_load_yaml(const char* path, struct ob_config* cfg);
+bool ob_config_load_menu_file(const char* path, struct ob_config* cfg);
 bool ob_config_dump_yaml(const struct ob_config* cfg, FILE* out);
 
 void ob_desktops_apply(const struct ob_desktops_config* cfg);

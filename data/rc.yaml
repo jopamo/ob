@@ -502,7 +502,7 @@ mouse:
           do:
             - GoToDesktop
 menu:
-  file: menu.xml
+  file: menu.yaml
   hideDelay: 200
   middle: no
   submenuShowDelay: 100

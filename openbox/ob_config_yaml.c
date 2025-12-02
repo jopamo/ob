@@ -646,6 +646,38 @@ bool ob_config_load_yaml(const char* path, struct ob_config* cfg) {
   return true;
 }
 
+bool ob_config_load_menu_file(const char* path, struct ob_config* cfg) {
+  FILE* fh = fopen(path, "r");
+  if (!fh)
+    return false;
+  yaml_parser_t parser;
+  yaml_document_t document;
+  if (!yaml_parser_initialize(&parser)) {
+    fclose(fh);
+    return false;
+  }
+  yaml_parser_set_input_file(&parser, fh);
+  if (!yaml_parser_load(&parser, &document)) {
+    yaml_parser_delete(&parser);
+    fclose(fh);
+    return false;
+  }
+  yaml_node_t* root = yaml_document_get_root_node(&document);
+  if (!root || root->type != YAML_SEQUENCE_NODE) {
+    yaml_document_delete(&document);
+    yaml_parser_delete(&parser);
+    fclose(fh);
+    return false;
+  }
+
+  parse_menu_items(&document, root, &cfg->menu.root, &cfg->menu.root_count);
+
+  yaml_document_delete(&document);
+  yaml_parser_delete(&parser);
+  fclose(fh);
+  return true;
+}
+
 bool ob_config_dump_yaml(const struct ob_config* cfg, FILE* out) {
   yaml_emitter_t emitter;
   yaml_event_t event;
