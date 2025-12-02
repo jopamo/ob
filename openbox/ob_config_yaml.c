@@ -648,22 +648,28 @@ bool ob_config_load_yaml(const char* path, struct ob_config* cfg) {
 
 bool ob_config_load_menu_file(const char* path, struct ob_config* cfg) {
   FILE* fh = fopen(path, "r");
-  if (!fh)
+  if (!fh) {
+    g_message("Menu YAML: unable to open %s: %s", path, g_strerror(errno));
     return false;
+  }
   yaml_parser_t parser;
   yaml_document_t document;
   if (!yaml_parser_initialize(&parser)) {
+    g_message("Menu YAML: failed to initialize parser for %s", path);
     fclose(fh);
     return false;
   }
   yaml_parser_set_input_file(&parser, fh);
   if (!yaml_parser_load(&parser, &document)) {
+    g_message("Menu YAML: parse error in %s (line %ld): %s", path, (long)parser.problem_mark.line + 1,
+              parser.problem ? parser.problem : "unknown");
     yaml_parser_delete(&parser);
     fclose(fh);
     return false;
   }
   yaml_node_t* root = yaml_document_get_root_node(&document);
   if (!root || root->type != YAML_SEQUENCE_NODE) {
+    g_message("Menu YAML: root of %s is not a sequence", path);
     yaml_document_delete(&document);
     yaml_parser_delete(&parser);
     fclose(fh);
@@ -671,6 +677,7 @@ bool ob_config_load_menu_file(const char* path, struct ob_config* cfg) {
   }
 
   parse_menu_items(&document, root, &cfg->menu.root, &cfg->menu.root_count);
+  g_message("Menu YAML: loaded %zu top-level items from %s", cfg->menu.root_count, path);
 
   yaml_document_delete(&document);
   yaml_parser_delete(&parser);
