@@ -325,6 +325,12 @@ gint main(gint argc, gchar** argv) {
         ob_theme_apply(&conf.theme);
         ob_focus_apply(&conf.focus);
         ob_placement_apply(&conf.placement);
+        ob_resistance_apply(&conf.resistance);
+        ob_resize_apply(&conf.resize);
+        ob_margins_apply(&conf.margins);
+        ob_dock_apply(&conf.dock);
+        ob_keyboard_config_apply(&conf.keyboard);
+        ob_mouse_config_apply(&conf.mouse);
         ob_keyboard_apply(conf.keybinds, conf.keybind_count);
         ob_mouse_apply(conf.mouse_bindings, conf.mouse_binding_count);
         ob_rules_apply(conf.window_rules, conf.window_rule_count);

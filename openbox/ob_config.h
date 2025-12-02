@@ -6,19 +6,28 @@
 #include <stdio.h>
 #include <glib.h>
 
+struct ob_font_config {
+  char* place;
+  char* name;
+  int size;
+  char* weight;
+  char* slant;
+};
+
 struct ob_theme_config {
   char* name;
   char* title_layout;
   bool keep_border;
   bool animate_iconify;
   int window_list_icon_size;
-  /* Fonts could go here or separate */
+  struct ob_font_config* fonts;
+  size_t font_count;
 };
 
 struct ob_desktops_config {
   int count;
   int first;
-  char** names; /* Array of strings */
+  char** names;
   size_t names_count;
   int popup_time;
 };
@@ -38,8 +47,54 @@ enum ob_place_policy { OB_CONFIG_PLACE_POLICY_SMART, OB_CONFIG_PLACE_POLICY_MOUS
 struct ob_placement_config {
   enum ob_place_policy policy;
   bool center_new;
-  int monitor;         /* 0 for primary, or explicit index */
-  bool monitor_active; /* Place on active monitor */
+  int monitor;
+  bool monitor_active;
+};
+
+struct ob_resistance_config {
+  int strength;
+  int screen_edge_strength;
+};
+
+struct ob_resize_config {
+  bool draw_contents;
+  char* popup_show;
+  char* popup_position;
+  struct {
+    int x;
+    int y;
+  } popup_fixed_position;
+};
+
+struct ob_margins_config {
+  int top;
+  int bottom;
+  int left;
+  int right;
+};
+
+struct ob_dock_config {
+  char* position;
+  int floating_x;
+  int floating_y;
+  bool no_strut;
+  char* stacking;
+  char* direction;
+  bool auto_hide;
+  int hide_delay;
+  int show_delay;
+  char* move_button;
+};
+
+struct ob_keyboard_config {
+  char* chain_quit_key;
+};
+
+struct ob_mouse_config {
+  int drag_threshold;
+  int double_click_time;
+  int screen_edge_warp_time;
+  bool screen_edge_warp_mouse;
 };
 
 struct ob_key_action {
@@ -63,8 +118,8 @@ struct ob_mouse_action {
 
 struct ob_mouse_binding {
   char* context;
-  char* button; /* "left", "right", "middle", "button8", etc */
-  char* click;  /* "press", "release", "double", "drag" */
+  char* button;
+  char* click;
   struct ob_mouse_action* actions;
   size_t action_count;
 };
@@ -74,13 +129,13 @@ struct ob_window_rule {
   char* match_name;
   char* match_role;
 
-  int desktop; /* -1 for unchanged */
-  bool maximized;
-  bool fullscreen;
-  bool skip_taskbar;
-  bool skip_pager;
-  bool follow; /* Jump to desktop */
-               /* Add other rule properties as needed */
+  int desktop;
+  int maximized;
+  int fullscreen;
+  int skip_taskbar;
+  int skip_pager;
+  int follow;
+  int decor;
 };
 
 struct ob_menu_item {
@@ -95,14 +150,27 @@ struct ob_menu_item {
 struct ob_menu {
   struct ob_menu_item* root;
   size_t root_count;
+  char* file;
+  int hide_delay;
+  bool middle;
+  int submenu_show_delay;
+  int submenu_hide_delay;
+  bool show_icons;
+  bool manage_desktops;
 };
 
 struct ob_config {
   int version;
-  struct ob_theme_config theme;
-  struct ob_desktops_config desktops;
+  struct ob_resistance_config resistance;
   struct ob_focus_config focus;
   struct ob_placement_config placement;
+  struct ob_theme_config theme;
+  struct ob_desktops_config desktops;
+  struct ob_resize_config resize;
+  struct ob_margins_config margins;
+  struct ob_dock_config dock;
+  struct ob_keyboard_config keyboard;
+  struct ob_mouse_config mouse;
 
   struct ob_keybind* keybinds;
   size_t keybind_count;
@@ -130,5 +198,12 @@ void ob_keyboard_apply(const struct ob_keybind* keybinds, size_t count);
 void ob_mouse_apply(const struct ob_mouse_binding* bindings, size_t count);
 void ob_rules_apply(const struct ob_window_rule* rules, size_t count);
 void ob_menu_apply(struct ob_menu* menu);
+
+void ob_resistance_apply(const struct ob_resistance_config* cfg);
+void ob_resize_apply(const struct ob_resize_config* cfg);
+void ob_margins_apply(const struct ob_margins_config* cfg);
+void ob_dock_apply(const struct ob_dock_config* cfg);
+void ob_keyboard_config_apply(const struct ob_keyboard_config* cfg);
+void ob_mouse_config_apply(const struct ob_mouse_config* cfg);
 
 #endif
