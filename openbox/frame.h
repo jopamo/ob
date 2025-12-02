@@ -23,6 +23,10 @@
 #include "geom.h"
 #include "obrender/render.h"
 
+#include <xcb/xcb.h>
+#include <X11/Xlib.h>
+#include <glib.h>
+
 typedef struct _ObFrame ObFrame;
 
 struct _ObClient;
@@ -141,7 +145,7 @@ struct _ObFrame {
   Window trrresize;
 
   Colormap colormap;
-  Visual* colormap_visual;
+  xcb_visualid_t colormap_visual;
 
   gint icon_on;    /* if the window icon button is on */
   gint label_on;   /* if the window title is on */

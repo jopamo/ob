@@ -33,10 +33,22 @@
 #include "obt/xqueue.h"
 #include "obt/prop.h"
 
-#define FRAME_EVENTMASK \
-  (EnterWindowMask | LeaveWindowMask | ButtonPressMask | ButtonReleaseMask | SubstructureRedirectMask | FocusChangeMask)
-#define ELEMENT_EVENTMASK \
-  (ButtonPressMask | ButtonReleaseMask | ButtonMotionMask | PointerMotionMask | EnterWindowMask | LeaveWindowMask)
+#include <X11/Xlib.h>
+#include <X11/Xlib-xcb.h>
+#include <xcb/xcb.h>
+#ifdef SHAPE
+#include <xcb/shape.h>
+#endif
+#ifdef DAMAGE
+#include <X11/extensions/Xdamage.h>
+#endif
+
+#define FRAME_EVENTMASK                                                                      \
+  (XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_LEAVE_WINDOW | XCB_EVENT_MASK_BUTTON_PRESS | \
+   XCB_EVENT_MASK_BUTTON_RELEASE | XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT | XCB_EVENT_MASK_FOCUS_CHANGE)
+#define ELEMENT_EVENTMASK                                                                       \
+  (XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE | XCB_EVENT_MASK_BUTTON_MOTION | \
+   XCB_EVENT_MASK_POINTER_MOTION | XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_LEAVE_WINDOW)
 
 #define FRAME_ANIMATE_ICONIFY_TIME 150000           /* .15 seconds */
 #define FRAME_ANIMATE_ICONIFY_STEP_TIME (1000 / 60) /* 60 Hz */
@@ -55,52 +67,98 @@ static void frame_publish_updates(ObFrame* self, gboolean force_extents, gboolea
 static void frame_apply_shape(ObFrame* self);
 
 typedef struct {
-  Colormap cmap;
+  xcb_colormap_t cmap;
   guint refcount;
 } FrameColormapEntry;
 
 static GHashTable* frame_colormap_cache = NULL;
 
-static Colormap frame_colormap_acquire(Visual* visual);
-static void frame_colormap_release(Visual* visual, Colormap cmap);
+static xcb_colormap_t frame_colormap_acquire(xcb_visualid_t visual);
+static void frame_colormap_release(xcb_visualid_t visual, xcb_colormap_t cmap);
 
-static Window createWindow(Window parent, Visual* visual, gulong mask, XSetWindowAttributes* attrib) {
-  return XCreateWindow(obt_display, parent, 0, 0, 1, 1, 0, (visual ? 32 : RrDepth(ob_rr_inst)), InputOutput,
-                       (visual ? visual : RrVisual(ob_rr_inst)), mask, attrib);
+static xcb_screen_t* get_screen(xcb_connection_t* conn, int screen_num) {
+  xcb_screen_iterator_t iter;
+  iter = xcb_setup_roots_iterator(xcb_get_setup(conn));
+  for (; iter.rem; --screen_num, xcb_screen_next(&iter))
+    if (screen_num == 0)
+      return iter.data;
+  return NULL;
 }
 
-static Visual* check_32bit_client(ObClient* c) {
-  XWindowAttributes wattrib;
-  Status ret;
+static Window createWindow(Window parent, xcb_visualid_t visual, uint32_t mask, uint32_t* val) {
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
+  xcb_window_t win = xcb_generate_id(conn);
+  uint8_t depth = 0; /* CopyFromParent */
+
+  if (visual) {
+    /* find the depth for the visual */
+    xcb_depth_iterator_t d_it;
+    xcb_screen_t* screen = get_screen(conn, ob_screen);
+    if (screen) {
+      d_it = xcb_screen_allowed_depths_iterator(screen);
+      for (; d_it.rem; xcb_depth_next(&d_it)) {
+        xcb_visualtype_iterator_t v_it = xcb_depth_visuals_iterator(d_it.data);
+        for (; v_it.rem; xcb_visualtype_next(&v_it)) {
+          if (v_it.data->visual_id == visual) {
+            depth = d_it.data->depth;
+            goto found_depth;
+          }
+        }
+      }
+    }
+  found_depth:;
+  }
+  else {
+    depth = RrDepth(ob_rr_inst);
+    visual = RrVisual(ob_rr_inst)->visualid;
+  }
+
+  xcb_create_window(conn, depth, win, parent, 0, 0, 1, 1, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT, visual, mask, val);
+  return win;
+}
+
+static xcb_visualid_t check_32bit_client(ObClient* c) {
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
+  xcb_get_window_attributes_reply_t* attr;
+  xcb_visualid_t visual = XCB_NONE;
 
   /* we're already running at 32 bit depth, yay. we don't need to use their
      visual */
   if (RrDepth(ob_rr_inst) == 32)
-    return NULL;
+    return XCB_NONE;
 
-  ret = XGetWindowAttributes(obt_display, c->window, &wattrib);
-  g_assert(ret != BadDrawable);
-  g_assert(ret != BadWindow);
-
-  if (wattrib.depth == 32)
-    return wattrib.visual;
-  return NULL;
+  /* We need to find the depth of the visual. xcb_get_window_attributes returns visual, but not depth directly?
+     Actually, xcb_get_geometry returns depth. */
+  xcb_get_geometry_reply_t* geom = xcb_get_geometry_reply(conn, xcb_get_geometry(conn, c->window), NULL);
+  if (geom) {
+    if (geom->depth == 32) {
+      attr = xcb_get_window_attributes_reply(conn, xcb_get_window_attributes(conn, c->window), NULL);
+      if (attr) {
+        visual = attr->visual;
+        free(attr);
+      }
+    }
+    free(geom);
+  }
+  return visual;
 }
 
-static Colormap frame_colormap_acquire(Visual* visual) {
+static xcb_colormap_t frame_colormap_acquire(xcb_visualid_t visual) {
   FrameColormapEntry* entry;
 
-  g_assert(visual != NULL);
+  g_assert(visual != XCB_NONE);
 
   if (!frame_colormap_cache)
-    frame_colormap_cache = g_hash_table_new(g_direct_hash, g_direct_equal);
+    frame_colormap_cache = g_hash_table_new(NULL, NULL);
 
-  entry = g_hash_table_lookup(frame_colormap_cache, visual);
+  entry = g_hash_table_lookup(frame_colormap_cache, GUINT_TO_POINTER(visual));
   if (!entry) {
+    xcb_connection_t* conn = XGetXCBConnection(obt_display);
     entry = g_new0(FrameColormapEntry, 1);
-    entry->cmap = XCreateColormap(obt_display, obt_root(ob_screen), visual, AllocNone);
+    entry->cmap = xcb_generate_id(conn);
+    xcb_create_colormap(conn, XCB_COLORMAP_ALLOC_NONE, entry->cmap, obt_root(ob_screen), visual);
     entry->refcount = 1;
-    g_hash_table_insert(frame_colormap_cache, visual, entry);
+    g_hash_table_insert(frame_colormap_cache, GUINT_TO_POINTER(visual), entry);
   }
   else
     entry->refcount++;
@@ -108,30 +166,31 @@ static Colormap frame_colormap_acquire(Visual* visual) {
   return entry->cmap;
 }
 
-static void frame_colormap_release(Visual* visual, Colormap cmap) {
+static void frame_colormap_release(xcb_visualid_t visual, xcb_colormap_t cmap) {
   FrameColormapEntry* entry;
 
   if (!visual || !cmap || !frame_colormap_cache)
     return;
 
-  entry = g_hash_table_lookup(frame_colormap_cache, visual);
+  entry = g_hash_table_lookup(frame_colormap_cache, GUINT_TO_POINTER(visual));
   if (!entry || entry->cmap != cmap)
     return;
 
   g_assert(entry->refcount > 0);
   entry->refcount--;
   if (entry->refcount == 0) {
-    g_hash_table_remove(frame_colormap_cache, visual);
-    XFreeColormap(obt_display, entry->cmap);
+    g_hash_table_remove(frame_colormap_cache, GUINT_TO_POINTER(visual));
+    xcb_free_colormap(XGetXCBConnection(obt_display), entry->cmap);
     g_free(entry);
   }
 }
 
 ObFrame* frame_new(ObClient* client) {
-  XSetWindowAttributes attrib;
-  gulong mask;
+  uint32_t mask;
+  uint32_t val[4];
   ObFrame* self;
-  Visual* visual;
+  xcb_visualid_t visual;
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
 
   self = g_slice_new0(ObFrame);
   self->client = client;
@@ -141,88 +200,94 @@ ObFrame* frame_new(ObClient* client) {
   /* create the non-visible decor windows */
 
   mask = 0;
+  int i = 0;
   if (visual) {
     /* client has a 32-bit visual */
-    mask = CWColormap | CWBackPixel | CWBorderPixel;
-    /* create a colormap with the visual */
+    mask = XCB_CW_BACK_PIXEL | XCB_CW_BORDER_PIXEL | XCB_CW_COLORMAP;
     self->colormap_visual = visual;
-    self->colormap = attrib.colormap = frame_colormap_acquire(visual);
-    attrib.background_pixel = BlackPixel(obt_display, ob_screen);
-    attrib.border_pixel = BlackPixel(obt_display, ob_screen);
+    self->colormap = frame_colormap_acquire(visual);
+    val[i++] = BlackPixel(obt_display, ob_screen); /* back pixel */
+    val[i++] = BlackPixel(obt_display, ob_screen); /* border pixel */
+    val[i++] = self->colormap;
   }
-  self->window = createWindow(obt_root(ob_screen), visual, mask, &attrib);
+  self->window = createWindow(obt_root(ob_screen), visual, mask, val);
 
   /* create the visible decor windows */
 
   mask = 0;
+  i = 0;
   if (visual) {
     /* client has a 32-bit visual */
-    mask = CWColormap | CWBackPixel | CWBorderPixel;
-    attrib.colormap = RrColormap(ob_rr_inst);
+    mask = XCB_CW_BACK_PIXEL | XCB_CW_BORDER_PIXEL | XCB_CW_COLORMAP;
+    val[i++] = BlackPixel(obt_display, ob_screen); /* back pixel */
+    val[i++] = BlackPixel(obt_display, ob_screen); /* border pixel */
+    val[i++] = RrColormap(ob_rr_inst);
   }
 
-  self->backback = createWindow(self->window, NULL, mask, &attrib);
-  self->backfront = createWindow(self->backback, NULL, mask, &attrib);
+  self->backback = createWindow(self->window, 0, mask, val);
+  self->backfront = createWindow(self->backback, 0, mask, val);
 
-  mask |= CWEventMask;
-  attrib.event_mask = ELEMENT_EVENTMASK;
-  self->innerleft = createWindow(self->window, NULL, mask, &attrib);
-  self->innertop = createWindow(self->window, NULL, mask, &attrib);
-  self->innerright = createWindow(self->window, NULL, mask, &attrib);
-  self->innerbottom = createWindow(self->window, NULL, mask, &attrib);
+  mask |= XCB_CW_EVENT_MASK;
+  val[i] = ELEMENT_EVENTMASK; /* Append event mask */
+  /* i is now index of event mask */
 
-  self->innerblb = createWindow(self->innerbottom, NULL, mask, &attrib);
-  self->innerbrb = createWindow(self->innerbottom, NULL, mask, &attrib);
-  self->innerbll = createWindow(self->innerleft, NULL, mask, &attrib);
-  self->innerbrr = createWindow(self->innerright, NULL, mask, &attrib);
+  self->innerleft = createWindow(self->window, 0, mask, val);
+  self->innertop = createWindow(self->window, 0, mask, val);
+  self->innerright = createWindow(self->window, 0, mask, val);
+  self->innerbottom = createWindow(self->window, 0, mask, val);
 
-  self->title = createWindow(self->window, NULL, mask, &attrib);
-  self->titleleft = createWindow(self->window, NULL, mask, &attrib);
-  self->titletop = createWindow(self->window, NULL, mask, &attrib);
-  self->titletopleft = createWindow(self->window, NULL, mask, &attrib);
-  self->titletopright = createWindow(self->window, NULL, mask, &attrib);
-  self->titleright = createWindow(self->window, NULL, mask, &attrib);
-  self->titlebottom = createWindow(self->window, NULL, mask, &attrib);
+  self->innerblb = createWindow(self->innerbottom, 0, mask, val);
+  self->innerbrb = createWindow(self->innerbottom, 0, mask, val);
+  self->innerbll = createWindow(self->innerleft, 0, mask, val);
+  self->innerbrr = createWindow(self->innerright, 0, mask, val);
 
-  self->topresize = createWindow(self->title, NULL, mask, &attrib);
-  self->tltresize = createWindow(self->title, NULL, mask, &attrib);
-  self->tllresize = createWindow(self->title, NULL, mask, &attrib);
-  self->trtresize = createWindow(self->title, NULL, mask, &attrib);
-  self->trrresize = createWindow(self->title, NULL, mask, &attrib);
+  self->title = createWindow(self->window, 0, mask, val);
+  self->titleleft = createWindow(self->window, 0, mask, val);
+  self->titletop = createWindow(self->window, 0, mask, val);
+  self->titletopleft = createWindow(self->window, 0, mask, val);
+  self->titletopright = createWindow(self->window, 0, mask, val);
+  self->titleright = createWindow(self->window, 0, mask, val);
+  self->titlebottom = createWindow(self->window, 0, mask, val);
 
-  self->left = createWindow(self->window, NULL, mask, &attrib);
-  self->right = createWindow(self->window, NULL, mask, &attrib);
+  self->topresize = createWindow(self->title, 0, mask, val);
+  self->tltresize = createWindow(self->title, 0, mask, val);
+  self->tllresize = createWindow(self->title, 0, mask, val);
+  self->trtresize = createWindow(self->title, 0, mask, val);
+  self->trrresize = createWindow(self->title, 0, mask, val);
 
-  self->label = createWindow(self->title, NULL, mask, &attrib);
-  self->max = createWindow(self->title, NULL, mask, &attrib);
-  self->close = createWindow(self->title, NULL, mask, &attrib);
-  self->desk = createWindow(self->title, NULL, mask, &attrib);
-  self->shade = createWindow(self->title, NULL, mask, &attrib);
-  self->icon = createWindow(self->title, NULL, mask, &attrib);
-  self->iconify = createWindow(self->title, NULL, mask, &attrib);
+  self->left = createWindow(self->window, 0, mask, val);
+  self->right = createWindow(self->window, 0, mask, val);
 
-  self->handle = createWindow(self->window, NULL, mask, &attrib);
-  self->lgrip = createWindow(self->handle, NULL, mask, &attrib);
-  self->rgrip = createWindow(self->handle, NULL, mask, &attrib);
+  self->label = createWindow(self->title, 0, mask, val);
+  self->max = createWindow(self->title, 0, mask, val);
+  self->close = createWindow(self->title, 0, mask, val);
+  self->desk = createWindow(self->title, 0, mask, val);
+  self->shade = createWindow(self->title, 0, mask, val);
+  self->icon = createWindow(self->title, 0, mask, val);
+  self->iconify = createWindow(self->title, 0, mask, val);
 
-  self->handleleft = createWindow(self->handle, NULL, mask, &attrib);
-  self->handleright = createWindow(self->handle, NULL, mask, &attrib);
+  self->handle = createWindow(self->window, 0, mask, val);
+  self->lgrip = createWindow(self->handle, 0, mask, val);
+  self->rgrip = createWindow(self->handle, 0, mask, val);
 
-  self->handletop = createWindow(self->window, NULL, mask, &attrib);
-  self->handlebottom = createWindow(self->window, NULL, mask, &attrib);
-  self->lgripleft = createWindow(self->window, NULL, mask, &attrib);
-  self->lgriptop = createWindow(self->window, NULL, mask, &attrib);
-  self->lgripbottom = createWindow(self->window, NULL, mask, &attrib);
-  self->rgripright = createWindow(self->window, NULL, mask, &attrib);
-  self->rgriptop = createWindow(self->window, NULL, mask, &attrib);
-  self->rgripbottom = createWindow(self->window, NULL, mask, &attrib);
+  self->handleleft = createWindow(self->handle, 0, mask, val);
+  self->handleright = createWindow(self->handle, 0, mask, val);
+
+  self->handletop = createWindow(self->window, 0, mask, val);
+  self->handlebottom = createWindow(self->window, 0, mask, val);
+  self->lgripleft = createWindow(self->window, 0, mask, val);
+  self->lgriptop = createWindow(self->window, 0, mask, val);
+  self->lgripbottom = createWindow(self->window, 0, mask, val);
+  self->rgripright = createWindow(self->window, 0, mask, val);
+  self->rgriptop = createWindow(self->window, 0, mask, val);
+  self->rgripbottom = createWindow(self->window, 0, mask, val);
 
   self->focused = FALSE;
 
   /* the other stuff is shown based on decor settings */
-  XMapWindow(obt_display, self->label);
-  XMapWindow(obt_display, self->backback);
-  XMapWindow(obt_display, self->backfront);
+  xcb_map_window(conn, self->label);
+  xcb_map_window(conn, self->backback);
+  xcb_map_window(conn, self->backfront);
 
   self->max_press = self->close_press = self->desk_press = self->iconify_press = self->shade_press = FALSE;
   self->max_hover = self->close_hover = self->desk_hover = self->iconify_hover = self->shade_hover = FALSE;
@@ -238,18 +303,32 @@ ObFrame* frame_new(ObClient* client) {
 
 static void set_theme_statics(ObFrame* self) {
   const RrFrameGeometry* geom = &ob_rr_theme->frame_geom;
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
+  uint32_t mask = XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT;
+  uint32_t val[2];
 
   /* set colors/appearance/sizes for stuff that doesn't change */
-  XResizeWindow(obt_display, self->max, geom->button_size, geom->button_size);
-  XResizeWindow(obt_display, self->iconify, geom->button_size, geom->button_size);
-  XResizeWindow(obt_display, self->icon, geom->button_size + 2, geom->button_size + 2);
-  XResizeWindow(obt_display, self->close, geom->button_size, geom->button_size);
-  XResizeWindow(obt_display, self->desk, geom->button_size, geom->button_size);
-  XResizeWindow(obt_display, self->shade, geom->button_size, geom->button_size);
-  XResizeWindow(obt_display, self->tltresize, geom->grip_width, geom->paddingy + 1);
-  XResizeWindow(obt_display, self->trtresize, geom->grip_width, geom->paddingy + 1);
-  XResizeWindow(obt_display, self->tllresize, geom->paddingx + 1, geom->title_height);
-  XResizeWindow(obt_display, self->trrresize, geom->paddingx + 1, geom->title_height);
+  val[0] = geom->button_size;
+  val[1] = geom->button_size;
+  xcb_configure_window(conn, self->max, mask, val);
+  xcb_configure_window(conn, self->iconify, mask, val);
+  xcb_configure_window(conn, self->close, mask, val);
+  xcb_configure_window(conn, self->desk, mask, val);
+  xcb_configure_window(conn, self->shade, mask, val);
+
+  val[0] = geom->button_size + 2;
+  val[1] = geom->button_size + 2;
+  xcb_configure_window(conn, self->icon, mask, val);
+
+  val[0] = geom->grip_width;
+  val[1] = geom->paddingy + 1;
+  xcb_configure_window(conn, self->tltresize, mask, val);
+  xcb_configure_window(conn, self->trtresize, mask, val);
+
+  val[0] = geom->paddingx + 1;
+  val[1] = geom->title_height;
+  xcb_configure_window(conn, self->tllresize, mask, val);
+  xcb_configure_window(conn, self->trrresize, mask, val);
 }
 
 static void free_theme_statics(ObFrame* self) {}
@@ -257,7 +336,7 @@ static void free_theme_statics(ObFrame* self) {}
 void frame_free(ObFrame* self) {
   free_theme_statics(self);
 
-  XDestroyWindow(obt_display, self->window);
+  xcb_destroy_window(XGetXCBConnection(obt_display), self->window);
   if (self->colormap)
     frame_colormap_release(self->colormap_visual, self->colormap);
 
@@ -272,8 +351,9 @@ void frame_show(ObFrame* self) {
        the client gets its MapNotify, i.e. to make sure the client is
        _visible_ when it gets MapNotify. */
     grab_server(TRUE);
-    XMapWindow(obt_display, self->client->window);
-    XMapWindow(obt_display, self->window);
+    xcb_connection_t* conn = XGetXCBConnection(obt_display);
+    xcb_map_window(conn, self->client->window);
+    xcb_map_window(conn, self->window);
     grab_server(FALSE);
   }
 }
@@ -281,11 +361,12 @@ void frame_show(ObFrame* self) {
 void frame_hide(ObFrame* self) {
   if (self->visible) {
     self->visible = FALSE;
+    xcb_connection_t* conn = XGetXCBConnection(obt_display);
     if (!frame_iconify_animating(self))
-      XUnmapWindow(obt_display, self->window);
+      xcb_unmap_window(conn, self->window);
     /* we unmap the client itself so that we can get MapRequest
        events, and because the ICCCM tells us to! */
-    XUnmapWindow(obt_display, self->client->window);
+    xcb_unmap_window(conn, self->client->window);
     self->client->ignore_unmaps += 1;
   }
 }
@@ -322,22 +403,23 @@ static void frame_publish_updates(ObFrame* self, gboolean force_extents, gboolea
 void frame_adjust_shape_kind(ObFrame* self, int kind) {
   const RrFrameGeometry* geom = &ob_rr_theme->frame_geom;
   gint num;
-  XRectangle xrect[2];
+  xcb_rectangle_t xrect[2];
   gboolean shaped;
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
 
-  shaped = (kind == ShapeBounding && self->client->shaped);
+  shaped = (kind == XCB_SHAPE_SK_BOUNDING && self->client->shaped);
 #ifdef ShapeInput
-  shaped |= (kind == ShapeInput && self->client->shaped_input);
+  shaped |= (kind == XCB_SHAPE_SK_INPUT && self->client->shaped_input);
 #endif
 
   if (!shaped) {
     /* clear the shape on the frame window */
-    XShapeCombineMask(obt_display, self->window, kind, self->size.left, self->size.top, None, ShapeSet);
+    xcb_shape_mask(conn, kind, XCB_SHAPE_SO_SET, self->window, self->size.left, self->size.top, XCB_NONE);
   }
   else {
     /* make the frame's shape match the clients */
-    XShapeCombineShape(obt_display, self->window, kind, self->size.left, self->size.top, self->client->window, kind,
-                       ShapeSet);
+    xcb_shape_combine(conn, kind, kind, XCB_SHAPE_SO_SET, self->window, self->size.left, self->size.top,
+                      self->client->window);
 
     num = 0;
     if (self->decorations & OB_FRAME_DECOR_TITLEBAR) {
@@ -356,16 +438,16 @@ void frame_adjust_shape_kind(ObFrame* self, int kind) {
       ++num;
     }
 
-    XShapeCombineRectangles(obt_display, self->window, ShapeBounding, 0, 0, xrect, num, ShapeUnion, Unsorted);
+    xcb_shape_rectangles(conn, XCB_SHAPE_SO_UNION, kind, XCB_CLIP_ORDERING_UNSORTED, self->window, 0, 0, num, xrect);
   }
 }
 #endif
 
 static void frame_apply_shape(ObFrame* self) {
 #ifdef SHAPE
-  frame_adjust_shape_kind(self, ShapeBounding);
+  frame_adjust_shape_kind(self, XCB_SHAPE_SK_BOUNDING);
 #ifdef ShapeInput
-  frame_adjust_shape_kind(self, ShapeInput);
+  frame_adjust_shape_kind(self, XCB_SHAPE_SK_INPUT);
 #endif
 #endif
 }
@@ -381,6 +463,9 @@ void frame_update_shape(ObFrame* self) {
 
 void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean fake) {
   const RrFrameGeometry* geom = &ob_rr_theme->frame_geom;
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
+  uint32_t mask, val[5];
+
   if (resized) {
     /* do this before changing the frame's status like max_horz max_vert */
     frame_adjust_cursors(self);
@@ -438,74 +523,89 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
 
     if (!fake) {
       gint innercornerheight = geom->grip_width - self->size.bottom;
+      mask = XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y | XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT;
 
       if (self->cbwidth_l) {
-        XMoveResizeWindow(obt_display, self->innerleft, self->size.left - self->cbwidth_l, self->size.top,
-                          self->cbwidth_l, self->client->area.height);
-
-        XMapWindow(obt_display, self->innerleft);
+        val[0] = self->size.left - self->cbwidth_l;
+        val[1] = self->size.top;
+        val[2] = self->cbwidth_l;
+        val[3] = self->client->area.height;
+        xcb_configure_window(conn, self->innerleft, mask, val);
+        xcb_map_window(conn, self->innerleft);
       }
       else
-        XUnmapWindow(obt_display, self->innerleft);
+        xcb_unmap_window(conn, self->innerleft);
 
       if (self->cbwidth_l && innercornerheight > 0) {
-        XMoveResizeWindow(obt_display, self->innerbll, 0,
-                          self->client->area.height - (geom->grip_width - self->size.bottom), self->cbwidth_l,
-                          geom->grip_width - self->size.bottom);
-
-        XMapWindow(obt_display, self->innerbll);
+        val[0] = 0;
+        val[1] = self->client->area.height - (geom->grip_width - self->size.bottom);
+        val[2] = self->cbwidth_l;
+        val[3] = geom->grip_width - self->size.bottom;
+        xcb_configure_window(conn, self->innerbll, mask, val);
+        xcb_map_window(conn, self->innerbll);
       }
       else
-        XUnmapWindow(obt_display, self->innerbll);
+        xcb_unmap_window(conn, self->innerbll);
 
       if (self->cbwidth_r) {
-        XMoveResizeWindow(obt_display, self->innerright, self->size.left + self->client->area.width, self->size.top,
-                          self->cbwidth_r, self->client->area.height);
-
-        XMapWindow(obt_display, self->innerright);
+        val[0] = self->size.left + self->client->area.width;
+        val[1] = self->size.top;
+        val[2] = self->cbwidth_r;
+        val[3] = self->client->area.height;
+        xcb_configure_window(conn, self->innerright, mask, val);
+        xcb_map_window(conn, self->innerright);
       }
       else
-        XUnmapWindow(obt_display, self->innerright);
+        xcb_unmap_window(conn, self->innerright);
 
       if (self->cbwidth_r && innercornerheight > 0) {
-        XMoveResizeWindow(obt_display, self->innerbrr, 0,
-                          self->client->area.height - (geom->grip_width - self->size.bottom), self->cbwidth_r,
-                          geom->grip_width - self->size.bottom);
-
-        XMapWindow(obt_display, self->innerbrr);
+        val[0] = 0;
+        val[1] = self->client->area.height - (geom->grip_width - self->size.bottom);
+        val[2] = self->cbwidth_r;
+        val[3] = geom->grip_width - self->size.bottom;
+        xcb_configure_window(conn, self->innerbrr, mask, val);
+        xcb_map_window(conn, self->innerbrr);
       }
       else
-        XUnmapWindow(obt_display, self->innerbrr);
+        xcb_unmap_window(conn, self->innerbrr);
 
       if (self->cbwidth_t) {
-        XMoveResizeWindow(obt_display, self->innertop, self->size.left - self->cbwidth_l,
-                          self->size.top - self->cbwidth_t,
-                          self->client->area.width + self->cbwidth_l + self->cbwidth_r, self->cbwidth_t);
-
-        XMapWindow(obt_display, self->innertop);
+        val[0] = self->size.left - self->cbwidth_l;
+        val[1] = self->size.top - self->cbwidth_t;
+        val[2] = self->client->area.width + self->cbwidth_l + self->cbwidth_r;
+        val[3] = self->cbwidth_t;
+        xcb_configure_window(conn, self->innertop, mask, val);
+        xcb_map_window(conn, self->innertop);
       }
       else
-        XUnmapWindow(obt_display, self->innertop);
+        xcb_unmap_window(conn, self->innertop);
 
       if (self->cbwidth_b) {
-        XMoveResizeWindow(obt_display, self->innerbottom, self->size.left - self->cbwidth_l,
-                          self->size.top + self->client->area.height,
-                          self->client->area.width + self->cbwidth_l + self->cbwidth_r, self->cbwidth_b);
+        val[0] = self->size.left - self->cbwidth_l;
+        val[1] = self->size.top + self->client->area.height;
+        val[2] = self->client->area.width + self->cbwidth_l + self->cbwidth_r;
+        val[3] = self->cbwidth_b;
+        xcb_configure_window(conn, self->innerbottom, mask, val);
 
-        XMoveResizeWindow(obt_display, self->innerblb, 0, 0, geom->grip_width + self->bwidth, self->cbwidth_b);
-        XMoveResizeWindow(
-            obt_display, self->innerbrb,
-            self->client->area.width + self->cbwidth_l + self->cbwidth_r - (geom->grip_width + self->bwidth), 0,
-            geom->grip_width + self->bwidth, self->cbwidth_b);
+        val[0] = 0;
+        val[1] = 0;
+        val[2] = geom->grip_width + self->bwidth;
+        val[3] = self->cbwidth_b;
+        xcb_configure_window(conn, self->innerblb, mask, val);
 
-        XMapWindow(obt_display, self->innerbottom);
-        XMapWindow(obt_display, self->innerblb);
-        XMapWindow(obt_display, self->innerbrb);
+        val[0] = self->client->area.width + self->cbwidth_l + self->cbwidth_r - (geom->grip_width + self->bwidth);
+        val[1] = 0;
+        /* val[2] and val[3] are same as above */
+        xcb_configure_window(conn, self->innerbrb, mask, val);
+
+        xcb_map_window(conn, self->innerbottom);
+        xcb_map_window(conn, self->innerblb);
+        xcb_map_window(conn, self->innerbrb);
       }
       else {
-        XUnmapWindow(obt_display, self->innerbottom);
-        XUnmapWindow(obt_display, self->innerblb);
-        XUnmapWindow(obt_display, self->innerbrb);
+        xcb_unmap_window(conn, self->innerbottom);
+        xcb_unmap_window(conn, self->innerblb);
+        xcb_unmap_window(conn, self->innerbrb);
       }
 
       if (self->bwidth) {
@@ -514,83 +614,111 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
         /* height of titleleft and titleright */
         titlesides = (!self->max_horz ? geom->grip_width : 0);
 
-        XMoveResizeWindow(obt_display, self->titletop, geom->grip_width + self->bwidth, 0,
-                          /* width + bwidth*2 - bwidth*2 - grips*2 */
-                          self->width - geom->grip_width * 2, self->bwidth);
-        XMoveResizeWindow(obt_display, self->titletopleft, 0, 0, geom->grip_width + self->bwidth, self->bwidth);
-        XMoveResizeWindow(
-            obt_display, self->titletopright,
-            self->client->area.width + self->size.left + self->size.right - geom->grip_width - self->bwidth, 0,
-            geom->grip_width + self->bwidth, self->bwidth);
+        val[0] = geom->grip_width + self->bwidth;
+        val[1] = 0;
+        val[2] = self->width - geom->grip_width * 2;
+        val[3] = self->bwidth;
+        xcb_configure_window(conn, self->titletop, mask, val);
+
+        val[0] = 0;
+        val[1] = 0;
+        val[2] = geom->grip_width + self->bwidth;
+        val[3] = self->bwidth;
+        xcb_configure_window(conn, self->titletopleft, mask, val);
+
+        val[0] = self->client->area.width + self->size.left + self->size.right - geom->grip_width - self->bwidth;
+        val[1] = 0;
+        /* val[2], val[3] same */
+        xcb_configure_window(conn, self->titletopright, mask, val);
 
         if (titlesides > 0) {
-          XMoveResizeWindow(obt_display, self->titleleft, 0, self->bwidth, self->bwidth, titlesides);
-          XMoveResizeWindow(obt_display, self->titleright,
-                            self->client->area.width + self->size.left + self->size.right - self->bwidth, self->bwidth,
-                            self->bwidth, titlesides);
+          val[0] = 0;
+          val[1] = self->bwidth;
+          val[2] = self->bwidth;
+          val[3] = titlesides;
+          xcb_configure_window(conn, self->titleleft, mask, val);
 
-          XMapWindow(obt_display, self->titleleft);
-          XMapWindow(obt_display, self->titleright);
+          val[0] = self->client->area.width + self->size.left + self->size.right - self->bwidth;
+          /* val[1], val[2], val[3] same */
+          xcb_configure_window(conn, self->titleright, mask, val);
+
+          xcb_map_window(conn, self->titleleft);
+          xcb_map_window(conn, self->titleright);
         }
         else {
-          XUnmapWindow(obt_display, self->titleleft);
-          XUnmapWindow(obt_display, self->titleright);
+          xcb_unmap_window(conn, self->titleleft);
+          xcb_unmap_window(conn, self->titleright);
         }
 
-        XMapWindow(obt_display, self->titletop);
-        XMapWindow(obt_display, self->titletopleft);
-        XMapWindow(obt_display, self->titletopright);
+        xcb_map_window(conn, self->titletop);
+        xcb_map_window(conn, self->titletopleft);
+        xcb_map_window(conn, self->titletopright);
 
         if (self->decorations & OB_FRAME_DECOR_TITLEBAR) {
-          XMoveResizeWindow(obt_display, self->titlebottom, (self->max_horz ? 0 : self->bwidth),
-                            geom->title_height + self->bwidth, self->width, self->bwidth);
+          val[0] = (self->max_horz ? 0 : self->bwidth);
+          val[1] = geom->title_height + self->bwidth;
+          val[2] = self->width;
+          val[3] = self->bwidth;
+          xcb_configure_window(conn, self->titlebottom, mask, val);
 
-          XMapWindow(obt_display, self->titlebottom);
+          xcb_map_window(conn, self->titlebottom);
         }
         else
-          XUnmapWindow(obt_display, self->titlebottom);
+          xcb_unmap_window(conn, self->titlebottom);
       }
       else {
-        XUnmapWindow(obt_display, self->titlebottom);
+        xcb_unmap_window(conn, self->titlebottom);
 
-        XUnmapWindow(obt_display, self->titletop);
-        XUnmapWindow(obt_display, self->titletopleft);
-        XUnmapWindow(obt_display, self->titletopright);
-        XUnmapWindow(obt_display, self->titleleft);
-        XUnmapWindow(obt_display, self->titleright);
+        xcb_unmap_window(conn, self->titletop);
+        xcb_unmap_window(conn, self->titletopleft);
+        xcb_unmap_window(conn, self->titletopright);
+        xcb_unmap_window(conn, self->titleleft);
+        xcb_unmap_window(conn, self->titleright);
       }
 
       if (self->decorations & OB_FRAME_DECOR_TITLEBAR) {
-        XMoveResizeWindow(obt_display, self->title, (self->max_horz ? 0 : self->bwidth), self->bwidth, self->width,
-                          geom->title_height);
+        val[0] = (self->max_horz ? 0 : self->bwidth);
+        val[1] = self->bwidth;
+        val[2] = self->width;
+        val[3] = geom->title_height;
+        xcb_configure_window(conn, self->title, mask, val);
 
-        XMapWindow(obt_display, self->title);
+        xcb_map_window(conn, self->title);
 
         if (self->decorations & OB_FRAME_DECOR_GRIPS) {
-          XMoveResizeWindow(obt_display, self->topresize, geom->grip_width, 0, self->width - geom->grip_width * 2,
-                            geom->paddingy + 1);
+          val[0] = geom->grip_width;
+          val[1] = 0;
+          val[2] = self->width - geom->grip_width * 2;
+          val[3] = geom->paddingy + 1;
+          xcb_configure_window(conn, self->topresize, mask, val);
 
-          XMoveWindow(obt_display, self->tltresize, 0, 0);
-          XMoveWindow(obt_display, self->tllresize, 0, 0);
-          XMoveWindow(obt_display, self->trtresize, self->width - geom->grip_width, 0);
-          XMoveWindow(obt_display, self->trrresize, self->width - geom->paddingx - 1, 0);
+          uint32_t move_mask = XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y;
+          uint32_t move_val[2] = {0, 0};
+          xcb_configure_window(conn, self->tltresize, move_mask, move_val);
+          xcb_configure_window(conn, self->tllresize, move_mask, move_val);
 
-          XMapWindow(obt_display, self->topresize);
-          XMapWindow(obt_display, self->tltresize);
-          XMapWindow(obt_display, self->tllresize);
-          XMapWindow(obt_display, self->trtresize);
-          XMapWindow(obt_display, self->trrresize);
+          move_val[0] = self->width - geom->grip_width;
+          xcb_configure_window(conn, self->trtresize, move_mask, move_val);
+
+          move_val[0] = self->width - geom->paddingx - 1;
+          xcb_configure_window(conn, self->trrresize, move_mask, move_val);
+
+          xcb_map_window(conn, self->topresize);
+          xcb_map_window(conn, self->tltresize);
+          xcb_map_window(conn, self->tllresize);
+          xcb_map_window(conn, self->trtresize);
+          xcb_map_window(conn, self->trrresize);
         }
         else {
-          XUnmapWindow(obt_display, self->topresize);
-          XUnmapWindow(obt_display, self->tltresize);
-          XUnmapWindow(obt_display, self->tllresize);
-          XUnmapWindow(obt_display, self->trtresize);
-          XUnmapWindow(obt_display, self->trrresize);
+          xcb_unmap_window(conn, self->topresize);
+          xcb_unmap_window(conn, self->tltresize);
+          xcb_unmap_window(conn, self->tllresize);
+          xcb_unmap_window(conn, self->trtresize);
+          xcb_unmap_window(conn, self->trrresize);
         }
       }
       else
-        XUnmapWindow(obt_display, self->title);
+        xcb_unmap_window(conn, self->title);
     }
 
     if ((self->decorations & OB_FRAME_DECOR_TITLEBAR))
@@ -601,144 +729,178 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
       gint sidebwidth = self->max_horz ? 0 : self->bwidth;
 
       if (self->bwidth && self->size.bottom) {
-        XMoveResizeWindow(obt_display, self->handlebottom, geom->grip_width + self->bwidth + sidebwidth,
-                          self->size.top + self->client->area.height + self->size.bottom - self->bwidth,
-                          self->width - (geom->grip_width + sidebwidth) * 2, self->bwidth);
+        val[0] = geom->grip_width + self->bwidth + sidebwidth;
+        val[1] = self->size.top + self->client->area.height + self->size.bottom - self->bwidth;
+        val[2] = self->width - (geom->grip_width + sidebwidth) * 2;
+        val[3] = self->bwidth;
+        xcb_configure_window(conn, self->handlebottom, mask, val);
 
         if (sidebwidth) {
-          XMoveResizeWindow(obt_display, self->lgripleft, 0,
-                            self->size.top + self->client->area.height + self->size.bottom -
-                                (!self->max_horz ? geom->grip_width : self->size.bottom - self->cbwidth_b),
-                            self->bwidth, (!self->max_horz ? geom->grip_width : self->size.bottom - self->cbwidth_b));
-          XMoveResizeWindow(obt_display, self->rgripright,
-                            self->size.left + self->client->area.width + self->size.right - self->bwidth,
-                            self->size.top + self->client->area.height + self->size.bottom -
-                                (!self->max_horz ? geom->grip_width : self->size.bottom - self->cbwidth_b),
-                            self->bwidth, (!self->max_horz ? geom->grip_width : self->size.bottom - self->cbwidth_b));
+          val[0] = 0;
+          val[1] = self->size.top + self->client->area.height + self->size.bottom -
+                   (!self->max_horz ? geom->grip_width : self->size.bottom - self->cbwidth_b);
+          val[2] = self->bwidth;
+          val[3] = (!self->max_horz ? geom->grip_width : self->size.bottom - self->cbwidth_b);
+          xcb_configure_window(conn, self->lgripleft, mask, val);
 
-          XMapWindow(obt_display, self->lgripleft);
-          XMapWindow(obt_display, self->rgripright);
+          val[0] = self->size.left + self->client->area.width + self->size.right - self->bwidth;
+          /* val[1], val[2], val[3] same */
+          xcb_configure_window(conn, self->rgripright, mask, val);
+
+          xcb_map_window(conn, self->lgripleft);
+          xcb_map_window(conn, self->rgripright);
         }
         else {
-          XUnmapWindow(obt_display, self->lgripleft);
-          XUnmapWindow(obt_display, self->rgripright);
+          xcb_unmap_window(conn, self->lgripleft);
+          xcb_unmap_window(conn, self->rgripright);
         }
 
-        XMoveResizeWindow(obt_display, self->lgripbottom, sidebwidth,
-                          self->size.top + self->client->area.height + self->size.bottom - self->bwidth,
-                          geom->grip_width + self->bwidth, self->bwidth);
-        XMoveResizeWindow(obt_display, self->rgripbottom,
-                          self->size.left + self->client->area.width + self->size.right - self->bwidth - sidebwidth -
-                              geom->grip_width,
-                          self->size.top + self->client->area.height + self->size.bottom - self->bwidth,
-                          geom->grip_width + self->bwidth, self->bwidth);
+        val[0] = sidebwidth;
+        val[1] = self->size.top + self->client->area.height + self->size.bottom - self->bwidth;
+        val[2] = geom->grip_width + self->bwidth;
+        val[3] = self->bwidth;
+        xcb_configure_window(conn, self->lgripbottom, mask, val);
 
-        XMapWindow(obt_display, self->handlebottom);
-        XMapWindow(obt_display, self->lgripbottom);
-        XMapWindow(obt_display, self->rgripbottom);
+        val[0] = self->size.left + self->client->area.width + self->size.right - self->bwidth - sidebwidth -
+                 geom->grip_width;
+        /* val[1], val[2], val[3] same */
+        xcb_configure_window(conn, self->rgripbottom, mask, val);
+
+        xcb_map_window(conn, self->handlebottom);
+        xcb_map_window(conn, self->lgripbottom);
+        xcb_map_window(conn, self->rgripbottom);
 
         if (self->decorations & OB_FRAME_DECOR_HANDLE && geom->handle_height > 0) {
-          XMoveResizeWindow(obt_display, self->handletop, geom->grip_width + self->bwidth + sidebwidth,
-                            FRAME_HANDLE_Y(self), self->width - (geom->grip_width + sidebwidth) * 2, self->bwidth);
-          XMapWindow(obt_display, self->handletop);
+          val[0] = geom->grip_width + self->bwidth + sidebwidth;
+          val[1] = FRAME_HANDLE_Y(self);
+          val[2] = self->width - (geom->grip_width + sidebwidth) * 2;
+          val[3] = self->bwidth;
+          xcb_configure_window(conn, self->handletop, mask, val);
+          xcb_map_window(conn, self->handletop);
 
           if (self->decorations & OB_FRAME_DECOR_GRIPS) {
-            XMoveResizeWindow(obt_display, self->handleleft, geom->grip_width, 0, self->bwidth, geom->handle_height);
-            XMoveResizeWindow(obt_display, self->handleright, self->width - geom->grip_width - self->bwidth, 0,
-                              self->bwidth, geom->handle_height);
+            val[0] = geom->grip_width;
+            val[1] = 0;
+            val[2] = self->bwidth;
+            val[3] = geom->handle_height;
+            xcb_configure_window(conn, self->handleleft, mask, val);
 
-            XMoveResizeWindow(obt_display, self->lgriptop, sidebwidth, FRAME_HANDLE_Y(self),
-                              geom->grip_width + self->bwidth, self->bwidth);
-            XMoveResizeWindow(obt_display, self->rgriptop,
-                              self->size.left + self->client->area.width + self->size.right - self->bwidth -
-                                  sidebwidth - geom->grip_width,
-                              FRAME_HANDLE_Y(self), geom->grip_width + self->bwidth, self->bwidth);
+            val[0] = self->width - geom->grip_width - self->bwidth;
+            /* val[1], val[2], val[3] same */
+            xcb_configure_window(conn, self->handleright, mask, val);
 
-            XMapWindow(obt_display, self->handleleft);
-            XMapWindow(obt_display, self->handleright);
-            XMapWindow(obt_display, self->lgriptop);
-            XMapWindow(obt_display, self->rgriptop);
+            val[0] = sidebwidth;
+            val[1] = FRAME_HANDLE_Y(self);
+            val[2] = geom->grip_width + self->bwidth;
+            val[3] = self->bwidth;
+            xcb_configure_window(conn, self->lgriptop, mask, val);
+
+            val[0] = self->size.left + self->client->area.width + self->size.right - self->bwidth - sidebwidth -
+                     geom->grip_width;
+            /* val[1], val[2], val[3] same */
+            xcb_configure_window(conn, self->rgriptop, mask, val);
+
+            xcb_map_window(conn, self->handleleft);
+            xcb_map_window(conn, self->handleright);
+            xcb_map_window(conn, self->lgriptop);
+            xcb_map_window(conn, self->rgriptop);
           }
           else {
-            XUnmapWindow(obt_display, self->handleleft);
-            XUnmapWindow(obt_display, self->handleright);
-            XUnmapWindow(obt_display, self->lgriptop);
-            XUnmapWindow(obt_display, self->rgriptop);
+            xcb_unmap_window(conn, self->handleleft);
+            xcb_unmap_window(conn, self->handleright);
+            xcb_unmap_window(conn, self->lgriptop);
+            xcb_unmap_window(conn, self->rgriptop);
           }
         }
         else {
-          XUnmapWindow(obt_display, self->handleleft);
-          XUnmapWindow(obt_display, self->handleright);
-          XUnmapWindow(obt_display, self->lgriptop);
-          XUnmapWindow(obt_display, self->rgriptop);
+          xcb_unmap_window(conn, self->handleleft);
+          xcb_unmap_window(conn, self->handleright);
+          xcb_unmap_window(conn, self->lgriptop);
+          xcb_unmap_window(conn, self->rgriptop);
 
-          XUnmapWindow(obt_display, self->handletop);
+          xcb_unmap_window(conn, self->handletop);
         }
       }
       else {
-        XUnmapWindow(obt_display, self->handleleft);
-        XUnmapWindow(obt_display, self->handleright);
-        XUnmapWindow(obt_display, self->lgriptop);
-        XUnmapWindow(obt_display, self->rgriptop);
+        xcb_unmap_window(conn, self->handleleft);
+        xcb_unmap_window(conn, self->handleright);
+        xcb_unmap_window(conn, self->lgriptop);
+        xcb_unmap_window(conn, self->rgriptop);
 
-        XUnmapWindow(obt_display, self->handletop);
+        xcb_unmap_window(conn, self->handletop);
 
-        XUnmapWindow(obt_display, self->handlebottom);
-        XUnmapWindow(obt_display, self->lgripleft);
-        XUnmapWindow(obt_display, self->rgripright);
-        XUnmapWindow(obt_display, self->lgripbottom);
-        XUnmapWindow(obt_display, self->rgripbottom);
+        xcb_unmap_window(conn, self->handlebottom);
+        xcb_unmap_window(conn, self->lgripleft);
+        xcb_unmap_window(conn, self->rgripright);
+        xcb_unmap_window(conn, self->lgripbottom);
+        xcb_unmap_window(conn, self->rgripbottom);
       }
 
       if (self->decorations & OB_FRAME_DECOR_HANDLE && geom->handle_height > 0) {
-        XMoveResizeWindow(obt_display, self->handle, sidebwidth, FRAME_HANDLE_Y(self) + self->bwidth, self->width,
-                          geom->handle_height);
-        XMapWindow(obt_display, self->handle);
+        val[0] = sidebwidth;
+        val[1] = FRAME_HANDLE_Y(self) + self->bwidth;
+        val[2] = self->width;
+        val[3] = geom->handle_height;
+        xcb_configure_window(conn, self->handle, mask, val);
+        xcb_map_window(conn, self->handle);
 
         if (self->decorations & OB_FRAME_DECOR_GRIPS) {
-          XMoveResizeWindow(obt_display, self->lgrip, 0, 0, geom->grip_width, geom->handle_height);
-          XMoveResizeWindow(obt_display, self->rgrip, self->width - geom->grip_width, 0, geom->grip_width,
-                            geom->handle_height);
+          val[0] = 0;
+          val[1] = 0;
+          val[2] = geom->grip_width;
+          val[3] = geom->handle_height;
+          xcb_configure_window(conn, self->lgrip, mask, val);
 
-          XMapWindow(obt_display, self->lgrip);
-          XMapWindow(obt_display, self->rgrip);
+          val[0] = self->width - geom->grip_width;
+          /* val[1], val[2], val[3] same */
+          xcb_configure_window(conn, self->rgrip, mask, val);
+
+          xcb_map_window(conn, self->lgrip);
+          xcb_map_window(conn, self->rgrip);
         }
         else {
-          XUnmapWindow(obt_display, self->lgrip);
-          XUnmapWindow(obt_display, self->rgrip);
+          xcb_unmap_window(conn, self->lgrip);
+          xcb_unmap_window(conn, self->rgrip);
         }
       }
       else {
-        XUnmapWindow(obt_display, self->lgrip);
-        XUnmapWindow(obt_display, self->rgrip);
+        xcb_unmap_window(conn, self->lgrip);
+        xcb_unmap_window(conn, self->rgrip);
 
-        XUnmapWindow(obt_display, self->handle);
+        xcb_unmap_window(conn, self->handle);
       }
 
       if (self->bwidth && !self->max_horz &&
           (self->client->area.height + self->size.top + self->size.bottom) > geom->grip_width * 2) {
-        XMoveResizeWindow(obt_display, self->left, 0, self->bwidth + geom->grip_width, self->bwidth,
-                          self->client->area.height + self->size.top + self->size.bottom - geom->grip_width * 2);
+        val[0] = 0;
+        val[1] = self->bwidth + geom->grip_width;
+        val[2] = self->bwidth;
+        val[3] = self->client->area.height + self->size.top + self->size.bottom - geom->grip_width * 2;
+        xcb_configure_window(conn, self->left, mask, val);
 
-        XMapWindow(obt_display, self->left);
+        xcb_map_window(conn, self->left);
       }
       else
-        XUnmapWindow(obt_display, self->left);
+        xcb_unmap_window(conn, self->left);
 
       if (self->bwidth && !self->max_horz &&
           (self->client->area.height + self->size.top + self->size.bottom) > geom->grip_width * 2) {
-        XMoveResizeWindow(obt_display, self->right,
-                          self->client->area.width + self->cbwidth_l + self->cbwidth_r + self->bwidth,
-                          self->bwidth + geom->grip_width, self->bwidth,
-                          self->client->area.height + self->size.top + self->size.bottom - geom->grip_width * 2);
+        val[0] = self->client->area.width + self->cbwidth_l + self->cbwidth_r + self->bwidth;
+        val[1] = self->bwidth + geom->grip_width;
+        val[2] = self->bwidth;
+        val[3] = self->client->area.height + self->size.top + self->size.bottom - geom->grip_width * 2;
+        xcb_configure_window(conn, self->right, mask, val);
 
-        XMapWindow(obt_display, self->right);
+        xcb_map_window(conn, self->right);
       }
       else
-        XUnmapWindow(obt_display, self->right);
+        xcb_unmap_window(conn, self->right);
 
-      XMoveResizeWindow(obt_display, self->backback, self->size.left, self->size.top, self->client->area.width,
-                        self->client->area.height);
+      val[0] = self->size.left;
+      val[1] = self->size.top;
+      val[2] = self->client->area.width;
+      val[3] = self->client->area.height;
+      xcb_configure_window(conn, self->backback, mask, val);
     }
   }
 
@@ -756,20 +918,27 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
   }
 
   if (!fake) {
-    if (!frame_iconify_animating(self))
+    if (!frame_iconify_animating(self)) {
       /* move and resize the top level frame.
          shading can change without being moved or resized.
 
          but don't do this during an iconify animation. it will be
          reflected afterwards.
       */
-      XMoveResizeWindow(obt_display, self->window, self->area.x, self->area.y, self->area.width, self->area.height);
+      val[0] = self->area.x;
+      val[1] = self->area.y;
+      val[2] = self->area.width;
+      val[3] = self->area.height;
+      xcb_configure_window(conn, self->window, mask, val);
+    }
 
     /* when the client has StaticGravity, it likes to move around.
        also this correctly positions the client when it maps.
        this also needs to be run when the frame's decorations sizes change!
     */
-    XMoveWindow(obt_display, self->client->window, self->size.left, self->size.top);
+    uint32_t move_mask = XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y;
+    uint32_t move_val[2] = {self->size.left, self->size.top};
+    xcb_configure_window(conn, self->client->window, move_mask, move_val);
 
     if (resized) {
       self->need_render = TRUE;
@@ -787,7 +956,9 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
       focus_cycle_update_indicator(self->client);
   }
   if (resized && (self->decorations & OB_FRAME_DECOR_TITLEBAR) && self->label_width) {
-    XResizeWindow(obt_display, self->label, self->label_width, geom->label_height);
+    val[0] = self->label_width;
+    val[1] = geom->label_height;
+    xcb_configure_window(conn, self->label, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, val);
   }
 }
 
@@ -799,59 +970,63 @@ static void frame_adjust_cursors(ObFrame* self) {
         (self->client->functions & OB_CLIENT_FUNC_RESIZE) && !(self->client->max_horz && self->client->max_vert);
     gboolean topbot = !self->client->max_vert;
     gboolean sh = self->client->shaded;
-    XSetWindowAttributes a;
+    uint32_t mask = XCB_CW_CURSOR;
+    uint32_t val;
+    xcb_connection_t* conn = XGetXCBConnection(obt_display);
 
     /* these ones turn off when max vert, and some when shaded */
-    a.cursor = ob_cursor(r && topbot && !sh ? OB_CURSOR_NORTH : OB_CURSOR_NONE);
-    XChangeWindowAttributes(obt_display, self->topresize, CWCursor, &a);
-    XChangeWindowAttributes(obt_display, self->titletop, CWCursor, &a);
-    a.cursor = ob_cursor(r && topbot ? OB_CURSOR_SOUTH : OB_CURSOR_NONE);
-    XChangeWindowAttributes(obt_display, self->handle, CWCursor, &a);
-    XChangeWindowAttributes(obt_display, self->handletop, CWCursor, &a);
-    XChangeWindowAttributes(obt_display, self->handlebottom, CWCursor, &a);
-    XChangeWindowAttributes(obt_display, self->innerbottom, CWCursor, &a);
+    val = ob_cursor(r && topbot && !sh ? OB_CURSOR_NORTH : OB_CURSOR_NONE);
+    xcb_change_window_attributes(conn, self->topresize, mask, &val);
+    xcb_change_window_attributes(conn, self->titletop, mask, &val);
+    val = ob_cursor(r && topbot ? OB_CURSOR_SOUTH : OB_CURSOR_NONE);
+    xcb_change_window_attributes(conn, self->handle, mask, &val);
+    xcb_change_window_attributes(conn, self->handletop, mask, &val);
+    xcb_change_window_attributes(conn, self->handlebottom, mask, &val);
+    xcb_change_window_attributes(conn, self->innerbottom, mask, &val);
 
     /* these ones change when shaded */
-    a.cursor = ob_cursor(r ? (sh ? OB_CURSOR_WEST : OB_CURSOR_NORTHWEST) : OB_CURSOR_NONE);
-    XChangeWindowAttributes(obt_display, self->titleleft, CWCursor, &a);
-    XChangeWindowAttributes(obt_display, self->tltresize, CWCursor, &a);
-    XChangeWindowAttributes(obt_display, self->tllresize, CWCursor, &a);
-    XChangeWindowAttributes(obt_display, self->titletopleft, CWCursor, &a);
-    a.cursor = ob_cursor(r ? (sh ? OB_CURSOR_EAST : OB_CURSOR_NORTHEAST) : OB_CURSOR_NONE);
-    XChangeWindowAttributes(obt_display, self->titleright, CWCursor, &a);
-    XChangeWindowAttributes(obt_display, self->trtresize, CWCursor, &a);
-    XChangeWindowAttributes(obt_display, self->trrresize, CWCursor, &a);
-    XChangeWindowAttributes(obt_display, self->titletopright, CWCursor, &a);
+    val = ob_cursor(r ? (sh ? OB_CURSOR_WEST : OB_CURSOR_NORTHWEST) : OB_CURSOR_NONE);
+    xcb_change_window_attributes(conn, self->titleleft, mask, &val);
+    xcb_change_window_attributes(conn, self->tltresize, mask, &val);
+    xcb_change_window_attributes(conn, self->tllresize, mask, &val);
+    xcb_change_window_attributes(conn, self->titletopleft, mask, &val);
+    val = ob_cursor(r ? (sh ? OB_CURSOR_EAST : OB_CURSOR_NORTHEAST) : OB_CURSOR_NONE);
+    xcb_change_window_attributes(conn, self->titleright, mask, &val);
+    xcb_change_window_attributes(conn, self->trtresize, mask, &val);
+    xcb_change_window_attributes(conn, self->trrresize, mask, &val);
+    xcb_change_window_attributes(conn, self->titletopright, mask, &val);
 
     /* these ones are pretty static */
-    a.cursor = ob_cursor(r ? OB_CURSOR_WEST : OB_CURSOR_NONE);
-    XChangeWindowAttributes(obt_display, self->left, CWCursor, &a);
-    XChangeWindowAttributes(obt_display, self->innerleft, CWCursor, &a);
-    a.cursor = ob_cursor(r ? OB_CURSOR_EAST : OB_CURSOR_NONE);
-    XChangeWindowAttributes(obt_display, self->right, CWCursor, &a);
-    XChangeWindowAttributes(obt_display, self->innerright, CWCursor, &a);
-    a.cursor = ob_cursor(r ? OB_CURSOR_SOUTHWEST : OB_CURSOR_NONE);
-    XChangeWindowAttributes(obt_display, self->lgrip, CWCursor, &a);
-    XChangeWindowAttributes(obt_display, self->handleleft, CWCursor, &a);
-    XChangeWindowAttributes(obt_display, self->lgripleft, CWCursor, &a);
-    XChangeWindowAttributes(obt_display, self->lgriptop, CWCursor, &a);
-    XChangeWindowAttributes(obt_display, self->lgripbottom, CWCursor, &a);
-    XChangeWindowAttributes(obt_display, self->innerbll, CWCursor, &a);
-    XChangeWindowAttributes(obt_display, self->innerblb, CWCursor, &a);
-    a.cursor = ob_cursor(r ? OB_CURSOR_SOUTHEAST : OB_CURSOR_NONE);
-    XChangeWindowAttributes(obt_display, self->rgrip, CWCursor, &a);
-    XChangeWindowAttributes(obt_display, self->handleright, CWCursor, &a);
-    XChangeWindowAttributes(obt_display, self->rgripright, CWCursor, &a);
-    XChangeWindowAttributes(obt_display, self->rgriptop, CWCursor, &a);
-    XChangeWindowAttributes(obt_display, self->rgripbottom, CWCursor, &a);
-    XChangeWindowAttributes(obt_display, self->innerbrr, CWCursor, &a);
-    XChangeWindowAttributes(obt_display, self->innerbrb, CWCursor, &a);
+    val = ob_cursor(r ? OB_CURSOR_WEST : OB_CURSOR_NONE);
+    xcb_change_window_attributes(conn, self->left, mask, &val);
+    xcb_change_window_attributes(conn, self->innerleft, mask, &val);
+    val = ob_cursor(r ? OB_CURSOR_EAST : OB_CURSOR_NONE);
+    xcb_change_window_attributes(conn, self->right, mask, &val);
+    xcb_change_window_attributes(conn, self->innerright, mask, &val);
+    val = ob_cursor(r ? OB_CURSOR_SOUTHWEST : OB_CURSOR_NONE);
+    xcb_change_window_attributes(conn, self->lgrip, mask, &val);
+    xcb_change_window_attributes(conn, self->handleleft, mask, &val);
+    xcb_change_window_attributes(conn, self->lgripleft, mask, &val);
+    xcb_change_window_attributes(conn, self->lgriptop, mask, &val);
+    xcb_change_window_attributes(conn, self->lgripbottom, mask, &val);
+    xcb_change_window_attributes(conn, self->innerbll, mask, &val);
+    xcb_change_window_attributes(conn, self->innerblb, mask, &val);
+    val = ob_cursor(r ? OB_CURSOR_SOUTHEAST : OB_CURSOR_NONE);
+    xcb_change_window_attributes(conn, self->rgrip, mask, &val);
+    xcb_change_window_attributes(conn, self->handleright, mask, &val);
+    xcb_change_window_attributes(conn, self->rgripright, mask, &val);
+    xcb_change_window_attributes(conn, self->rgriptop, mask, &val);
+    xcb_change_window_attributes(conn, self->rgripbottom, mask, &val);
+    xcb_change_window_attributes(conn, self->innerbrr, mask, &val);
+    xcb_change_window_attributes(conn, self->innerbrb, mask, &val);
   }
 }
 
 void frame_adjust_client_area(ObFrame* self) {
   /* adjust the window which is there to prevent flashing on unmap */
-  XMoveResizeWindow(obt_display, self->backfront, 0, 0, self->client->area.width, self->client->area.height);
+  uint32_t mask = XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y | XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT;
+  uint32_t val[4] = {0, 0, self->client->area.width, self->client->area.height};
+  xcb_configure_window(XGetXCBConnection(obt_display), self->backfront, mask, val);
 }
 
 void frame_adjust_state(ObFrame* self) {
@@ -864,7 +1039,7 @@ void frame_adjust_focus(ObFrame* self, gboolean hilite) {
   self->focused = hilite;
   self->need_render = TRUE;
   framerender_frame(self);
-  XFlush(obt_display);
+  xcb_flush(XGetXCBConnection(obt_display));
 }
 
 void frame_adjust_title(ObFrame* self) {
@@ -882,9 +1057,10 @@ void frame_grab_client(ObFrame* self) {
      we need to set up the client's dimensions and everything before we
      send a mapnotify or we create race conditions.
   */
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
 
   /* reparent the client to the frame */
-  XReparentWindow(obt_display, self->client->window, self->window, 0, 0);
+  xcb_reparent_window(conn, self->client->window, self->window, 0, 0);
 
   /*
     When reparenting the client window, it is usually not mapped yet, since
@@ -897,7 +1073,8 @@ void frame_grab_client(ObFrame* self) {
 
   /* select the event mask on the client's parent (to receive config/map
      req's) the ButtonPress is to catch clicks on the client border */
-  XSelectInput(obt_display, self->window, FRAME_EVENTMASK);
+  uint32_t val = FRAME_EVENTMASK;
+  xcb_change_window_attributes(conn, self->window, XCB_CW_EVENT_MASK, &val);
 
   /* set all the windows for the frame in the window_map */
   window_add(&self->window, CLIENT_AS_WINDOW(self->client));
@@ -1067,6 +1244,9 @@ static void layout_title(ObFrame* self) {
   const RrFrameGeometry* geom = &ob_rr_theme->frame_geom;
   gchar* lc;
   gint i;
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
+  uint32_t mask = XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y;
+  uint32_t val[2];
 
   const gint bwidth = geom->button_size + geom->paddingx + 1;
   /* position of the leftmost button */
@@ -1149,53 +1329,67 @@ static void layout_title(ObFrame* self) {
 
   /* position and map the elements */
   if (self->icon_on) {
-    XMapWindow(obt_display, self->icon);
-    XMoveWindow(obt_display, self->icon, self->icon_x, geom->paddingy);
+    xcb_map_window(conn, self->icon);
+    val[0] = self->icon_x;
+    val[1] = geom->paddingy;
+    xcb_configure_window(conn, self->icon, mask, val);
   }
   else
-    XUnmapWindow(obt_display, self->icon);
+    xcb_unmap_window(conn, self->icon);
 
   if (self->desk_on) {
-    XMapWindow(obt_display, self->desk);
-    XMoveWindow(obt_display, self->desk, self->desk_x, geom->paddingy + 1);
+    xcb_map_window(conn, self->desk);
+    val[0] = self->desk_x;
+    val[1] = geom->paddingy + 1;
+    xcb_configure_window(conn, self->desk, mask, val);
   }
   else
-    XUnmapWindow(obt_display, self->desk);
+    xcb_unmap_window(conn, self->desk);
 
   if (self->shade_on) {
-    XMapWindow(obt_display, self->shade);
-    XMoveWindow(obt_display, self->shade, self->shade_x, geom->paddingy + 1);
+    xcb_map_window(conn, self->shade);
+    val[0] = self->shade_x;
+    val[1] = geom->paddingy + 1;
+    xcb_configure_window(conn, self->shade, mask, val);
   }
   else
-    XUnmapWindow(obt_display, self->shade);
+    xcb_unmap_window(conn, self->shade);
 
   if (self->iconify_on) {
-    XMapWindow(obt_display, self->iconify);
-    XMoveWindow(obt_display, self->iconify, self->iconify_x, geom->paddingy + 1);
+    xcb_map_window(conn, self->iconify);
+    val[0] = self->iconify_x;
+    val[1] = geom->paddingy + 1;
+    xcb_configure_window(conn, self->iconify, mask, val);
   }
   else
-    XUnmapWindow(obt_display, self->iconify);
+    xcb_unmap_window(conn, self->iconify);
 
   if (self->max_on) {
-    XMapWindow(obt_display, self->max);
-    XMoveWindow(obt_display, self->max, self->max_x, geom->paddingy + 1);
+    xcb_map_window(conn, self->max);
+    val[0] = self->max_x;
+    val[1] = geom->paddingy + 1;
+    xcb_configure_window(conn, self->max, mask, val);
   }
   else
-    XUnmapWindow(obt_display, self->max);
+    xcb_unmap_window(conn, self->max);
 
   if (self->close_on) {
-    XMapWindow(obt_display, self->close);
-    XMoveWindow(obt_display, self->close, self->close_x, geom->paddingy + 1);
+    xcb_map_window(conn, self->close);
+    val[0] = self->close_x;
+    val[1] = geom->paddingy + 1;
+    xcb_configure_window(conn, self->close, mask, val);
   }
   else
-    XUnmapWindow(obt_display, self->close);
+    xcb_unmap_window(conn, self->close);
 
   if (self->label_on && self->label_width > 0) {
-    XMapWindow(obt_display, self->label);
-    XMoveWindow(obt_display, self->label, self->label_x, geom->paddingy);
+    xcb_map_window(conn, self->label);
+    val[0] = self->label_x;
+    val[1] = geom->paddingy;
+    xcb_configure_window(conn, self->label, mask, val);
   }
   else
-    XUnmapWindow(obt_display, self->label);
+    xcb_unmap_window(conn, self->label);
 }
 
 gboolean frame_next_context_from_string(gchar* names, ObFrameContext* cx) {
@@ -1653,6 +1847,9 @@ static gboolean frame_animate_iconify(gpointer p) {
   GDateTime* now;
   gulong time;
   gboolean iconifying;
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
+  uint32_t mask = XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y | XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT;
+  uint32_t val[4];
 
   if (self->client->icon_geometry.width == 0) {
     /* there is no icon geometry set so just go straight down */
@@ -1712,20 +1909,25 @@ static gboolean frame_animate_iconify(gpointer p) {
     h = self->size.top; /* just the titlebar */
   }
 
-  XMoveResizeWindow(obt_display, self->window, x, y, w, h);
-  XFlush(obt_display);
+  val[0] = x;
+  val[1] = y;
+  val[2] = w;
+  val[3] = h;
+  xcb_configure_window(conn, self->window, mask, val);
+  xcb_flush(conn);
 
   return time > 0; /* repeat until we're out of time */
 }
 
 void frame_end_iconify_animation(gpointer data) {
   ObFrame* self = data;
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
   /* see if there is an animation going */
   if (self->iconify_animation_going == 0)
     return;
 
   if (!self->visible)
-    XUnmapWindow(obt_display, self->window);
+    xcb_unmap_window(conn, self->window);
   else {
     /* Send a ConfigureNotify when the animation is done to keep pagers
        in sync.  since the window is mapped at a different location and is then moved, we
@@ -1738,10 +1940,13 @@ void frame_end_iconify_animation(gpointer data) {
   self->iconify_animation_going = 0;
   self->iconify_animation_timer = 0;
 
-  XMoveResizeWindow(obt_display, self->window, self->area.x, self->area.y, self->area.width, self->area.height);
+  uint32_t mask = XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y | XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT;
+  uint32_t val[4] = {self->area.x, self->area.y, self->area.width, self->area.height};
+  xcb_configure_window(conn, self->window, mask, val);
+
   /* we delay re-rendering until after we're done animating */
   framerender_frame(self);
-  XFlush(obt_display);
+  xcb_flush(conn);
 }
 
 void frame_begin_iconify_animation(ObFrame* self, gboolean iconifying) {
@@ -1799,6 +2004,6 @@ void frame_begin_iconify_animation(ObFrame* self, gboolean iconifying) {
 
     // show it during the animation even if it is not "visible"
     if (!self->visible)
-      XMapWindow(obt_display, self->window);
+      xcb_map_window(XGetXCBConnection(obt_display), self->window);
   }
 }
