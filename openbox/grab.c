@@ -24,12 +24,15 @@
 #include "debug.h"
 #include "obt/display.h"
 #include "obt/keyboard.h"
+#include "openbox/x11/x11.h"
 
 #include <glib.h>
 #include <X11/Xlib.h>
+#include <X11/Xlib-xcb.h>
+#include <xcb/xcb.h>
 
-#define GRAB_PTR_MASK (ButtonPressMask | ButtonReleaseMask | PointerMotionMask)
-#define GRAB_KEY_MASK (KeyPressMask | KeyReleaseMask)
+#define GRAB_PTR_MASK (XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE | XCB_EVENT_MASK_POINTER_MOTION)
+#define GRAB_KEY_MASK (XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE)
 
 #define MASK_LIST_SIZE 8
 
@@ -73,12 +76,22 @@ ObtIC* grab_input_context(void) {
   return ic;
 }
 
+static void xcb_sync(xcb_connection_t* conn) {
+  free(xcb_get_input_focus_reply(conn, xcb_get_input_focus(conn), NULL));
+}
+
 gboolean grab_keyboard_full(gboolean grab) {
   gboolean ret = FALSE;
 
   if (grab) {
     if (kgrabs++ == 0) {
-      ret = XGrabKeyboard(obt_display, grab_window(), False, GrabModeAsync, GrabModeAsync, event_time()) == Success;
+      xcb_connection_t* conn = XGetXCBConnection(obt_display);
+      xcb_grab_keyboard_cookie_t cookie =
+          xcb_grab_keyboard(conn, FALSE, grab_window(), event_time(), XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC);
+      xcb_grab_keyboard_reply_t* reply = xcb_grab_keyboard_reply(conn, cookie, NULL);
+      ret = reply && reply->status == XCB_GRAB_STATUS_SUCCESS;
+      free(reply);
+
       if (!ret)
         --kgrabs;
       else {
@@ -91,7 +104,7 @@ gboolean grab_keyboard_full(gboolean grab) {
   }
   else if (kgrabs > 0) {
     if (--kgrabs == 0) {
-      XUngrabKeyboard(obt_display, ungrab_time());
+      xcb_ungrab_keyboard(XGetXCBConnection(obt_display), ungrab_time());
     }
     ret = TRUE;
   }
@@ -104,8 +117,14 @@ gboolean grab_pointer_full(gboolean grab, gboolean owner_events, gboolean confin
 
   if (grab) {
     if (pgrabs++ == 0) {
-      ret = XGrabPointer(obt_display, grab_window(), owner_events, GRAB_PTR_MASK, GrabModeAsync, GrabModeAsync,
-                         (confine ? obt_root(ob_screen) : None), ob_cursor(cur), event_time()) == Success;
+      xcb_connection_t* conn = XGetXCBConnection(obt_display);
+      xcb_grab_pointer_cookie_t cookie =
+          xcb_grab_pointer(conn, owner_events, grab_window(), GRAB_PTR_MASK, XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC,
+                           (confine ? obt_root(ob_screen) : XCB_NONE), ob_cursor(cur), event_time());
+      xcb_grab_pointer_reply_t* reply = xcb_grab_pointer_reply(conn, cookie, NULL);
+      ret = reply && reply->status == XCB_GRAB_STATUS_SUCCESS;
+      free(reply);
+
       if (!ret)
         --pgrabs;
       else
@@ -116,7 +135,7 @@ gboolean grab_pointer_full(gboolean grab, gboolean owner_events, gboolean confin
   }
   else if (pgrabs > 0) {
     if (--pgrabs == 0) {
-      XUngrabPointer(obt_display, ungrab_time());
+      xcb_ungrab_pointer(XGetXCBConnection(obt_display), ungrab_time());
     }
     ret = TRUE;
   }
@@ -125,16 +144,17 @@ gboolean grab_pointer_full(gboolean grab, gboolean owner_events, gboolean confin
 
 gint grab_server(gboolean grab) {
   static guint sgrabs = 0;
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
   if (grab) {
     if (sgrabs++ == 0) {
-      XGrabServer(obt_display);
-      XSync(obt_display, FALSE);
+      xcb_grab_server(conn);
+      xcb_sync(conn);
     }
   }
   else if (sgrabs > 0) {
     if (--sgrabs == 0) {
-      XUngrabServer(obt_display);
-      XFlush(obt_display);
+      xcb_ungrab_server(conn);
+      xcb_flush(conn);
     }
   }
   return sgrabs;
@@ -178,38 +198,44 @@ void grab_shutdown(gboolean reconfig) {
 
 void grab_button_full(guint button, guint state, Window win, guint mask, gint pointer_mode, ObCursor cur) {
   guint i;
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
+  xcb_generic_error_t* err = NULL;
 
-  /* can get BadAccess from these */
-  obt_display_ignore_errors(TRUE);
-  for (i = 0; i < MASK_LIST_SIZE; ++i)
-    XGrabButton(obt_display, button, state | mask_list[i], win, False, mask, pointer_mode, GrabModeAsync, None,
-                ob_cursor(cur));
-  obt_display_ignore_errors(FALSE);
-  if (obt_display_error_occured)
-    ob_debug("Failed to grab button %d modifiers %d", button, state);
+  for (i = 0; i < MASK_LIST_SIZE; ++i) {
+    err = xcb_request_check(conn, xcb_grab_button_checked(conn, FALSE, win, mask, pointer_mode, XCB_GRAB_MODE_ASYNC,
+                                                          XCB_NONE, ob_cursor(cur), button, state | mask_list[i]));
+    if (err) {
+      ob_debug("Failed to grab button %d modifiers %d", button, state);
+      free(err);
+    }
+  }
 }
 
 void ungrab_button(guint button, guint state, Window win) {
   guint i;
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
 
   for (i = 0; i < MASK_LIST_SIZE; ++i)
-    XUngrabButton(obt_display, button, state | mask_list[i], win);
+    xcb_ungrab_button(conn, button, win, state | mask_list[i]);
 }
 
 void grab_key(guint keycode, guint state, Window win, gint keyboard_mode) {
   guint i;
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
+  xcb_generic_error_t* err = NULL;
 
-  /* can get BadAccess' from these */
-  obt_display_ignore_errors(TRUE);
-  for (i = 0; i < MASK_LIST_SIZE; ++i)
-    XGrabKey(obt_display, keycode, state | mask_list[i], win, FALSE, GrabModeAsync, keyboard_mode);
-  obt_display_ignore_errors(FALSE);
-  if (obt_display_error_occured)
-    ob_debug("Failed to grab keycode %d modifiers %d", keycode, state);
+  for (i = 0; i < MASK_LIST_SIZE; ++i) {
+    err = xcb_request_check(conn, xcb_grab_key_checked(conn, FALSE, win, state | mask_list[i], keycode, keyboard_mode,
+                                                       XCB_GRAB_MODE_ASYNC));
+    if (err) {
+      ob_debug("Failed to grab keycode %d modifiers %d", keycode, state);
+      free(err);
+    }
+  }
 }
 
 void ungrab_all_keys(Window win) {
-  XUngrabKey(obt_display, AnyKey, AnyModifier, win);
+  xcb_ungrab_key(XGetXCBConnection(obt_display), XCB_GRAB_ANY, win, XCB_MOD_MASK_ANY);
 }
 
 void grab_key_passive_count(int change) {
@@ -224,7 +250,7 @@ void ungrab_passive_key(void) {
   /*ob_debug("ungrabbing %d passive grabs\n", passive_count);*/
   if (passive_count) {
     /* kill our passive grab */
-    XUngrabKeyboard(obt_display, event_time());
+    xcb_ungrab_keyboard(XGetXCBConnection(obt_display), event_time());
     passive_count = 0;
   }
 }

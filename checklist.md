@@ -3,12 +3,12 @@
 ## Runtime code still on Xlib
 - [ ] `obt/xqueue.c` — event intake uses `XPending`/`XNextEvent`; replace with `xcb_poll_for_event` + bounded property replies (per HACKING.md).
 - [ ] `openbox/event.c` — central dispatcher still consumes Xlib events; plan XCB intake and conversions.
-- [ ] `openbox/grab.c` — pointer/keyboard/server grabs via Xlib; migrate to XCB grabs/ungrabs.
-- [ ] `openbox/client.c`, `openbox/window.c` — window attribute/query, save-set, event mask changes via Xlib; move to XCB variants.
+- [x] `openbox/grab.c` — pointer/keyboard/server grabs via Xlib; migrate to XCB grabs/ungrabs.
+- [x] `openbox/client.c`, `openbox/window.c` — window attribute/query, save-set, event mask changes via Xlib; move to XCB variants.
 - [ ] `openbox/frame.c`, `openbox/popup.c`, `openbox/prompt.c`, `openbox/focus_cycle_popup.c`, `openbox/focus_cycle_indicator.c`, `openbox/menuframe.c` — frame/popup creation, map/moveresize, cursor attributes via Xlib; map to XCB.
 - [x] `openbox/dock.c` — dockapp save-set, attribute queries, map/select via Xlib.
 - [x] `openbox/screen.c` — support window setup and root selections via Xlib; convert to XCB.
-- [ ] `openbox/moveresize.c` — XSync alarms/events; evaluate XCB sync extension path or keep minimal Xlib interop.
+- [x] `openbox/moveresize.c` — XSync alarms/events; evaluate XCB sync extension path or keep minimal Xlib interop.
 
 ## Tools using Xlib atoms/properties
 - [x] `tools/obpanel/obpanel.c` — atom setup uses `XInternAtom`; migrate to `xcb_intern_atom` and adjust property/event calls accordingly.

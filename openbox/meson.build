@@ -79,7 +79,7 @@ openbox_sources = files(
   'window.c',
 )
 
-openbox_deps = [glib_dep, yaml_dep, x11_dep, x11_xcb_dep, xcb_dep, xext_dep, pango_dep, pangoxft_dep]
+openbox_deps = [glib_dep, yaml_dep, x11_dep, x11_xcb_dep, xcb_dep, xcb_sync_dep, xcb_icccm_dep, xcb_shape_dep, xext_dep, pango_dep, pangoxft_dep]
 if have_libsn
   openbox_deps += libsn_dep
 endif

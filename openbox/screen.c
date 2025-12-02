@@ -51,10 +51,9 @@
 #include <assert.h>
 
 /*! The event mask to grab on the root window */
-static const uint32_t ROOT_EVENT_MASK = XCB_EVENT_MASK_STRUCTURE_NOTIFY | XCB_EVENT_MASK_PROPERTY_CHANGE |
-                                        XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_LEAVE_WINDOW |
-                                        XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT | XCB_EVENT_MASK_FOCUS_CHANGE |
-                                        XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE;
+#define ROOT_EVENTMASK                                                                                       \
+  (StructureNotifyMask | PropertyChangeMask | EnterWindowMask | LeaveWindowMask | SubstructureRedirectMask | \
+   FocusChangeMask | ButtonPressMask | ButtonReleaseMask)
 
 static gboolean screen_validate_layout(ObDesktopLayout* l);
 static gboolean replace_wm(void);
@@ -102,7 +101,6 @@ static gboolean replace_wm(void) {
   Time timestamp;
   xcb_connection_t* conn;
   xcb_get_selection_owner_reply_t* owner_reply = NULL;
-  xcb_get_selection_owner_reply_t* verify_reply = NULL;
   gboolean ret = FALSE;
 
   conn = screen_xcb();
@@ -129,21 +127,19 @@ static gboolean replace_wm(void) {
     }
 
     /* We want to find out when the current selection owner dies */
-    uint32_t mask = XCB_EVENT_MASK_STRUCTURE_NOTIFY;
-    xcb_generic_error_t* err = xcb_request_check(
-        conn, xcb_change_window_attributes_checked(conn, current_wm_sn_owner, XCB_CW_EVENT_MASK, &mask));
-    if (err) {
+    obt_display_ignore_errors(TRUE);
+    XSelectInput(obt_display, current_wm_sn_owner, StructureNotifyMask);
+    XSync(obt_display, FALSE);
+    obt_display_ignore_errors(FALSE);
+    if (obt_display_error_occured)
       current_wm_sn_owner = XCB_WINDOW_NONE;
-      free(err);
-    }
   }
 
   timestamp = event_time();
 
-  xcb_set_selection_owner(conn, screen_support_win, wm_sn_atom, timestamp);
+  XSetSelectionOwner(obt_display, wm_sn_atom, screen_support_win, timestamp);
 
-  verify_reply = xcb_get_selection_owner_reply(conn, xcb_get_selection_owner(conn, wm_sn_atom), NULL);
-  if (!verify_reply || verify_reply->owner != screen_support_win) {
+  if (XGetSelectionOwner(obt_display, wm_sn_atom) != screen_support_win) {
     g_message(_("Could not acquire window manager selection on screen %d"), ob_screen);
     goto done;
   }
@@ -180,7 +176,6 @@ static gboolean replace_wm(void) {
 
 done:
   free(owner_reply);
-  free(verify_reply);
   return ret;
 }
 
@@ -189,8 +184,6 @@ gboolean screen_annex(void) {
   gint i, num_support;
   gulong* supported;
   xcb_connection_t* conn;
-  xcb_generic_error_t* err;
-  uint32_t root_event_mask;
   xcb_window_t support_win;
 
   conn = screen_xcb();
@@ -201,9 +194,9 @@ gboolean screen_annex(void) {
   support_win = xcb_generate_id(conn);
   if (support_win == XCB_WINDOW_NONE)
     return FALSE;
-  uint32_t values[] = {XCB_EVENT_MASK_PROPERTY_CHANGE, 1};
+  uint32_t values[] = {1, XCB_EVENT_MASK_PROPERTY_CHANGE};
   xcb_create_window(conn, XCB_COPY_FROM_PARENT, support_win, obt_root(ob_screen), -100, -100, 1, 1, 0,
-                    XCB_WINDOW_CLASS_INPUT_OUTPUT, XCB_COPY_FROM_PARENT, XCB_CW_EVENT_MASK | XCB_CW_OVERRIDE_REDIRECT,
+                    XCB_WINDOW_CLASS_INPUT_OUTPUT, XCB_COPY_FROM_PARENT, XCB_CW_OVERRIDE_REDIRECT | XCB_CW_EVENT_MASK,
                     values);
   xcb_map_window(conn, support_win);
   uint32_t stack_mode = XCB_STACK_MODE_BELOW;
@@ -216,14 +209,14 @@ gboolean screen_annex(void) {
     return FALSE;
   }
 
-  root_event_mask = ROOT_EVENT_MASK;
-  err = xcb_request_check(
-      conn, xcb_change_window_attributes_checked(conn, obt_root(ob_screen), XCB_CW_EVENT_MASK, &root_event_mask));
-  if (err) {
+  obt_display_ignore_errors(TRUE);
+  XSelectInput(obt_display, obt_root(ob_screen), ROOT_EVENTMASK);
+  XSync(obt_display, FALSE);
+  obt_display_ignore_errors(FALSE);
+  if (obt_display_error_occured) {
     g_message(_("A window manager is already running on screen %d"), ob_screen);
 
     xcb_destroy_window(conn, screen_support_win);
-    free(err);
     xcb_flush(conn);
     return FALSE;
   }

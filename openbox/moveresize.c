@@ -36,8 +36,14 @@
 #include "obt/xqueue.h"
 #include "obt/prop.h"
 #include "obt/keyboard.h"
+#include "openbox/x11/x11.h"
 
 #include <X11/Xlib.h>
+#include <X11/Xlib-xcb.h>
+#include <xcb/xcb.h>
+#ifdef SYNC
+#include <xcb/sync.h>
+#endif
 #include <glib.h>
 
 /* how far windows move and resize with the keyboard arrows */
@@ -47,7 +53,7 @@
 gboolean moveresize_in_progress = FALSE;
 ObClient* moveresize_client = NULL;
 #ifdef SYNC
-XSyncAlarm moveresize_alarm = None;
+xcb_sync_alarm_t moveresize_alarm = XCB_NONE;
 #endif
 
 static gboolean moving = FALSE; /* TRUE - moving, FALSE - resizing */
@@ -263,30 +269,39 @@ void moveresize_start(ObClient* c, gint x, gint y, guint b, guint32 cnr) {
     /* Initialize values for the resize syncing, and create an alarm for
        the client's xsync counter */
 
-    XSyncValue val;
-    XSyncAlarmAttributes aa;
+    xcb_connection_t* conn = XGetXCBConnection(obt_display);
+    xcb_sync_int64_t val;
+    uint32_t mask;
+    uint32_t values[8];
+    int i = 0;
 
     /* set the counter to an initial value */
-    XSyncIntToValue(&val, 0);
-    XSyncSetCounter(obt_display, moveresize_client->sync_counter, val);
+    val.hi = 0;
+    val.lo = 0;
+    xcb_sync_set_counter(conn, moveresize_client->sync_counter, val);
 
     /* this will be incremented when we tell the client what we're
        looking for */
     moveresize_client->sync_counter_value = 0;
 
     /* the next sequence we're waiting for with the alarm */
-    XSyncIntToValue(&val, 1);
+    val.lo = 1;
 
     /* set an alarm on the counter */
-    aa.trigger.counter = moveresize_client->sync_counter;
-    aa.trigger.wait_value = val;
-    aa.trigger.value_type = XSyncAbsolute;
-    aa.trigger.test_type = XSyncPositiveTransition;
-    aa.events = True;
-    XSyncIntToValue(&aa.delta, 1);
-    moveresize_alarm = XSyncCreateAlarm(
-        obt_display, XSyncCACounter | XSyncCAValue | XSyncCAValueType | XSyncCATestType | XSyncCADelta | XSyncCAEvents,
-        &aa);
+    moveresize_alarm = xcb_generate_id(conn);
+    mask = XCB_SYNC_CA_COUNTER | XCB_SYNC_CA_VALUE_TYPE | XCB_SYNC_CA_VALUE | XCB_SYNC_CA_TEST_TYPE |
+           XCB_SYNC_CA_DELTA | XCB_SYNC_CA_EVENTS;
+
+    values[i++] = moveresize_client->sync_counter;
+    values[i++] = XCB_SYNC_VALUETYPE_ABSOLUTE;
+    values[i++] = val.lo; /* value low */
+    values[i++] = val.hi; /* value high */
+    values[i++] = XCB_SYNC_TESTTYPE_POSITIVE_TRANSITION;
+    values[i++] = 1; /* delta low */
+    values[i++] = 0; /* delta high */
+    values[i++] = 1; /* events */
+
+    xcb_sync_create_alarm(conn, moveresize_alarm, mask, values);
   }
 #endif
 }
@@ -301,9 +316,9 @@ void moveresize_end(gboolean cancel) {
   if (!moving) {
 #ifdef SYNC
     /* turn off the alarm */
-    if (moveresize_alarm != None) {
-      XSyncDestroyAlarm(obt_display, moveresize_alarm);
-      moveresize_alarm = None;
+    if (moveresize_alarm != XCB_NONE) {
+      xcb_sync_destroy_alarm(XGetXCBConnection(obt_display), moveresize_alarm);
+      moveresize_alarm = XCB_NONE;
     }
 
     if (sync_timer)
@@ -385,25 +400,27 @@ static void do_resize(void) {
         /* don't send another sync when one is pending */
         waiting_for_sync == 0 && moveresize_client->sync_request && moveresize_client->sync_counter &&
         !moveresize_client->not_responding) {
-      XEvent ce;
-      XSyncValue val;
+      xcb_client_message_event_t ce;
+      xcb_sync_int64_t val;
 
       /* increment the value we're waiting for */
       ++moveresize_client->sync_counter_value;
-      XSyncIntToValue(&val, moveresize_client->sync_counter_value);
+      val.lo = moveresize_client->sync_counter_value;
+      val.hi = 0;
 
       /* tell the client what we're waiting for */
-      ce.xclient.type = ClientMessage;
-      ce.xclient.message_type = OBT_PROP_ATOM(WM_PROTOCOLS);
-      ce.xclient.display = obt_display;
-      ce.xclient.window = moveresize_client->window;
-      ce.xclient.format = 32;
-      ce.xclient.data.l[0] = OBT_PROP_ATOM(NET_WM_SYNC_REQUEST);
-      ce.xclient.data.l[1] = event_time();
-      ce.xclient.data.l[2] = XSyncValueLow32(val);
-      ce.xclient.data.l[3] = XSyncValueHigh32(val);
-      ce.xclient.data.l[4] = 0l;
-      XSendEvent(obt_display, moveresize_client->window, FALSE, NoEventMask, &ce);
+      ce.response_type = XCB_CLIENT_MESSAGE;
+      ce.format = 32;
+      ce.sequence = 0;
+      ce.window = moveresize_client->window;
+      ce.type = OBT_PROP_ATOM(WM_PROTOCOLS);
+      ce.data.data32[0] = OBT_PROP_ATOM(NET_WM_SYNC_REQUEST);
+      ce.data.data32[1] = event_time();
+      ce.data.data32[2] = val.lo;
+      ce.data.data32[3] = val.hi;
+      ce.data.data32[4] = 0;
+
+      xcb_send_event(XGetXCBConnection(obt_display), 0, moveresize_client->window, XCB_EVENT_MASK_NO_EVENT, (char*)&ce);
 
       waiting_for_sync = 1;
 
@@ -558,7 +575,7 @@ static void edge_warp_move_ptr(void) {
       g_assert_not_reached();
   }
 
-  XWarpPointer(obt_display, 0, obt_root(ob_screen), 0, 0, 0, 0, x, y);
+  xcb_warp_pointer(XGetXCBConnection(obt_display), XCB_NONE, obt_root(ob_screen), 0, 0, 0, 0, x, y);
 }
 
 static gboolean edge_warp_delay_func(gpointer data) {
@@ -671,7 +688,7 @@ static void move_with_keys(KeySym sym, guint state) {
   }
 
   screen_pointer_pos(&opx, &opy);
-  XWarpPointer(obt_display, None, None, 0, 0, 0, 0, dx, dy);
+  xcb_warp_pointer(XGetXCBConnection(obt_display), XCB_NONE, XCB_NONE, 0, 0, 0, 0, dx, dy);
   /* steal the motion events this causes */
   XSync(obt_display, FALSE);
   {
@@ -843,7 +860,7 @@ static void resize_with_keys(KeySym sym, guint state) {
     pdy = dh;
 
   screen_pointer_pos(&opx, &opy);
-  XWarpPointer(obt_display, None, None, 0, 0, 0, 0, pdx, pdy);
+  xcb_warp_pointer(XGetXCBConnection(obt_display), XCB_NONE, XCB_NONE, 0, 0, 0, 0, pdx, pdy);
   /* steal the motion events this causes */
   XSync(obt_display, FALSE);
   {

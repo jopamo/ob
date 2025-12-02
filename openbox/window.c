@@ -29,6 +29,11 @@
 #include "obt/prop.h"
 #include "obt/xqueue.h"
 
+#include <xcb/xcb.h>
+#include <xcb/xcb_icccm.h>
+#include <X11/Xlib.h>
+#include <X11/Xlib-xcb.h>
+
 static GHashTable* window_map;
 
 static guint window_hash(Window* w) {
@@ -104,47 +109,53 @@ void window_remove(Window xwin) {
 
 void window_manage_all(void) {
   guint i, j, nchild;
-  Window w, *children;
-  XWMHints* wmhints;
-  XWindowAttributes attrib;
+  xcb_window_t* children;
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
+  xcb_query_tree_reply_t* tree;
+  xcb_get_window_attributes_reply_t* attrib;
 
-  if (!XQueryTree(obt_display, RootWindow(obt_display, ob_screen), &w, &w, &children, &nchild)) {
-    ob_debug("XQueryTree failed in window_manage_all");
-    nchild = 0;
+  tree = xcb_query_tree_reply(conn, xcb_query_tree(conn, obt_root(ob_screen)), NULL);
+  if (!tree) {
+    ob_debug("xcb_query_tree failed in window_manage_all");
+    return;
   }
+
+  nchild = xcb_query_tree_children_length(tree);
+  children = xcb_query_tree_children(tree);
 
   /* remove all icon windows from the list */
   for (i = 0; i < nchild; i++) {
-    if (children[i] == None)
+    xcb_icccm_wm_hints_t wmhints;
+    if (children[i] == XCB_WINDOW_NONE)
       continue;
-    wmhints = XGetWMHints(obt_display, children[i]);
-    if (wmhints) {
-      if ((wmhints->flags & IconWindowHint) && (wmhints->icon_window != children[i]))
+    if (xcb_icccm_get_wm_hints_reply(conn, xcb_icccm_get_wm_hints(conn, children[i]), &wmhints, NULL)) {
+      if ((wmhints.flags & XCB_ICCCM_WM_HINT_ICON_WINDOW) && (wmhints.icon_window != children[i]))
         for (j = 0; j < nchild; j++)
-          if (children[j] == wmhints->icon_window) {
+          if (children[j] == wmhints.icon_window) {
             /* XXX watch the window though */
-            children[j] = None;
+            children[j] = XCB_WINDOW_NONE;
             break;
           }
-      XFree(wmhints);
     }
   }
 
   for (i = 0; i < nchild; ++i) {
-    if (children[i] == None)
+    if (children[i] == XCB_WINDOW_NONE)
       continue;
     if (window_find(children[i]))
       continue; /* skip our own windows */
-    if (XGetWindowAttributes(obt_display, children[i], &attrib)) {
-      if (attrib.map_state == IsUnmapped)
+
+    attrib = xcb_get_window_attributes_reply(conn, xcb_get_window_attributes(conn, children[i]), NULL);
+    if (attrib) {
+      if (attrib->map_state == XCB_MAP_STATE_UNMAPPED)
         ;
       else
         window_manage(children[i]);
+      free(attrib);
     }
   }
 
-  if (children)
-    XFree(children);
+  free(tree);
 }
 
 static gboolean check_unmap(XEvent* e, gpointer data) {
@@ -154,7 +165,8 @@ static gboolean check_unmap(XEvent* e, gpointer data) {
 }
 
 void window_manage(Window win) {
-  XWindowAttributes attrib;
+  xcb_get_window_attributes_reply_t* attrib;
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
   gboolean no_manage = FALSE;
   gboolean is_dockapp = FALSE;
   Window icon_win = None;
@@ -167,39 +179,41 @@ void window_manage(Window win) {
     ob_debug("Trying to manage unmapped window. Aborting that.");
     no_manage = TRUE;
   }
-  else if (!XGetWindowAttributes(obt_display, win, &attrib))
-    no_manage = TRUE;
   else {
-    XWMHints* wmhints;
+    attrib = xcb_get_window_attributes_reply(conn, xcb_get_window_attributes(conn, win), NULL);
+    if (!attrib)
+      no_manage = TRUE;
+    else {
+      xcb_icccm_wm_hints_t wmhints;
 
-    /* is the window a docking app */
-    is_dockapp = FALSE;
-    if ((wmhints = XGetWMHints(obt_display, win))) {
-      if ((wmhints->flags & StateHint) && wmhints->initial_state == WithdrawnState) {
-        if (wmhints->flags & IconWindowHint)
-          icon_win = wmhints->icon_window;
-        is_dockapp = TRUE;
-      }
-      XFree(wmhints);
-    }
-    /* This is a new method to declare that a window is a dockapp, being
-       implemented by Windowmaker, to alleviate pain in writing GTK+
-       dock apps.
-       http://thread.gmane.org/gmane.comp.window-managers.openbox/4881
-    */
-    if (!is_dockapp) {
-      gchar** ss;
-      if (OBT_PROP_GETSS_TYPE(win, WM_CLASS, STRING_NO_CC, &ss)) {
-        if (ss[0] && ss[1] && strcmp(ss[1], "DockApp") == 0)
+      /* is the window a docking app */
+      is_dockapp = FALSE;
+      if (xcb_icccm_get_wm_hints_reply(conn, xcb_icccm_get_wm_hints(conn, win), &wmhints, NULL)) {
+        if ((wmhints.flags & XCB_ICCCM_WM_HINT_STATE) && wmhints.initial_state == XCB_ICCCM_WM_STATE_WITHDRAWN) {
+          if (wmhints.flags & XCB_ICCCM_WM_HINT_ICON_WINDOW)
+            icon_win = wmhints.icon_window;
           is_dockapp = TRUE;
-        g_strfreev(ss);
+        }
+      }
+      /* This is a new method to declare that a window is a dockapp, being
+         implemented by Windowmaker, to alleviate pain in writing GTK+
+         dock apps.
+         http://thread.gmane.org/gmane.comp.window-managers.openbox/4881
+      */
+      if (!is_dockapp) {
+        gchar** ss;
+        if (OBT_PROP_GETSS_TYPE(win, WM_CLASS, STRING_NO_CC, &ss)) {
+          if (ss[0] && ss[1] && strcmp(ss[1], "DockApp") == 0)
+            is_dockapp = TRUE;
+          g_strfreev(ss);
+        }
       }
     }
   }
 
   if (!no_manage) {
-    if (attrib.override_redirect) {
-      ob_debug("not managing override redirect window 0x%x", win);
+    if (attrib->override_redirect) {
+      ob_debug("not managing override redirect window 0x%x", (unsigned int)win);
       grab_server(FALSE);
     }
     else if (is_dockapp) {
@@ -209,10 +223,11 @@ void window_manage(Window win) {
     }
     else
       client_manage(win, NULL);
+    free(attrib);
   }
   else {
     grab_server(FALSE);
-    ob_debug("FAILED to manage window 0x%x", win);
+    ob_debug("FAILED to manage window 0x%x", (unsigned int)win);
   }
 }
 

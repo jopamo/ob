@@ -22,7 +22,7 @@
 #include <glib.h>
 
 #ifdef SYNC
-#include <X11/extensions/sync.h>
+#include <xcb/sync.h>
 #endif
 
 struct _ObClient;
@@ -32,7 +32,7 @@ typedef enum { OB_RESIZE_POS_CENTER, OB_RESIZE_POS_TOP, OB_RESIZE_POS_FIXED } Ob
 extern gboolean moveresize_in_progress;
 extern struct _ObClient* moveresize_client;
 #ifdef SYNC
-extern XSyncAlarm moveresize_alarm;
+extern xcb_sync_alarm_t moveresize_alarm;
 #endif
 
 void moveresize_startup(gboolean reconfig);

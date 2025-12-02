@@ -56,12 +56,23 @@
 #endif
 
 #include <glib.h>
-#include <X11/Xutil.h>
+#include <X11/Xlib.h>
+#include <X11/Xlib-xcb.h>
+#include <xcb/xcb.h>
+#include <xcb/xcb_icccm.h>
+#ifdef SHAPE
+#include <xcb/shape.h>
+#endif
+#ifdef SYNC
+#include <xcb/sync.h>
+#endif
 
 /*! The event mask to grab on client windows */
-#define CLIENT_EVENTMASK (PropertyChangeMask | StructureNotifyMask | ColormapChangeMask)
+#define CLIENT_EVENTMASK \
+  (XCB_EVENT_MASK_PROPERTY_CHANGE | XCB_EVENT_MASK_STRUCTURE_NOTIFY | XCB_EVENT_MASK_COLOR_MAP_CHANGE)
 
-#define CLIENT_NOPROPAGATEMASK (ButtonPressMask | ButtonReleaseMask | ButtonMotionMask)
+#define CLIENT_NOPROPAGATEMASK \
+  (XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE | XCB_EVENT_MASK_BUTTON_MOTION)
 
 #define OB_OPACITY_OPAQUE 0xffffffffu
 /* Dim unfocused windows to roughly 90% opacity */
@@ -241,7 +252,8 @@ void client_set_list(void) {
 
 void client_manage(Window window, ObPrompt* prompt) {
   ObClient* self;
-  XSetWindowAttributes attrib_set;
+  uint32_t attrib_mask;
+  uint32_t attrib_values[2];
   gboolean try_activate = FALSE;
   gboolean do_activate;
   ObAppSettings* settings;
@@ -251,14 +263,16 @@ void client_manage(Window window, ObPrompt* prompt) {
   guint32 user_time;
   gboolean obplaced;
   gulong ignore_start = FALSE;
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
 
   ob_debug("Managing window: 0x%lx", window);
 
   /* choose the events we want to receive on the CLIENT window
      (ObPrompt windows can request events too) */
-  attrib_set.event_mask = CLIENT_EVENTMASK | (prompt ? prompt->event_mask : 0);
-  attrib_set.do_not_propagate_mask = CLIENT_NOPROPAGATEMASK;
-  XChangeWindowAttributes(obt_display, window, CWEventMask | CWDontPropagate, &attrib_set);
+  attrib_mask = XCB_CW_EVENT_MASK | XCB_CW_DONT_PROPAGATE;
+  attrib_values[0] = CLIENT_EVENTMASK | (prompt ? prompt->event_mask : 0);
+  attrib_values[1] = CLIENT_NOPROPAGATEMASK;
+  xcb_change_window_attributes(conn, window, attrib_mask, attrib_values);
 
   /* create the ObClient struct, and populate it from the hints on the
      window */
@@ -304,7 +318,7 @@ void client_manage(Window window, ObPrompt* prompt) {
      should be reparented back to root automatically, unless we are managing
      an internal ObPrompt window  */
   if (!self->prompt)
-    XChangeSaveSet(obt_display, window, SetModeInsert);
+    xcb_change_save_set(conn, XCB_SET_MODE_INSERT, window);
 
   /* create the decoration frame for the client window */
   self->frame = frame_new(self);
@@ -360,7 +374,9 @@ void client_manage(Window window, ObPrompt* prompt) {
   }
 
   /* remove the client's border */
-  XSetWindowBorderWidth(obt_display, self->window, 0);
+  attrib_mask = XCB_CONFIG_WINDOW_BORDER_WIDTH;
+  attrib_values[0] = 0;
+  xcb_configure_window(conn, self->window, attrib_mask, attrib_values);
 
   /* adjust the frame to the client's size before showing or placing
      the window */
@@ -597,6 +613,7 @@ void client_unmanage_all(void) {
 void client_unmanage(ObClient* self) {
   GSList* it;
   gulong ignore_start;
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
 
   ob_debug("Unmanaging window: 0x%x plate 0x%x (%s) (%s)", self->window, self->frame->window, self->class,
            self->title ? self->title : "");
@@ -605,7 +622,9 @@ void client_unmanage(ObClient* self) {
 
   /* we dont want events no more. do this before hiding the frame so we
      don't generate more events */
-  XSelectInput(obt_display, self->window, NoEventMask);
+  uint32_t mask = XCB_CW_EVENT_MASK;
+  uint32_t val = XCB_EVENT_MASK_NO_EVENT;
+  xcb_change_window_attributes(conn, self->window, mask, &val);
 
   /* ignore enter events from the unmap so it doesnt mess with the focus */
   if (!config_focus_under_mouse)
@@ -613,7 +632,7 @@ void client_unmanage(ObClient* self) {
 
   frame_hide(self->frame);
   /* flush to send the hide to the server quickly */
-  XFlush(obt_display);
+  xcb_flush(conn);
 
   if (!config_focus_under_mouse)
     event_end_ignore_all_enters(ignore_start);
@@ -626,7 +645,7 @@ void client_unmanage(ObClient* self) {
   /* remove the window from our save set, unless we are managing an internal
      ObPrompt window */
   if (!self->prompt)
-    XChangeSaveSet(obt_display, self->window, SetModeDelete);
+    xcb_change_save_set(conn, XCB_SET_MODE_DELETE, self->window);
 
   /* update the focus lists */
   focus_order_remove(self);
@@ -692,7 +711,9 @@ void client_unmanage(ObClient* self) {
     self->decorations = 0; /* unmanaged windows have no decor */
 
     /* give the client its border back */
-    XSetWindowBorderWidth(obt_display, self->window, self->border_width);
+    uint32_t bw_mask = XCB_CONFIG_WINDOW_BORDER_WIDTH;
+    uint32_t bw_val = self->border_width;
+    xcb_configure_window(conn, self->window, bw_mask, &bw_val);
 
     client_move_resize(self, a.x, a.y, a.width, a.height);
   }
@@ -713,7 +734,7 @@ void client_unmanage(ObClient* self) {
     /* if we're left in an unmapped state, the client wont be mapped.
        this is bad, since we will no longer be managing the window on
        restart */
-    XMapWindow(obt_display, self->window);
+    xcb_map_window(conn, self->window);
   }
 
   /* these should not be left on the window ever.  other window managers
@@ -1008,6 +1029,7 @@ static ObAppSettings* client_get_settings_state(ObClient* self) {
 
 static void client_restore_session_state(ObClient* self) {
   GList* it;
+  uint32_t vals[2];
 
   ob_debug_type(OB_DEBUG_SM, "Restore session for client %s", self->title);
 
@@ -1027,7 +1049,11 @@ static void client_restore_session_state(ObClient* self) {
     self->area.width = self->session->w;
   if (self->session->h > 0)
     self->area.height = self->session->h;
-  XResizeWindow(obt_display, self->window, self->area.width, self->area.height);
+
+  vals[0] = self->area.width;
+  vals[1] = self->area.height;
+  xcb_configure_window(XGetXCBConnection(obt_display), self->window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT,
+                       vals);
 
   self->desktop = (self->session->desktop == DESKTOP_ALL ? self->session->desktop
                                                          : MIN(screen_num_desktops - 1, self->session->desktop));
@@ -1271,18 +1297,23 @@ static void client_get_startup_id(ObClient* self) {
 }
 
 static void client_get_area(ObClient* self) {
-  XWindowAttributes wattrib;
-  Status ret;
+  xcb_get_geometry_reply_t* geom;
+  xcb_get_window_attributes_reply_t* attr;
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
 
-  ret = XGetWindowAttributes(obt_display, self->window, &wattrib);
-  g_assert(ret != BadWindow);
+  geom = xcb_get_geometry_reply(conn, xcb_get_geometry(conn, self->window), NULL);
+  attr = xcb_get_window_attributes_reply(conn, xcb_get_window_attributes(conn, self->window), NULL);
 
-  RECT_SET(self->area, wattrib.x, wattrib.y, wattrib.width, wattrib.height);
-  POINT_SET(self->root_pos, wattrib.x, wattrib.y);
-  self->border_width = wattrib.border_width;
+  if (geom && attr) {
+    RECT_SET(self->area, geom->x, geom->y, geom->width, geom->height);
+    POINT_SET(self->root_pos, geom->x, geom->y);
+    self->border_width = geom->border_width;
 
-  ob_debug("client area: %d %d  %d %d  bw %d", wattrib.x, wattrib.y, wattrib.width, wattrib.height,
-           wattrib.border_width);
+    ob_debug("client area: %d %d  %d %d  bw %d", geom->x, geom->y, geom->width, geom->height, geom->border_width);
+  }
+
+  free(geom);
+  free(attr);
 }
 
 static void client_get_desktop(ObClient* self) {
@@ -1375,14 +1406,16 @@ static void client_get_shaped(ObClient* self) {
   self->shaped = FALSE;
 #ifdef SHAPE
   if (obt_display_extension_shape) {
-    gint foo;
-    guint ufoo;
-    gint s;
+    xcb_connection_t* conn = XGetXCBConnection(obt_display);
+    xcb_shape_query_extents_reply_t* reply;
 
-    XShapeSelectInput(obt_display, self->window, ShapeNotifyMask);
+    xcb_shape_select_input(conn, self->window, 1); /* ShapeNotifyMask */
 
-    XShapeQueryExtents(obt_display, self->window, &s, &foo, &foo, &ufoo, &ufoo, &foo, &foo, &foo, &ufoo, &ufoo);
-    self->shaped = !!s;
+    reply = xcb_shape_query_extents_reply(conn, xcb_shape_query_extents(conn, self->window), NULL);
+    if (reply) {
+      self->shaped = reply->bounding_shaped;
+      free(reply);
+    }
   }
 #endif
 }
@@ -1391,8 +1424,12 @@ void client_update_transient_for(ObClient* self) {
   Window t = None;
   ObClient* target = NULL;
   gboolean trangroup = FALSE;
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
+  xcb_window_t transient_for = XCB_WINDOW_NONE;
 
-  if (XGetTransientForHint(obt_display, self->window, &t)) {
+  if (xcb_icccm_get_wm_transient_for_reply(conn, xcb_icccm_get_wm_transient_for(conn, self->window), &transient_for,
+                                           NULL)) {
+    t = transient_for;
     if (t != self->window) { /* can't be transient to itself! */
       ObWindow* tw = window_find(t);
       /* if this happens then we need to check for it */
@@ -1538,6 +1575,8 @@ void client_get_type_and_transientness(ObClient* self) {
   guint num, i;
   guint32* val;
   Window t;
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
+  xcb_window_t transient_for = XCB_WINDOW_NONE;
 
   self->type = -1;
   self->transient = FALSE;
@@ -1577,8 +1616,11 @@ void client_get_type_and_transientness(ObClient* self) {
     g_free(val);
   }
 
-  if (XGetTransientForHint(obt_display, self->window, &t))
+  if (xcb_icccm_get_wm_transient_for_reply(conn, xcb_icccm_get_wm_transient_for(conn, self->window), &transient_for,
+                                           NULL)) {
+    t = transient_for;
     self->transient = TRUE;
+  }
 
   if (self->type == (ObClientType)-1) {
     /*the window type hint was not set, which means we either classify
@@ -1637,13 +1679,14 @@ void client_update_sync_request_counter(ObClient* self) {
   guint32 i;
 
   if (OBT_PROP_GET32(self->window, NET_WM_SYNC_REQUEST_COUNTER, CARDINAL, &i)) {
-    XSyncValue val;
+    xcb_sync_int64_t val;
 
     self->sync_counter = i;
 
     /* this must be set when managing a new window according to EWMH */
-    XSyncIntToValue(&val, 0);
-    XSyncSetCounter(obt_display, self->sync_counter, val);
+    val.hi = 0;
+    val.lo = 0;
+    xcb_sync_set_counter(XGetXCBConnection(obt_display), self->sync_counter, val);
   }
   else
     self->sync_counter = None;
@@ -1651,10 +1694,14 @@ void client_update_sync_request_counter(ObClient* self) {
 #endif
 
 static void client_get_colormap(ObClient* self) {
-  XWindowAttributes wa;
+  xcb_get_window_attributes_reply_t* attr;
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
 
-  if (XGetWindowAttributes(obt_display, self->window, &wa))
-    client_update_colormap(self, wa.colormap);
+  attr = xcb_get_window_attributes_reply(conn, xcb_get_window_attributes(conn, self->window), NULL);
+  if (attr) {
+    client_update_colormap(self, attr->colormap);
+    free(attr);
+  }
 }
 
 void client_update_colormap(ObClient* self, Colormap colormap) {
@@ -1774,8 +1821,8 @@ static void client_apply_frame_opacity(ObClient* self, gboolean apply, guint32 v
 }
 
 void client_update_normal_hints(ObClient* self) {
-  XSizeHints size;
-  glong ret;
+  xcb_size_hints_t size;
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
 
   /* defaults */
   self->min_ratio = 0.0f;
@@ -1786,33 +1833,33 @@ void client_update_normal_hints(ObClient* self) {
   SIZE_SET(self->max_size, G_MAXINT, G_MAXINT);
 
   /* get the hints from the window */
-  if (XGetWMNormalHints(obt_display, self->window, &size, &ret)) {
+  if (xcb_icccm_get_wm_normal_hints_reply(conn, xcb_icccm_get_wm_normal_hints(conn, self->window), &size, NULL)) {
     /* normal windows can't request placement! har har
     if (!client_normal(self))
     */
-    self->positioned = (size.flags & (PPosition | USPosition));
-    self->sized = (size.flags & (PSize | USSize));
+    self->positioned = (size.flags & (XCB_ICCCM_SIZE_HINT_P_POSITION | XCB_ICCCM_SIZE_HINT_US_POSITION));
+    self->sized = (size.flags & (XCB_ICCCM_SIZE_HINT_P_SIZE | XCB_ICCCM_SIZE_HINT_US_SIZE));
 
-    if (size.flags & PWinGravity)
+    if (size.flags & XCB_ICCCM_SIZE_HINT_P_WIN_GRAVITY)
       self->gravity = size.win_gravity;
 
-    if (size.flags & PAspect) {
-      if (size.min_aspect.y)
-        self->min_ratio = (gfloat)size.min_aspect.x / size.min_aspect.y;
-      if (size.max_aspect.y)
-        self->max_ratio = (gfloat)size.max_aspect.x / size.max_aspect.y;
+    if (size.flags & XCB_ICCCM_SIZE_HINT_P_ASPECT) {
+      if (size.min_aspect_den)
+        self->min_ratio = (gfloat)size.min_aspect_num / size.min_aspect_den;
+      if (size.max_aspect_den)
+        self->max_ratio = (gfloat)size.max_aspect_num / size.max_aspect_den;
     }
 
-    if (size.flags & PMinSize)
+    if (size.flags & XCB_ICCCM_SIZE_HINT_P_MIN_SIZE)
       SIZE_SET(self->min_size, size.min_width, size.min_height);
 
-    if (size.flags & PMaxSize)
+    if (size.flags & XCB_ICCCM_SIZE_HINT_P_MAX_SIZE)
       SIZE_SET(self->max_size, size.max_width, size.max_height);
 
-    if (size.flags & PBaseSize)
+    if (size.flags & XCB_ICCCM_SIZE_HINT_BASE_SIZE)
       SIZE_SET(self->base_size, size.base_width, size.base_height);
 
-    if (size.flags & PResizeInc && size.width_inc && size.height_inc)
+    if (size.flags & XCB_ICCCM_SIZE_HINT_P_RESIZE_INC && size.width_inc && size.height_inc)
       SIZE_SET(self->size_inc, size.width_inc, size.height_inc);
 
     ob_debug("Normal hints: min size (%d %d) max size (%d %d)", self->min_size.width, self->min_size.height,
