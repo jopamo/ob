@@ -120,7 +120,13 @@ static gboolean load_menu_file_with_fallbacks(const gchar* name, struct ob_confi
 static gboolean try_menu_path(const gchar* path, struct ob_config* conf) {
   if (!path)
     return FALSE;
-  return ob_config_load_menu_file(path, conf);
+  g_message("Trying menu file: %s", path);
+  if (ob_config_load_menu_file(path, conf)) {
+    g_message("Loaded menu file: %s", path);
+    return TRUE;
+  }
+  g_message("Menu file not usable: %s", path);
+  return FALSE;
 }
 
 static gboolean load_menu_file_with_fallbacks(const gchar* name, struct ob_config* conf) {
