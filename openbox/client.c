@@ -330,7 +330,8 @@ void client_manage(Window window, ObPrompt* prompt) {
   launch_time = sn_app_started(self->startup_id, self->class, self->name);
 
   if (!OBT_PROP_GET32(self->window, NET_WM_USER_TIME, CARDINAL, &user_time)) {
-    if (self->user_time_window != None && OBT_PROP_GET32(self->user_time_window, NET_WM_USER_TIME, CARDINAL, &user_time))
+    if (self->user_time_window != None &&
+        OBT_PROP_GET32(self->user_time_window, NET_WM_USER_TIME, CARDINAL, &user_time))
       ;
     else
       user_time = event_time();

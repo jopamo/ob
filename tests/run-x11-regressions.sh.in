@@ -5,9 +5,20 @@ set -eu
 builddir='@TEST_BUILD_DIR@'
 timeout_s='@TEST_TIMEOUT_S@'
 openbox_bin="${OPENBOX_TEST_BINARY:-@OPENBOX_BIN@}"
+host_display="${DISPLAY:-}"
+test_display="${OPENBOX_TEST_DISPLAY:-:1}"
+test_screen="${OPENBOX_TEST_SCREEN:-1024x768x24}"
+started_xephyr=0
+ob_pid=''
+xephyr_pid=''
 
-if [ -z "${DISPLAY:-}" ]; then
+if [ -z "$host_display" ]; then
   echo "Skipping X11 regression tests: DISPLAY is not set."
+  exit 77
+fi
+
+if ! command -v Xephyr >/dev/null 2>&1; then
+  echo "Skipping X11 regression tests: Xephyr is not available."
   exit 77
 fi
 
@@ -15,14 +26,49 @@ if ! command -v xprop >/dev/null 2>&1; then
   echo "Skipping X11 regression tests: xprop is not available."
   exit 77
 fi
+if [ "$test_display" = "$host_display" ]; then
+  echo "Skipping X11 regression tests: refusing to run on current display $host_display. Set OPENBOX_TEST_DISPLAY to a nested display (e.g. :1)." >&2
+  exit 77
+fi
+
+start_xephyr() {
+  DISPLAY="$host_display" Xephyr "$test_display" -screen "$test_screen" -nolisten tcp -terminate -reset -ac >/dev/null 2>&1 &
+  xephyr_pid=$!
+
+  for _ in $(seq 1 50); do
+    if DISPLAY="$test_display" xprop -root >/dev/null 2>&1; then
+      started_xephyr=1
+      return 0
+    fi
+    sleep 0.1
+  done
+
+  echo "Xephyr on $test_display did not become ready." >&2
+  return 1
+}
 
 cleanup() {
   if [ -n "${ob_pid:-}" ] && kill -0 "$ob_pid" 2>/dev/null; then
     kill "$ob_pid" 2>/dev/null || true
     wait "$ob_pid" 2>/dev/null || true
   fi
+  if [ "${started_xephyr:-0}" -eq 1 ] && [ -n "${xephyr_pid:-}" ]; then
+    if kill -0 "$xephyr_pid" 2>/dev/null; then
+      kill "$xephyr_pid" 2>/dev/null || true
+    fi
+    wait "$xephyr_pid" 2>/dev/null || true
+  fi
 }
 trap cleanup EXIT INT TERM
+
+if ! DISPLAY="$test_display" xprop -root >/dev/null 2>&1; then
+  if ! start_xephyr; then
+    echo "Skipping X11 regression tests: unable to start Xephyr on $test_display." >&2
+    exit 77
+  fi
+fi
+DISPLAY="$test_display"
+export DISPLAY
 
 startup_openbox() {
   "${openbox_bin}" --replace --sm-disable >"$builddir/openbox-test.log" 2>&1 &

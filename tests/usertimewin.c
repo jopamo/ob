@@ -38,9 +38,8 @@ int main(void) {
   Atom atimewin = XInternAtom(display, "_NET_WM_USER_TIME_WINDOW", False);
   Atom active_atom = XInternAtom(display, "_NET_ACTIVE_WINDOW", False);
 
-  Window focus_win =
-      XCreateSimpleWindow(display, RootWindow(display, screen), 10, 10, 200, 150, 0, BlackPixel(display, screen),
-                          WhitePixel(display, screen));
+  Window focus_win = XCreateSimpleWindow(display, RootWindow(display, screen), 10, 10, 200, 150, 0,
+                                         BlackPixel(display, screen), WhitePixel(display, screen));
   XMapWindow(display, focus_win);
   XFlush(display);
   sleep(1);
@@ -52,9 +51,8 @@ int main(void) {
                                 CopyFromParent, 0, NULL);
   XMapWindow(display, helper);
 
-  Window test_win =
-      XCreateSimpleWindow(display, RootWindow(display, screen), 240, 10, 200, 150, 0, BlackPixel(display, screen),
-                          WhitePixel(display, screen));
+  Window test_win = XCreateSimpleWindow(display, RootWindow(display, screen), 240, 10, 200, 150, 0,
+                                        BlackPixel(display, screen), WhitePixel(display, screen));
 
   /* Tell Openbox that helper carries timestamps for test_win */
   unsigned long helper_id = helper;

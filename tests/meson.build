@@ -92,3 +92,19 @@ test(
   timeout: 300,
   is_parallel: false,
   depends: test_targets)
+
+unit_prop_test = executable(
+  'test-unit-prop',
+  'unit-prop.c',
+  include_directories: [common_includes],
+  dependencies: [glib_dep, obx11_dep],
+  link_with: [libobt],
+  install: false,
+  build_by_default: false)
+
+test(
+  'unit-prop',
+  unit_prop_test,
+  suite: ['unit'],
+  timeout: 30,
+  is_parallel: true)

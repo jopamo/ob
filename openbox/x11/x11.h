@@ -30,6 +30,7 @@ typedef struct {
   guchar* data;
   gulong n_items;
   gint format;
+  Atom type;
 } ObX11PropertyValue;
 
 typedef struct {

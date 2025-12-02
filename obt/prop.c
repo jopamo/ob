@@ -19,53 +19,35 @@
 
 #include "obt/prop.h"
 #include "obt/display.h"
+#include "openbox/x11/x11.h"
 
 #include <X11/Xatom.h>
+#include <X11/Xlib-xcb.h>
 #ifdef HAVE_STRING_H
 #include <string.h>
 #endif
+#include <stdint.h>
 #include <limits.h>
+#include <xcb/xcb.h>
+#include <xcb/xproto.h>
 
 Atom prop_atoms[OBT_PROP_NUM_ATOMS];
 gboolean prop_started = FALSE;
 
-#define CREATE_NAME(var, name) (prop_atoms[OBT_PROP_##var] = XInternAtom((obt_display), (name), FALSE))
+#define CREATE_NAME(var, name) (prop_atoms[OBT_PROP_##var] = ob_x11_atom((name)))
 #define CREATE(var) CREATE_NAME(var, #var)
 #define CREATE_(var) CREATE_NAME(var, "_" #var)
 #define MAX_PROP_BYTES (8 * 1024 * 1024) /* hard cap to avoid oversized allocations */
+
+static inline xcb_connection_t* prop_conn(void) {
+  g_return_val_if_fail(obt_display != NULL, NULL);
+  return XGetXCBConnection(obt_display);
+}
 
 static gulong max_items_for_size(gint size) {
   const gulong element_bytes = size / 8;
   g_assert(element_bytes);
   return MAX_PROP_BYTES / element_bytes;
-}
-
-static glong prop_request_len(gint size) {
-  const gulong max_items = max_items_for_size(size);
-  const gulong request_32 = (max_items * size + 31) / 32; /* number of 32-bit multiples */
-  g_assert(request_32 <= LONG_MAX);
-  return (glong)request_32;
-}
-
-static gboolean reply_matches(Atom expected_type,
-                              Atom ret_type,
-                              gint expected_size,
-                              gint ret_size,
-                              gulong ret_items,
-                              gulong bytes_left,
-                              gulong min_items,
-                              gulong max_items) {
-  if (ret_type != expected_type)
-    return FALSE;
-  if (ret_size != expected_size)
-    return FALSE;
-  if (bytes_left)
-    return FALSE;
-  if (ret_items < min_items)
-    return FALSE;
-  if (ret_items > max_items)
-    return FALSE;
-  return TRUE;
 }
 
 void obt_prop_startup(void) {
@@ -247,76 +229,64 @@ Atom obt_prop_atom(ObtPropAtom a) {
 
 static gboolean get_prealloc(Window win, Atom prop, Atom type, gint size, guchar* data, gulong num) {
   gboolean ret = FALSE;
-  gint res;
-  guchar* xdata = NULL;
-  Atom ret_type;
-  gint ret_size;
-  gulong ret_items, bytes_left;
-  glong num32 = 32 / size * num; /* num in 32-bit elements */
+  ObX11PropertyValue val = {0};
+  guint i;
 
   if ((gulong)num > max_items_for_size(size))
     return FALSE;
-  res = XGetWindowProperty(obt_display, win, prop, 0l, num32, FALSE, type, &ret_type, &ret_size, &ret_items,
-                           &bytes_left, &xdata);
-  if (res == Success && ret_items && xdata) {
-    if (reply_matches(type, ret_type, size, ret_size, ret_items, bytes_left, num, num)) {
-      guint i;
-      for (i = 0; i < num; ++i)
-        switch (size) {
-          case 8:
-            data[i] = xdata[i];
-            break;
-          case 16:
-            ((guint16*)data)[i] = ((gushort*)xdata)[i];
-            break;
-          case 32:
-            ((guint32*)data)[i] = ((gulong*)xdata)[i];
-            break;
-          default:
-            g_assert_not_reached(); /* unhandled size */
-        }
-      ret = TRUE;
+
+  if (!ob_x11_get_property(win, prop, type, size, num, num, &val))
+    return FALSE;
+
+  for (i = 0; i < num; ++i)
+    switch (size) {
+      case 8:
+        data[i] = val.data[i];
+        break;
+      case 16:
+        ((guint16*)data)[i] = ((guint16*)val.data)[i];
+        break;
+      case 32:
+        ((guint32*)data)[i] = ((guint32*)val.data)[i];
+        break;
+      default:
+        g_assert_not_reached(); /* unhandled size */
     }
-    XFree(xdata);
-  }
+  ret = TRUE;
+
+  ob_x11_property_value_clear(&val);
   return ret;
 }
 
 static gboolean get_all(Window win, Atom prop, Atom type, gint size, guchar** data, guint* num) {
   gboolean ret = FALSE;
-  gint res;
-  guchar* xdata = NULL;
-  Atom ret_type;
-  gint ret_size;
-  gulong ret_items, bytes_left;
+  ObX11PropertyValue val = {0};
+  guint i;
+  const gulong element_bytes = size / 8;
 
-  res = XGetWindowProperty(obt_display, win, prop, 0l, prop_request_len(size), FALSE, type, &ret_type, &ret_size,
-                           &ret_items, &bytes_left, &xdata);
-  if (res == Success) {
-    if (reply_matches(type, ret_type, size, ret_size, ret_items, bytes_left, 1, max_items_for_size(size))) {
-      guint i;
-      const gulong element_bytes = size / 8;
+  if (!ob_x11_get_property(win, prop, type, size, 1, 0, &val))
+    goto done;
 
-      *data = g_malloc(ret_items * element_bytes);
-      for (i = 0; i < ret_items; ++i)
-        switch (size) {
-          case 8:
-            (*data)[i] = xdata[i];
-            break;
-          case 16:
-            ((guint16*)*data)[i] = ((gushort*)xdata)[i];
-            break;
-          case 32:
-            ((guint32*)*data)[i] = ((gulong*)xdata)[i];
-            break;
-          default:
-            g_assert_not_reached(); /* unhandled size */
-        }
-      *num = ret_items;
-      ret = TRUE;
+  *data = g_malloc(val.n_items * element_bytes);
+  for (i = 0; i < val.n_items; ++i)
+    switch (size) {
+      case 8:
+        (*data)[i] = val.data[i];
+        break;
+      case 16:
+        ((guint16*)*data)[i] = ((guint16*)val.data)[i];
+        break;
+      case 32:
+        ((guint32*)*data)[i] = ((guint32*)val.data)[i];
+        break;
+      default:
+        g_assert_not_reached(); /* unhandled size */
     }
-    XFree(xdata);
-  }
+  *num = val.n_items;
+  ret = TRUE;
+
+done:
+  ob_x11_property_value_clear(&val);
   return ret;
 }
 
@@ -330,13 +300,35 @@ static gboolean get_all(Window win, Atom prop, Atom type, gint size, guchar** da
     otherwise.
 */
 static gboolean get_text_property(Window win, Atom prop, XTextProperty* tprop, ObtPropTextType type) {
-  if (!(XGetTextProperty(obt_display, win, tprop, prop) && tprop->nitems))
+  ObX11PropertyValue val = {0};
+  gboolean ok;
+
+  ok = ob_x11_get_property(win, prop, AnyPropertyType, 8, 1, 0, &val);
+  if (!ok)
     return FALSE;
+
+  tprop->value = val.data;
+  val.data = NULL;
+  tprop->encoding = val.type;
+  tprop->format = val.format;
+  tprop->nitems = val.n_items;
+
   if (tprop->nitems > MAX_PROP_BYTES || tprop->format != 8) {
-    XFree(tprop->value);
+    g_free(tprop->value);
     tprop->value = NULL;
+    ob_x11_property_value_clear(&val);
     return FALSE;
   }
+
+  /* The property data is length-based; add a terminator before string parsing. */
+  {
+    guchar* terminated = g_malloc(tprop->nitems + 1);
+    memcpy(terminated, tprop->value, tprop->nitems);
+    terminated[tprop->nitems] = '\0';
+    g_free(tprop->value);
+    tprop->value = terminated;
+  }
+
   if (!type)
     return TRUE; /* no type checking */
   switch (type) {
@@ -518,7 +510,7 @@ gboolean obt_prop_get_text(Window win, Atom prop, ObtPropTextType type, gchar** 
     }
   }
   if (tprop.value)
-    XFree(tprop.value);
+    g_free(tprop.value);
   return ret;
 }
 
@@ -536,21 +528,50 @@ gboolean obt_prop_get_array_text(Window win, Atom prop, ObtPropTextType type, gc
     }
   }
   if (tprop.value)
-    XFree(tprop.value);
+    g_free(tprop.value);
   return ret;
 }
 
 void obt_prop_set32(Window win, Atom prop, Atom type, gulong val) {
-  XChangeProperty(obt_display, win, prop, type, 32, PropModeReplace, (guchar*)&val, 1);
+  xcb_connection_t* conn = prop_conn();
+  uint32_t data;
+
+  if (!conn)
+    return;
+
+  data = (uint32_t)val;
+  xcb_change_property(conn, XCB_PROP_MODE_REPLACE, win, prop, type, 32, 1, &data);
 }
 
 void obt_prop_set_array32(Window win, Atom prop, Atom type, gulong* val, guint num) {
-  XChangeProperty(obt_display, win, prop, type, 32, PropModeReplace, (guchar*)val, num);
+  xcb_connection_t* conn = prop_conn();
+  guint i;
+  uint32_t* data;
+
+  if (!conn)
+    return;
+  if (!num)
+    return;
+
+  data = g_new(uint32_t, num);
+  for (i = 0; i < num; ++i)
+    data[i] = (uint32_t)val[i];
+
+  xcb_change_property(conn, XCB_PROP_MODE_REPLACE, win, prop, type, 32, num, data);
+  g_free(data);
 }
 
 void obt_prop_set_text(Window win, Atom prop, const gchar* val) {
-  XChangeProperty(obt_display, win, prop, OBT_PROP_ATOM(UTF8_STRING), 8, PropModeReplace, (const guchar*)val,
-                  strlen(val));
+  xcb_connection_t* conn = prop_conn();
+  gsize len;
+
+  if (!conn)
+    return;
+  if (!val)
+    return;
+
+  len = strlen(val);
+  xcb_change_property(conn, XCB_PROP_MODE_REPLACE, win, prop, OBT_PROP_ATOM(UTF8_STRING), 8, len, val);
 }
 
 void obt_prop_set_array_text(Window win, Atom prop, const gchar* const* strs) {
@@ -562,12 +583,19 @@ void obt_prop_set_array_text(Window win, Atom prop, const gchar* const* strs) {
     str = g_string_append(str, *s);
     str = g_string_append_c(str, '\0');
   }
-  XChangeProperty(obt_display, win, prop, OBT_PROP_ATOM(UTF8_STRING), 8, PropModeReplace, (guchar*)str->str, str->len);
+  {
+    xcb_connection_t* conn = prop_conn();
+    if (conn)
+      xcb_change_property(conn, XCB_PROP_MODE_REPLACE, win, prop, OBT_PROP_ATOM(UTF8_STRING), 8, str->len, str->str);
+  }
   g_string_free(str, TRUE);
 }
 
 void obt_prop_erase(Window win, Atom prop) {
-  XDeleteProperty(obt_display, win, prop);
+  xcb_connection_t* conn = prop_conn();
+  if (!conn)
+    return;
+  xcb_delete_property(conn, win, prop);
 }
 
 void obt_prop_message(gint screen,
@@ -591,16 +619,17 @@ void obt_prop_message_to(Window to,
                          glong data3,
                          glong data4,
                          glong mask) {
-  XEvent ce;
-  ce.xclient.type = ClientMessage;
-  ce.xclient.message_type = messagetype;
-  ce.xclient.display = obt_display;
-  ce.xclient.window = about;
-  ce.xclient.format = 32;
-  ce.xclient.data.l[0] = data0;
-  ce.xclient.data.l[1] = data1;
-  ce.xclient.data.l[2] = data2;
-  ce.xclient.data.l[3] = data3;
-  ce.xclient.data.l[4] = data4;
-  XSendEvent(obt_display, to, FALSE, mask, &ce);
+  xcb_connection_t* conn = prop_conn();
+  xcb_client_message_event_t ev = {
+      .response_type = XCB_CLIENT_MESSAGE,
+      .format = 32,
+      .window = about,
+      .type = messagetype,
+      .data.data32 = {(uint32_t)data0, (uint32_t)data1, (uint32_t)data2, (uint32_t)data3, (uint32_t)data4}};
+
+  if (!conn)
+    return;
+
+  xcb_send_event(conn, 0, to, (uint32_t)mask, (const char*)&ev);
+  xcb_flush(conn);
 }

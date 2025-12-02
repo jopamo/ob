@@ -23,6 +23,11 @@
 #ifdef HAVE_STRING_H
 #include <string.h>
 #endif
+#include <stdlib.h>
+#include <stdint.h>
+
+#include <X11/Xlib-xcb.h>
+#include <xcb/xcb.h>
 
 static GHashTable* atom_cache = NULL;
 static GHashTable* atom_cache_optional = NULL;
@@ -37,6 +42,11 @@ static inline Atom pointer_to_atom(gconstpointer ptr) {
 
 static GHashTable** cache_for_mode(gboolean only_if_exists) {
   return only_if_exists ? &atom_cache_optional : &atom_cache;
+}
+
+static inline xcb_connection_t* ob_x11_connection(void) {
+  g_return_val_if_fail(obt_display != NULL, NULL);
+  return XGetXCBConnection(obt_display);
 }
 
 static Atom ob_x11_atom_lookup(const char* name, gboolean only_if_exists) {
@@ -54,7 +64,15 @@ static Atom ob_x11_atom_lookup(const char* name, gboolean only_if_exists) {
   if (cached)
     return pointer_to_atom(cached);
 
-  atom = XInternAtom(obt_display, name, only_if_exists);
+  xcb_connection_t* conn = ob_x11_connection();
+  if (!conn)
+    return None;
+
+  xcb_intern_atom_cookie_t cookie = xcb_intern_atom(conn, only_if_exists, strlen(name), name);
+  xcb_intern_atom_reply_t* reply = xcb_intern_atom_reply(conn, cookie, NULL);
+  atom = reply ? reply->atom : None;
+  free(reply);
+
   if (atom != None)
     g_hash_table_insert(*cache, g_strdup(name), atom_to_pointer(atom));
 
@@ -91,15 +109,18 @@ gboolean ob_x11_get_property(Window win,
                              gulong min_items,
                              gulong max_items,
                              ObX11PropertyValue* value) {
-  Atom ret_type;
-  gint ret_format;
   gulong ret_items, bytes_left;
   gulong allowed_max;
-  guchar* xdata = NULL;
   gboolean ret = FALSE;
   glong request;
   gsize element_bytes;
   gsize total_bytes;
+  const guchar* xdata = NULL;
+  xcb_connection_t* conn;
+  xcb_get_property_cookie_t cookie;
+  xcb_get_property_reply_t* reply = NULL;
+  gsize value_len_bytes;
+  uint32_t long_length;
 
   g_return_val_if_fail(value != NULL, FALSE);
   memset(value, 0, sizeof(*value));
@@ -113,35 +134,48 @@ gboolean ob_x11_get_property(Window win,
     return FALSE;
 
   request = request_length(allowed_max, format);
-  if (XGetWindowProperty(obt_display, win, prop, 0l, request, FALSE, type, &ret_type, &ret_format, &ret_items,
-                         &bytes_left, &xdata) != Success)
+  long_length = (uint32_t)request;
+  conn = ob_x11_connection();
+  if (!conn)
+    return FALSE;
+
+  cookie = xcb_get_property(conn, FALSE, win, prop, type ? type : XCB_GET_PROPERTY_TYPE_ANY, 0, long_length);
+  reply = xcb_get_property_reply(conn, cookie, NULL);
+  if (!reply)
     goto done;
 
-  if (!xdata)
+  if (type != AnyPropertyType && reply->type != type)
     goto done;
-  if (type != AnyPropertyType && ret_type != type)
+
+  bytes_left = reply->bytes_after;
+  value_len_bytes = xcb_get_property_value_length(reply);
+
+  if (!value_len_bytes && min_items > 0)
     goto done;
-  if (ret_format != format)
+
+  if (reply->format != format)
     goto done;
   if (bytes_left)
     goto done;
+  if (element_bytes == 0 || (value_len_bytes % element_bytes))
+    goto done;
+
+  ret_items = value_len_bytes / element_bytes;
   if (ret_items < min_items || ret_items > allowed_max)
     goto done;
 
   total_bytes = ret_items * element_bytes;
-  if (total_bytes) {
-    value->data = g_malloc(total_bytes);
-    memcpy(value->data, xdata, total_bytes);
-  }
-  else
-    value->data = NULL;
+  xdata = xcb_get_property_value(reply);
+  if (total_bytes && xdata)
+    value->data = g_memdup2(xdata, total_bytes);
+
   value->n_items = ret_items;
   value->format = format;
+  value->type = reply->type;
   ret = TRUE;
 
 done:
-  if (xdata)
-    XFree(xdata);
+  free(reply);
   if (!ret)
     ob_x11_property_value_clear(value);
   return ret;
@@ -154,6 +188,7 @@ void ob_x11_property_value_clear(ObX11PropertyValue* value) {
   value->data = NULL;
   value->n_items = 0;
   value->format = 0;
+  value->type = None;
 }
 
 gboolean ob_x11_property_to_string_list(const ObX11PropertyValue* value,

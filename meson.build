@@ -72,6 +72,8 @@ pango_dep = dependency('pango', version: '>=1.8.0')
 pangoxft_dep = dependency('pangoxft', version: '>=1.8.0')
 yaml_dep = dependency('yaml-0.1')
 x11_dep = dependency('x11')
+x11_xcb_dep = dependency('x11-xcb')
+xcb_dep = dependency('xcb')
 xext_dep = dependency('xext')
 xrender_dep = dependency('xrender')
 xau_dep = dependency('xau')
@@ -255,7 +257,7 @@ subdir('po')
 # ---------------------------------------------------------------------------
 # Install pkg-config files for the public libraries
 # ---------------------------------------------------------------------------
-obt_private_libs = [x11_dep, xext_dep, xrender_dep, glib_dep]
+obt_private_libs = [x11_dep, x11_xcb_dep, xcb_dep, xext_dep, xrender_dep, glib_dep]
 obt_private_libs += xrandr_dep
 if have_xdamage
   obt_private_libs += xdamage_dep

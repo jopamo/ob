@@ -493,10 +493,10 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
                           self->client->area.width + self->cbwidth_l + self->cbwidth_r, self->cbwidth_b);
 
         XMoveResizeWindow(obt_display, self->innerblb, 0, 0, geom->grip_width + self->bwidth, self->cbwidth_b);
-        XMoveResizeWindow(obt_display, self->innerbrb,
-                          self->client->area.width + self->cbwidth_l + self->cbwidth_r -
-                              (geom->grip_width + self->bwidth),
-                          0, geom->grip_width + self->bwidth, self->cbwidth_b);
+        XMoveResizeWindow(
+            obt_display, self->innerbrb,
+            self->client->area.width + self->cbwidth_l + self->cbwidth_r - (geom->grip_width + self->bwidth), 0,
+            geom->grip_width + self->bwidth, self->cbwidth_b);
 
         XMapWindow(obt_display, self->innerbottom);
         XMapWindow(obt_display, self->innerblb);
@@ -518,10 +518,10 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
                           /* width + bwidth*2 - bwidth*2 - grips*2 */
                           self->width - geom->grip_width * 2, self->bwidth);
         XMoveResizeWindow(obt_display, self->titletopleft, 0, 0, geom->grip_width + self->bwidth, self->bwidth);
-        XMoveResizeWindow(obt_display, self->titletopright,
-                          self->client->area.width + self->size.left + self->size.right - geom->grip_width -
-                              self->bwidth,
-                          0, geom->grip_width + self->bwidth, self->bwidth);
+        XMoveResizeWindow(
+            obt_display, self->titletopright,
+            self->client->area.width + self->size.left + self->size.right - geom->grip_width - self->bwidth, 0,
+            geom->grip_width + self->bwidth, self->bwidth);
 
         if (titlesides > 0) {
           XMoveResizeWindow(obt_display, self->titleleft, 0, self->bwidth, self->bwidth, titlesides);
@@ -567,8 +567,8 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
         XMapWindow(obt_display, self->title);
 
         if (self->decorations & OB_FRAME_DECOR_GRIPS) {
-          XMoveResizeWindow(obt_display, self->topresize, geom->grip_width, 0,
-                            self->width - geom->grip_width * 2, geom->paddingy + 1);
+          XMoveResizeWindow(obt_display, self->topresize, geom->grip_width, 0, self->width - geom->grip_width * 2,
+                            geom->paddingy + 1);
 
           XMoveWindow(obt_display, self->tltresize, 0, 0);
           XMoveWindow(obt_display, self->tllresize, 0, 0);
@@ -614,8 +614,7 @@ void frame_adjust_area(ObFrame* self, gboolean moved, gboolean resized, gboolean
                             self->size.left + self->client->area.width + self->size.right - self->bwidth,
                             self->size.top + self->client->area.height + self->size.bottom -
                                 (!self->max_horz ? geom->grip_width : self->size.bottom - self->cbwidth_b),
-                            self->bwidth,
-                            (!self->max_horz ? geom->grip_width : self->size.bottom - self->cbwidth_b));
+                            self->bwidth, (!self->max_horz ? geom->grip_width : self->size.bottom - self->cbwidth_b));
 
           XMapWindow(obt_display, self->lgripleft);
           XMapWindow(obt_display, self->rgripright);

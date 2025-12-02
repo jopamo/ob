@@ -495,8 +495,7 @@ gunichar obt_keyboard_keypress_to_unichar(ObtIC* ic, XEvent* ev) {
     return 0;
 
   if (keyboard_compose_state) {
-    enum xkb_compose_feed_result feed =
-        xkb_compose_state_feed(keyboard_compose_state, (xkb_keysym_t)sym);
+    enum xkb_compose_feed_result feed = xkb_compose_state_feed(keyboard_compose_state, (xkb_keysym_t)sym);
     if (feed == XKB_COMPOSE_FEED_ACCEPTED) {
       switch (xkb_compose_state_get_status(keyboard_compose_state)) {
         case XKB_COMPOSE_COMPOSING:
@@ -540,11 +539,9 @@ void obt_keyboard_handle_event(const XEvent* e) {
     return;
 
   enum xkb_key_direction dir = (e->type == KeyPress) ? XKB_KEY_DOWN : XKB_KEY_UP;
-  xkb_mod_mask_t before =
-      xkb_state_serialize_mods(keyboard_state, XKB_STATE_MODS_DEPRESSED | XKB_STATE_MODS_LATCHED);
+  xkb_mod_mask_t before = xkb_state_serialize_mods(keyboard_state, XKB_STATE_MODS_DEPRESSED | XKB_STATE_MODS_LATCHED);
   xkb_state_update_key(keyboard_state, e->xkey.keycode, dir);
-  xkb_mod_mask_t after =
-      xkb_state_serialize_mods(keyboard_state, XKB_STATE_MODS_DEPRESSED | XKB_STATE_MODS_LATCHED);
+  xkb_mod_mask_t after = xkb_state_serialize_mods(keyboard_state, XKB_STATE_MODS_DEPRESSED | XKB_STATE_MODS_LATCHED);
   xkb_mod_mask_t delta = (dir == XKB_KEY_DOWN) ? (after & ~before) : (before & ~after);
 
   keyboard_last_mask = (guint)(delta & ALL_MASKS);
