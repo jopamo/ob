@@ -137,6 +137,13 @@ static gboolean load_menu_file_with_fallbacks(const gchar* name, struct ob_confi
   if (ok)
     return TRUE;
 
+  /* allow running uninstalled from the source tree */
+  path = g_build_filename(g_get_current_dir(), "data", name, NULL);
+  ok = try_menu_path(path, conf);
+  g_free(path);
+  if (ok)
+    return TRUE;
+
   /* system config dirs */
   gchar** cfg_dirs = g_get_system_config_dirs();
   if (cfg_dirs) {
@@ -149,6 +156,13 @@ static gboolean load_menu_file_with_fallbacks(const gchar* name, struct ob_confi
     }
     g_strfreev(cfg_dirs);
   }
+  if (ok)
+    return TRUE;
+
+  /* packaged data dir (DATADIR/openbox) */
+  path = g_build_filename(DATADIR, "openbox", name, NULL);
+  ok = try_menu_path(path, conf);
+  g_free(path);
   if (ok)
     return TRUE;
 
