@@ -4,6 +4,7 @@
 
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
+#include <X11/Xlib-xcb.h>
 #include <X11/Xutil.h>
 #include <cairo/cairo.h>
 #include <cairo/cairo-xlib.h>
@@ -14,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <xcb/xcb.h>
 
 #ifdef HAVE_ALSA
 #include <alsa/asoundlib.h>
@@ -68,6 +70,21 @@ typedef struct {
   Atom wm_name;
   Atom wm_hints;
 } PanelAtoms;
+
+static Atom intern_atom(Display* dpy, const char* name) {
+  xcb_connection_t* conn = XGetXCBConnection(dpy);
+  Atom atom = None;
+  if (!conn)
+    return atom;
+
+  xcb_intern_atom_cookie_t cookie = xcb_intern_atom(conn, 0, strlen(name), name);
+  xcb_intern_atom_reply_t* reply = xcb_intern_atom_reply(conn, cookie, NULL);
+  if (reply) {
+    atom = (Atom)reply->atom;
+    free(reply);
+  }
+  return atom;
+}
 
 typedef struct {
   Window window;
@@ -227,11 +244,11 @@ static void panel_init_atoms(Panel* panel) {
   a->net_wm_window_type_dock = OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_DOCK);
   a->net_wm_window_type_desktop = OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_DESKTOP);
   a->net_wm_window_type_splash = OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_SPLASH);
-  a->net_wm_window_type_dropdown = XInternAtom(panel->dpy, "_NET_WM_WINDOW_TYPE_DROPDOWN_MENU", False);
+  a->net_wm_window_type_dropdown = intern_atom(panel->dpy, "_NET_WM_WINDOW_TYPE_DROPDOWN_MENU");
   a->net_wm_window_type_popup = OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_POPUP_MENU);
   a->net_wm_window_type_tooltip = OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_TOOLTIP);
   a->net_wm_window_type_notification = OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_NOTIFICATION);
-  a->net_wm_state_sticky = XInternAtom(panel->dpy, "_NET_WM_STATE_STICKY", False);
+  a->net_wm_state_sticky = intern_atom(panel->dpy, "_NET_WM_STATE_STICKY");
   a->net_wm_visible_name = OBT_PROP_ATOM(NET_WM_VISIBLE_NAME);
   a->net_wm_name = OBT_PROP_ATOM(NET_WM_NAME);
   a->wm_name = XA_WM_NAME;

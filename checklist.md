@@ -11,7 +11,7 @@
 - [ ] `openbox/moveresize.c` — XSync alarms/events; evaluate XCB sync extension path or keep minimal Xlib interop.
 
 ## Tools using Xlib atoms/properties
-- [ ] `tools/obpanel/obpanel.c` — atom setup uses `XInternAtom`; migrate to `xcb_intern_atom` and adjust property/event calls accordingly.
+- [x] `tools/obpanel/obpanel.c` — atom setup uses `XInternAtom`; migrate to `xcb_intern_atom` and adjust property/event calls accordingly.
 
 ## Tests still using Xlib atom/property helpers
 - [x] `tests/oldfullscreen.c` — motif hints atoms via `XInternAtom`/`XChangeProperty`; port to XCB.
@@ -29,4 +29,4 @@
 - [x] `tests/duplicatesession.c` — `SM_CLIENT_ID`/`STRING` via `XInternAtom`; port to XCB.
 ## Notes
 - No remaining `XGetWindowProperty` callers found; property fetches now use shared helpers or XCB in touched paths.
-- Recently migrated: `tests/icons.c`, `tests/extentsrequest.c`, `tests/usertimewin.c`, `tests/wmhints.c`, `tests/oldfullscreen.c`, `tests/fullscreen.c`, `tests/skiptaskbar.c`, `tests/skiptaskbar2.c`, `tests/modal*.c`, `tests/groupmodal.c`, `tests/urgent.c`, `tests/iconifydelay.c`, `tests/strut.c`, `tests/confignotifymax.c`, `tests/mapiconic.c`, `tests/restack.c`, `tests/title.c`, `tests/duplicatesession.c`, `tools/obxprop/obxprop.c` now XCB-based.
+- Recently migrated: `tests/icons.c`, `tests/extentsrequest.c`, `tests/usertimewin.c`, `tests/wmhints.c`, `tests/oldfullscreen.c`, `tests/fullscreen.c`, `tests/skiptaskbar.c`, `tests/skiptaskbar2.c`, `tests/modal*.c`, `tests/groupmodal.c`, `tests/urgent.c`, `tests/iconifydelay.c`, `tests/strut.c`, `tests/confignotifymax.c`, `tests/mapiconic.c`, `tests/restack.c`, `tests/title.c`, `tests/duplicatesession.c`, `tools/obxprop/obxprop.c`, `tools/obpanel/obpanel.c` now XCB-based.
