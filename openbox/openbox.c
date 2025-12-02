@@ -143,7 +143,7 @@ static gboolean load_menu_file_with_fallbacks(const gchar* name, struct ob_confi
   if (ok)
     return TRUE;
 
-  /* allow running uninstalled from the build tree (binary in build*/openbox/) */
+  /* allow running uninstalled from the build tree (e.g. build-asan/openbox/) */
   gchar* exe_path = g_file_read_link("/proc/self/exe", NULL);
   if (exe_path) {
     gchar* exe_dir = g_path_get_dirname(exe_path);
