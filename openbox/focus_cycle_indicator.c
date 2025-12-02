@@ -26,6 +26,8 @@
 #include "obrender/render.h"
 
 #include <X11/Xlib.h>
+#include <X11/Xlib-xcb.h>
+#include <xcb/xcb.h>
 #include <glib.h>
 
 #define FOCUS_INDICATOR_WIDTH 6
@@ -41,13 +43,20 @@ static RrAppearance* a_focus_indicator;
 static RrColor* color_white;
 static gboolean visible;
 
-static Window create_window(Window parent, gulong mask, XSetWindowAttributes* attrib) {
-  return XCreateWindow(obt_display, parent, 0, 0, 1, 1, 0, RrDepth(ob_rr_inst), InputOutput, RrVisual(ob_rr_inst), mask,
-                       attrib);
+static Window create_window(Window parent, uint32_t mask, uint32_t* val) {
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
+  xcb_window_t win = xcb_generate_id(conn);
+  uint8_t depth = RrDepth(ob_rr_inst);
+  xcb_visualid_t visual = RrVisual(ob_rr_inst)->visualid;
+
+  xcb_create_window(conn, depth, win, parent, 0, 0, 1, 1, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT, visual, mask, val);
+  return win;
 }
 
 void focus_cycle_indicator_startup(gboolean reconfig) {
-  XSetWindowAttributes attr;
+  uint32_t mask;
+  uint32_t val[2];
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
 
   visible = FALSE;
 
@@ -59,12 +68,14 @@ void focus_cycle_indicator_startup(gboolean reconfig) {
   focus_indicator.right.type = OB_WINDOW_CLASS_INTERNAL;
   focus_indicator.bottom.type = OB_WINDOW_CLASS_INTERNAL;
 
-  attr.override_redirect = True;
-  attr.background_pixel = BlackPixel(obt_display, ob_screen);
-  focus_indicator.top.window = create_window(obt_root(ob_screen), CWOverrideRedirect | CWBackPixel, &attr);
-  focus_indicator.left.window = create_window(obt_root(ob_screen), CWOverrideRedirect | CWBackPixel, &attr);
-  focus_indicator.right.window = create_window(obt_root(ob_screen), CWOverrideRedirect | CWBackPixel, &attr);
-  focus_indicator.bottom.window = create_window(obt_root(ob_screen), CWOverrideRedirect | CWBackPixel, &attr);
+  mask = XCB_CW_OVERRIDE_REDIRECT | XCB_CW_BACK_PIXEL;
+  val[0] = 1; /* True */
+  val[1] = BlackPixel(obt_display, ob_screen);
+
+  focus_indicator.top.window = create_window(obt_root(ob_screen), mask, val);
+  focus_indicator.left.window = create_window(obt_root(ob_screen), mask, val);
+  focus_indicator.right.window = create_window(obt_root(ob_screen), mask, val);
+  focus_indicator.bottom.window = create_window(obt_root(ob_screen), mask, val);
 
   stacking_add(INTERNAL_AS_WINDOW(&focus_indicator.top));
   stacking_add(INTERNAL_AS_WINDOW(&focus_indicator.left));
@@ -92,6 +103,7 @@ void focus_cycle_indicator_startup(gboolean reconfig) {
 }
 
 void focus_cycle_indicator_shutdown(gboolean reconfig) {
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
   if (reconfig)
     return;
 
@@ -109,10 +121,10 @@ void focus_cycle_indicator_shutdown(gboolean reconfig) {
   stacking_remove(INTERNAL_AS_WINDOW(&focus_indicator.right));
   stacking_remove(INTERNAL_AS_WINDOW(&focus_indicator.bottom));
 
-  XDestroyWindow(obt_display, focus_indicator.top.window);
-  XDestroyWindow(obt_display, focus_indicator.left.window);
-  XDestroyWindow(obt_display, focus_indicator.right.window);
-  XDestroyWindow(obt_display, focus_indicator.bottom.window);
+  xcb_destroy_window(conn, focus_indicator.top.window);
+  xcb_destroy_window(conn, focus_indicator.left.window);
+  xcb_destroy_window(conn, focus_indicator.right.window);
+  xcb_destroy_window(conn, focus_indicator.bottom.window);
 }
 
 void focus_cycle_update_indicator(ObClient* c) {
@@ -121,16 +133,20 @@ void focus_cycle_update_indicator(ObClient* c) {
 }
 
 void focus_cycle_draw_indicator(ObClient* c) {
+  xcb_connection_t* conn = XGetXCBConnection(obt_display);
+  uint32_t mask = XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y | XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT;
+  uint32_t val[4];
+
   if (!c && visible) {
     gulong ignore_start;
 
     /* kill enter events cause by this unmapping */
     ignore_start = event_start_ignore_all_enters();
 
-    XUnmapWindow(obt_display, focus_indicator.top.window);
-    XUnmapWindow(obt_display, focus_indicator.left.window);
-    XUnmapWindow(obt_display, focus_indicator.right.window);
-    XUnmapWindow(obt_display, focus_indicator.bottom.window);
+    xcb_unmap_window(conn, focus_indicator.top.window);
+    xcb_unmap_window(conn, focus_indicator.left.window);
+    xcb_unmap_window(conn, focus_indicator.right.window);
+    xcb_unmap_window(conn, focus_indicator.bottom.window);
 
     event_end_ignore_all_enters(ignore_start);
 
@@ -156,7 +172,11 @@ void focus_cycle_draw_indicator(ObClient* c) {
     /* kill enter events cause by this moving */
     ignore_start = event_start_ignore_all_enters();
 
-    XMoveResizeWindow(obt_display, focus_indicator.top.window, x, y, w, h);
+    val[0] = x;
+    val[1] = y;
+    val[2] = w;
+    val[3] = h;
+    xcb_configure_window(conn, focus_indicator.top.window, mask, val);
     a_focus_indicator->texture[0].data.lineart.x1 = 0;
     a_focus_indicator->texture[0].data.lineart.y1 = h - 1;
     a_focus_indicator->texture[0].data.lineart.x2 = 0;
@@ -180,7 +200,11 @@ void focus_cycle_draw_indicator(ObClient* c) {
     w = wl;
     h = c->frame->area.height;
 
-    XMoveResizeWindow(obt_display, focus_indicator.left.window, x, y, w, h);
+    val[0] = x;
+    val[1] = y;
+    val[2] = w;
+    val[3] = h;
+    xcb_configure_window(conn, focus_indicator.left.window, mask, val);
     a_focus_indicator->texture[0].data.lineart.x1 = w - 1;
     a_focus_indicator->texture[0].data.lineart.y1 = 0;
     a_focus_indicator->texture[0].data.lineart.x2 = 0;
@@ -204,7 +228,11 @@ void focus_cycle_draw_indicator(ObClient* c) {
     w = wr;
     h = c->frame->area.height;
 
-    XMoveResizeWindow(obt_display, focus_indicator.right.window, x, y, w, h);
+    val[0] = x;
+    val[1] = y;
+    val[2] = w;
+    val[3] = h;
+    xcb_configure_window(conn, focus_indicator.right.window, mask, val);
     a_focus_indicator->texture[0].data.lineart.x1 = 0;
     a_focus_indicator->texture[0].data.lineart.y1 = 0;
     a_focus_indicator->texture[0].data.lineart.x2 = w - 1;
@@ -228,7 +256,11 @@ void focus_cycle_draw_indicator(ObClient* c) {
     w = c->frame->area.width;
     h = wb;
 
-    XMoveResizeWindow(obt_display, focus_indicator.bottom.window, x, y, w, h);
+    val[0] = x;
+    val[1] = y;
+    val[2] = w;
+    val[3] = h;
+    xcb_configure_window(conn, focus_indicator.bottom.window, mask, val);
     a_focus_indicator->texture[0].data.lineart.x1 = 0;
     a_focus_indicator->texture[0].data.lineart.y1 = 0;
     a_focus_indicator->texture[0].data.lineart.x2 = 0;
@@ -247,10 +279,10 @@ void focus_cycle_draw_indicator(ObClient* c) {
     a_focus_indicator->texture[3].data.lineart.y2 = 0;
     RrPaint(a_focus_indicator, focus_indicator.bottom.window, w, h);
 
-    XMapWindow(obt_display, focus_indicator.top.window);
-    XMapWindow(obt_display, focus_indicator.left.window);
-    XMapWindow(obt_display, focus_indicator.right.window);
-    XMapWindow(obt_display, focus_indicator.bottom.window);
+    xcb_map_window(conn, focus_indicator.top.window);
+    xcb_map_window(conn, focus_indicator.left.window);
+    xcb_map_window(conn, focus_indicator.right.window);
+    xcb_map_window(conn, focus_indicator.bottom.window);
 
     event_end_ignore_all_enters(ignore_start);
 
