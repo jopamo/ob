@@ -499,8 +499,10 @@ gboolean place_client(ObClient* client,
   h = &client_area->height;
   place_per_app_setting_size(client, monitor_area, w, h, settings);
 
-  if (!should_set_client_position(client, settings))
+  if (!should_set_client_position(client, settings)) {
+    g_slice_free(Rect, monitor_area);
     return FALSE;
+  }
 
   x = &client_area->x;
   y = &client_area->y;
