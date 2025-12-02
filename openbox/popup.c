@@ -37,7 +37,7 @@ ObPopup* popup_new(void) {
   ObPopup* self = g_slice_new0(ObPopup);
   xcb_connection_t* conn = XGetXCBConnection(obt_display);
   uint32_t mask;
-  uint32_t val[3];
+  uint32_t val[4];
 
   self->obwin.type = OB_WINDOW_CLASS_INTERNAL;
   self->gravity = NorthWestGravity;
