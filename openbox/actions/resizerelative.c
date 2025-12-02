@@ -15,36 +15,38 @@ typedef struct {
   gint bottom_denom;
 } Options;
 
-static gpointer setup_func(xmlNodePtr node);
+static gpointer setup_func(GHashTable* options);
 static void free_func(gpointer options);
 static gboolean run_func(ObActionsData* data, gpointer options);
 
 void action_resizerelative_startup(void) {
-  actions_register("ResizeRelative", setup_func, free_func, run_func);
+  actions_register_opt("ResizeRelative", setup_func, free_func, run_func);
 }
 
-static void xml_node_relative(xmlNodePtr n, gint* num, gint* denom) {
-  gchar* s;
+static void parse_relative_option(GHashTable* options, const char* key, gint* num, gint* denom) {
+  const char* val;
+  if (!options)
+    return;
 
-  s = obt_xml_node_string(n);
-  config_parse_relative_number(s, num, denom);
-  g_free(s);
+  val = g_hash_table_lookup(options, key);
+  if (val) {
+    gchar* dup = g_strdup(val);
+    config_parse_relative_number(dup, num, denom);
+    g_free(dup);
+  }
 }
 
-static gpointer setup_func(xmlNodePtr node) {
-  xmlNodePtr n;
+static gpointer setup_func(GHashTable* options) {
   Options* o;
 
   o = g_slice_new0(Options);
 
-  if ((n = obt_xml_find_node(node, "left")))
-    xml_node_relative(n, &o->left, &o->left_denom);
-  if ((n = obt_xml_find_node(node, "right")))
-    xml_node_relative(n, &o->right, &o->right_denom);
-  if ((n = obt_xml_find_node(node, "top")) || (n = obt_xml_find_node(node, "up")))
-    xml_node_relative(n, &o->top, &o->top_denom);
-  if ((n = obt_xml_find_node(node, "bottom")) || (n = obt_xml_find_node(node, "down")))
-    xml_node_relative(n, &o->bottom, &o->bottom_denom);
+  parse_relative_option(options, "left", &o->left, &o->left_denom);
+  parse_relative_option(options, "right", &o->right, &o->right_denom);
+  parse_relative_option(options, "top", &o->top, &o->top_denom);
+  parse_relative_option(options, "up", &o->top, &o->top_denom);
+  parse_relative_option(options, "bottom", &o->bottom, &o->bottom_denom);
+  parse_relative_option(options, "down", &o->bottom, &o->bottom_denom);
 
   return o;
 }

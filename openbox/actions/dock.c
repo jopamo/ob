@@ -7,8 +7,8 @@ static gboolean raise_func(ObActionsData* data, gpointer options);
 static gboolean lower_func(ObActionsData* data, gpointer options);
 
 void action_dock_startup(void) {
-  actions_register("RaiseDock", NULL, NULL, raise_func);
-  actions_register("LowerDock", NULL, NULL, lower_func);
+  actions_register_opt("RaiseDock", NULL, NULL, raise_func);
+  actions_register_opt("LowerDock", NULL, NULL, lower_func);
 }
 
 /* Always return FALSE because its not interactive */

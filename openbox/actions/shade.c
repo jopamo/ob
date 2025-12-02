@@ -6,9 +6,9 @@ static gboolean run_func_off(ObActionsData* data, gpointer options);
 static gboolean run_func_toggle(ObActionsData* data, gpointer options);
 
 void action_shade_startup(void) {
-  actions_register("Shade", NULL, NULL, run_func_on);
-  actions_register("Unshade", NULL, NULL, run_func_off);
-  actions_register("ToggleShade", NULL, NULL, run_func_toggle);
+  actions_register_opt("Shade", NULL, NULL, run_func_on);
+  actions_register_opt("Unshade", NULL, NULL, run_func_off);
+  actions_register_opt("ToggleShade", NULL, NULL, run_func_toggle);
 }
 
 /* Always return FALSE because its not interactive */

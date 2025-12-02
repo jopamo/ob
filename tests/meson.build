@@ -62,7 +62,7 @@ hidpi_test = executable(
   'test-hidpi',
   'hidpi.c',
   include_directories: [common_includes],
-  dependencies: [glib_dep, pango_dep, pangoxft_dep, xml_dep, x11_dep, xext_dep, xrender_dep],
+  dependencies: [glib_dep, pango_dep, pangoxft_dep, x11_dep, xext_dep, xrender_dep],
   link_with: [libobrender, libobt],
   install: false,
   build_by_default: false)

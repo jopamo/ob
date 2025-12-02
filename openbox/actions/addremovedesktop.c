@@ -7,54 +7,53 @@ typedef struct {
   gboolean add;
 } Options;
 
-static gpointer setup_func(xmlNodePtr node);
-static gpointer setup_add_func(xmlNodePtr node);
-static gpointer setup_remove_func(xmlNodePtr node);
+static gpointer setup_func(GHashTable* options);
+static gpointer setup_add_func(GHashTable* options);
+static gpointer setup_remove_func(GHashTable* options);
 static void free_func(gpointer o);
 static gboolean run_func(ObActionsData* data, gpointer options);
 /* 3.4-compatibility */
-static gpointer setup_addcurrent_func(xmlNodePtr node);
-static gpointer setup_addlast_func(xmlNodePtr node);
-static gpointer setup_removecurrent_func(xmlNodePtr node);
-static gpointer setup_removelast_func(xmlNodePtr node);
+static gpointer setup_addcurrent_func(GHashTable* options);
+static gpointer setup_addlast_func(GHashTable* options);
+static gpointer setup_removecurrent_func(GHashTable* options);
+static gpointer setup_removelast_func(GHashTable* options);
 
 void action_addremovedesktop_startup(void) {
-  actions_register("AddDesktop", setup_add_func, free_func, run_func);
-  actions_register("RemoveDesktop", setup_remove_func, free_func, run_func);
+  actions_register_opt("AddDesktop", setup_add_func, free_func, run_func);
+  actions_register_opt("RemoveDesktop", setup_remove_func, free_func, run_func);
 
   /* 3.4-compatibility */
-  actions_register("AddDesktopLast", setup_addlast_func, free_func, run_func);
-  actions_register("RemoveDesktopLast", setup_removelast_func, free_func, run_func);
-  actions_register("AddDesktopCurrent", setup_addcurrent_func, free_func, run_func);
-  actions_register("RemoveDesktopCurrent", setup_removecurrent_func, free_func, run_func);
+  actions_register_opt("AddDesktopLast", setup_addlast_func, free_func, run_func);
+  actions_register_opt("RemoveDesktopLast", setup_removelast_func, free_func, run_func);
+  actions_register_opt("AddDesktopCurrent", setup_addcurrent_func, free_func, run_func);
+  actions_register_opt("RemoveDesktopCurrent", setup_removecurrent_func, free_func, run_func);
 }
 
-static gpointer setup_func(xmlNodePtr node) {
-  xmlNodePtr n;
+static gpointer setup_func(GHashTable* options) {
   Options* o;
+  const char* where;
 
   o = g_slice_new0(Options);
 
-  if ((n = obt_xml_find_node(node, "where"))) {
-    gchar* s = obt_xml_node_string(n);
-    if (!g_ascii_strcasecmp(s, "last"))
+  where = options ? g_hash_table_lookup(options, "where") : NULL;
+  if (where) {
+    if (!g_ascii_strcasecmp(where, "last"))
       o->current = FALSE;
-    else if (!g_ascii_strcasecmp(s, "current"))
+    else if (!g_ascii_strcasecmp(where, "current"))
       o->current = TRUE;
-    g_free(s);
   }
 
   return o;
 }
 
-static gpointer setup_add_func(xmlNodePtr node) {
-  Options* o = setup_func(node);
+static gpointer setup_add_func(GHashTable* options) {
+  Options* o = setup_func(options);
   o->add = TRUE;
   return o;
 }
 
-static gpointer setup_remove_func(xmlNodePtr node) {
-  Options* o = setup_func(node);
+static gpointer setup_remove_func(GHashTable* options) {
+  Options* o = setup_func(options);
   o->add = FALSE;
   return o;
 }
@@ -80,26 +79,26 @@ static gboolean run_func(ObActionsData* data, gpointer options) {
 }
 
 /* 3.4-compatibility */
-static gpointer setup_addcurrent_func(xmlNodePtr node) {
-  Options* o = setup_add_func(node);
+static gpointer setup_addcurrent_func(GHashTable* options) {
+  Options* o = setup_add_func(options);
   o->current = TRUE;
   return o;
 }
 
-static gpointer setup_addlast_func(xmlNodePtr node) {
-  Options* o = setup_add_func(node);
+static gpointer setup_addlast_func(GHashTable* options) {
+  Options* o = setup_add_func(options);
   o->current = FALSE;
   return o;
 }
 
-static gpointer setup_removecurrent_func(xmlNodePtr node) {
-  Options* o = setup_remove_func(node);
+static gpointer setup_removecurrent_func(GHashTable* options) {
+  Options* o = setup_remove_func(options);
   o->current = TRUE;
   return o;
 }
 
-static gpointer setup_removelast_func(xmlNodePtr node) {
-  Options* o = setup_remove_func(node);
+static gpointer setup_removelast_func(GHashTable* options) {
+  Options* o = setup_remove_func(options);
   o->current = FALSE;
   return o;
 }

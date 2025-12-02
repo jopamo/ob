@@ -18,7 +18,6 @@
 
 #include "misc.h"
 #include "frame.h"
-#include "obt/xml.h"
 #include "obt/keyboard.h"
 
 #include <glib.h>
@@ -34,7 +33,7 @@ typedef struct _ObActionsSelectorData ObActionsSelectorData;
 
 typedef void (*ObActionsDataFreeFunc)(gpointer options);
 typedef gboolean (*ObActionsRunFunc)(ObActionsData* data, gpointer options);
-typedef gpointer (*ObActionsDataSetupFunc)(xmlNodePtr node);
+typedef gpointer (*ObActionsOptSetupFunc)(GHashTable* options);
 typedef void (*ObActionsShutdownFunc)(void);
 
 /* functions for interactive actions */
@@ -44,11 +43,11 @@ typedef gboolean (*ObActionsIPreFunc)(guint initial_state, gpointer options);
 typedef void (*ObActionsIPostFunc)(gpointer options);
 typedef gboolean (*ObActionsIInputFunc)(guint initial_state, XEvent* e, ObtIC* ic, gpointer options, gboolean* used);
 typedef void (*ObActionsICancelFunc)(gpointer options);
-typedef gpointer (*ObActionsIDataSetupFunc)(xmlNodePtr node,
-                                            ObActionsIPreFunc* pre,
-                                            ObActionsIInputFunc* input,
-                                            ObActionsICancelFunc* cancel,
-                                            ObActionsIPostFunc* post);
+typedef gpointer (*ObActionsIOptSetupFunc)(GHashTable* options,
+                                           ObActionsIPreFunc* pre,
+                                           ObActionsIInputFunc* input,
+                                           ObActionsICancelFunc* cancel,
+                                           ObActionsIPostFunc* post);
 
 struct _ObActionsData {
   ObUserAction uact;
@@ -64,23 +63,22 @@ struct _ObActionsData {
 void actions_startup(gboolean reconfigure);
 void actions_shutdown(gboolean reconfigure);
 
-/*! Use this if the actions created from this name may be interactive */
-gboolean actions_register_i(const gchar* name,
-                            ObActionsIDataSetupFunc setup,
-                            ObActionsDataFreeFunc free,
-                            ObActionsRunFunc run);
+gboolean actions_register_i_opt(const gchar* name,
+                                ObActionsIOptSetupFunc setup,
+                                ObActionsDataFreeFunc free,
+                                ObActionsRunFunc run);
 
-gboolean actions_register(const gchar* name,
-                          ObActionsDataSetupFunc setup,
-                          ObActionsDataFreeFunc free,
-                          ObActionsRunFunc run);
+gboolean actions_register_opt(const gchar* name,
+                              ObActionsOptSetupFunc setup,
+                              ObActionsDataFreeFunc free,
+                              ObActionsRunFunc run);
 
 gboolean actions_set_shutdown(const gchar* name, ObActionsShutdownFunc shutdown);
 gboolean actions_set_modifies_focused_window(const gchar* name, gboolean modifies);
 gboolean actions_set_can_stop(const gchar* name, gboolean modifies);
 
-ObActionsAct* actions_parse(xmlNodePtr node);
 ObActionsAct* actions_parse_string(const gchar* name);
+ObActionsAct* actions_create_with_options(const gchar* name, GHashTable* options);
 
 gboolean actions_act_is_interactive(ObActionsAct* act);
 

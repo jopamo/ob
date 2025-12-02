@@ -1,8 +1,11 @@
 #include "openbox/actions.h"
+#include "openbox/actions/helpers.h"
 #include "openbox/screen.h"
 #include "openbox/client.h"
 #include "openbox/openbox.h"
 #include "obt/keyboard.h"
+#include <stdlib.h>
+#include <string.h>
 
 typedef enum { LAST, CURRENT, RELATIVE, ABSOLUTE } SwitchType;
 
@@ -23,52 +26,70 @@ typedef struct {
   gboolean follow;
 } Options;
 
-static gpointer setup_func(xmlNodePtr node);
-static gpointer setup_send_func(xmlNodePtr node);
+static gpointer setup_func(GHashTable* options);
+static gpointer setup_send_func(GHashTable* options);
 static void free_func(gpointer o);
 static gboolean run_func(ObActionsData* data, gpointer options);
 
 /* 3.4-compatibility */
-static gpointer setup_go_last_func(xmlNodePtr node);
-static gpointer setup_send_last_func(xmlNodePtr node);
-static gpointer setup_go_abs_func(xmlNodePtr node);
-static gpointer setup_go_next_func(xmlNodePtr node);
-static gpointer setup_send_next_func(xmlNodePtr node);
-static gpointer setup_go_prev_func(xmlNodePtr node);
-static gpointer setup_send_prev_func(xmlNodePtr node);
-static gpointer setup_go_left_func(xmlNodePtr node);
-static gpointer setup_send_left_func(xmlNodePtr node);
-static gpointer setup_go_right_func(xmlNodePtr node);
-static gpointer setup_send_right_func(xmlNodePtr node);
-static gpointer setup_go_up_func(xmlNodePtr node);
-static gpointer setup_send_up_func(xmlNodePtr node);
-static gpointer setup_go_down_func(xmlNodePtr node);
-static gpointer setup_send_down_func(xmlNodePtr node);
+static gpointer setup_go_last_func(GHashTable* options);
+static gpointer setup_send_last_func(GHashTable* options);
+static gpointer setup_go_abs_func(GHashTable* options);
+static gpointer setup_go_next_func(GHashTable* options);
+static gpointer setup_send_next_func(GHashTable* options);
+static gpointer setup_go_prev_func(GHashTable* options);
+static gpointer setup_send_prev_func(GHashTable* options);
+static gpointer setup_go_left_func(GHashTable* options);
+static gpointer setup_send_left_func(GHashTable* options);
+static gpointer setup_go_right_func(GHashTable* options);
+static gpointer setup_send_right_func(GHashTable* options);
+static gpointer setup_go_up_func(GHashTable* options);
+static gpointer setup_send_up_func(GHashTable* options);
+static gpointer setup_go_down_func(GHashTable* options);
+static gpointer setup_send_down_func(GHashTable* options);
+static gpointer setup_go_first_func(GHashTable* options);
+static gpointer setup_go_second_func(GHashTable* options);
+static gpointer setup_go_third_func(GHashTable* options);
+static gpointer setup_go_fourth_func(GHashTable* options);
+static gpointer setup_send_first_func(GHashTable* options);
+static gpointer setup_send_second_func(GHashTable* options);
+static gpointer setup_send_third_func(GHashTable* options);
+static gpointer setup_send_fourth_func(GHashTable* options);
 
 void action_desktop_startup(void) {
-  actions_register("GoToDesktop", setup_func, free_func, run_func);
-  actions_register("SendToDesktop", setup_send_func, free_func, run_func);
+  actions_register_opt("GoToDesktop", setup_func, free_func, run_func);
+  actions_register_opt("SendToDesktop", setup_send_func, free_func, run_func);
   /* 3.4-compatibility */
-  actions_register("DesktopLast", setup_go_last_func, free_func, run_func);
-  actions_register("SendToDesktopLast", setup_send_last_func, free_func, run_func);
-  actions_register("Desktop", setup_go_abs_func, free_func, run_func);
-  actions_register("DesktopNext", setup_go_next_func, free_func, run_func);
-  actions_register("SendToDesktopNext", setup_send_next_func, free_func, run_func);
-  actions_register("DesktopPrevious", setup_go_prev_func, free_func, run_func);
-  actions_register("SendToDesktopPrevious", setup_send_prev_func, free_func, run_func);
-  actions_register("DesktopLeft", setup_go_left_func, free_func, run_func);
-  actions_register("SendToDesktopLeft", setup_send_left_func, free_func, run_func);
-  actions_register("DesktopRight", setup_go_right_func, free_func, run_func);
-  actions_register("SendToDesktopRight", setup_send_right_func, free_func, run_func);
-  actions_register("DesktopUp", setup_go_up_func, free_func, run_func);
-  actions_register("SendToDesktopUp", setup_send_up_func, free_func, run_func);
-  actions_register("DesktopDown", setup_go_down_func, free_func, run_func);
-  actions_register("SendToDesktopDown", setup_send_down_func, free_func, run_func);
+  actions_register_opt("DesktopLast", setup_go_last_func, free_func, run_func);
+  actions_register_opt("SendToDesktopLast", setup_send_last_func, free_func, run_func);
+  actions_register_opt("Desktop", setup_go_abs_func, free_func, run_func);
+  actions_register_opt("DesktopNext", setup_go_next_func, free_func, run_func);
+  actions_register_opt("SendToDesktopNext", setup_send_next_func, free_func, run_func);
+  actions_register_opt("DesktopPrevious", setup_go_prev_func, free_func, run_func);
+  actions_register_opt("SendToDesktopPrevious", setup_send_prev_func, free_func, run_func);
+  actions_register_opt("DesktopLeft", setup_go_left_func, free_func, run_func);
+  actions_register_opt("SendToDesktopLeft", setup_send_left_func, free_func, run_func);
+  actions_register_opt("DesktopRight", setup_go_right_func, free_func, run_func);
+  actions_register_opt("SendToDesktopRight", setup_send_right_func, free_func, run_func);
+  actions_register_opt("DesktopUp", setup_go_up_func, free_func, run_func);
+  actions_register_opt("SendToDesktopUp", setup_send_up_func, free_func, run_func);
+  actions_register_opt("DesktopDown", setup_go_down_func, free_func, run_func);
+  actions_register_opt("SendToDesktopDown", setup_send_down_func, free_func, run_func);
+  /* default keybindings compatibility */
+  actions_register_opt("DesktopFirst", setup_go_first_func, free_func, run_func);
+  actions_register_opt("DesktopSecond", setup_go_second_func, free_func, run_func);
+  actions_register_opt("DesktopThird", setup_go_third_func, free_func, run_func);
+  actions_register_opt("DesktopFourth", setup_go_fourth_func, free_func, run_func);
+  actions_register_opt("SendToDesktopFirst", setup_send_first_func, free_func, run_func);
+  actions_register_opt("SendToDesktopSecond", setup_send_second_func, free_func, run_func);
+  actions_register_opt("SendToDesktopThird", setup_send_third_func, free_func, run_func);
+  actions_register_opt("SendToDesktopFourth", setup_send_fourth_func, free_func, run_func);
 }
 
-static gpointer setup_func(xmlNodePtr node) {
-  xmlNodePtr n;
+static gpointer setup_func(GHashTable* options) {
   Options* o;
+  const char* s;
+  const char* wrap_s;
 
   o = g_slice_new0(Options);
   /* don't go anywhere if there are no options given */
@@ -77,8 +98,7 @@ static gpointer setup_func(xmlNodePtr node) {
   /* wrap by default - it's handy! */
   o->u.rel.wrap = TRUE;
 
-  if ((n = obt_xml_find_node(node, "to"))) {
-    gchar* s = obt_xml_node_string(n);
+  if ((s = g_hash_table_lookup(options, "to"))) {
     if (!g_ascii_strcasecmp(s, "last"))
       o->type = LAST;
     else if (!g_ascii_strcasecmp(s, "current"))
@@ -113,30 +133,30 @@ static gpointer setup_func(xmlNodePtr node) {
       o->type = ABSOLUTE;
       o->u.abs.desktop = atoi(s) - 1;
     }
-    g_free(s);
   }
 
-  if ((n = obt_xml_find_node(node, "wrap")))
-    o->u.rel.wrap = obt_xml_node_bool(n);
+  if ((wrap_s = g_hash_table_lookup(options, "wrap")))
+    o->u.rel.wrap = actions_parse_bool(wrap_s);
 
   return o;
 }
 
-static gpointer setup_send_func(xmlNodePtr node) {
-  xmlNodePtr n;
+static gpointer setup_send_func(GHashTable* options) {
   Options* o;
+  const char* s;
+  const char* follow_s;
 
-  o = setup_func(node);
-  if ((n = obt_xml_find_node(node, "desktop"))) {
+  o = setup_func(options);
+  if ((s = g_hash_table_lookup(options, "desktop"))) {
     /* 3.4 compatibility */
-    o->u.abs.desktop = obt_xml_node_int(n) - 1;
+    o->u.abs.desktop = atoi(s) - 1;
     o->type = ABSOLUTE;
   }
   o->send = TRUE;
   o->follow = TRUE;
 
-  if ((n = obt_xml_find_node(node, "follow")))
-    o->follow = obt_xml_node_bool(n);
+  if ((follow_s = g_hash_table_lookup(options, "follow")))
+    o->follow = actions_parse_bool(follow_s);
 
   return o;
 }
@@ -188,119 +208,160 @@ static gboolean run_func(ObActionsData* data, gpointer options) {
 }
 
 /* 3.4-compatilibity */
-static gpointer setup_follow(xmlNodePtr node) {
-  xmlNodePtr n;
+static gpointer setup_follow(GHashTable* options) {
   Options* o = g_slice_new0(Options);
+  const char* follow_s;
   o->send = TRUE;
   o->follow = TRUE;
-  if ((n = obt_xml_find_node(node, "follow")))
-    o->follow = obt_xml_node_bool(n);
+  if ((follow_s = g_hash_table_lookup(options, "follow")))
+    o->follow = actions_parse_bool(follow_s);
   return o;
 }
 
-static gpointer setup_go_last_func(xmlNodePtr node) {
+static gpointer setup_go_last_func(GHashTable* options) {
   Options* o = g_slice_new0(Options);
   o->type = LAST;
   return o;
 }
 
-static gpointer setup_send_last_func(xmlNodePtr node) {
-  Options* o = setup_follow(node);
+static gpointer setup_send_last_func(GHashTable* options) {
+  Options* o = setup_follow(options);
   o->type = LAST;
   return o;
 }
 
-static gpointer setup_go_abs_func(xmlNodePtr node) {
-  xmlNodePtr n;
+static gpointer setup_go_abs_func(GHashTable* options) {
   Options* o = g_slice_new0(Options);
+  const char* s;
   o->type = ABSOLUTE;
-  if ((n = obt_xml_find_node(node, "desktop")))
-    o->u.abs.desktop = obt_xml_node_int(n) - 1;
+  if ((s = g_hash_table_lookup(options, "desktop")))
+    o->u.abs.desktop = atoi(s) - 1;
   else
     o->u.abs.desktop = screen_desktop;
   return o;
 }
 
-static void setup_rel(Options* o, xmlNodePtr node, gboolean lin, ObDirection dir) {
-  xmlNodePtr n;
+static void setup_rel(Options* o, GHashTable* options, gboolean lin, ObDirection dir) {
+  const char* wrap_s;
 
   o->type = RELATIVE;
   o->u.rel.linear = lin;
   o->u.rel.dir = dir;
   o->u.rel.wrap = TRUE;
 
-  if ((n = obt_xml_find_node(node, "wrap")))
-    o->u.rel.wrap = obt_xml_node_bool(n);
+  if ((wrap_s = g_hash_table_lookup(options, "wrap")))
+    o->u.rel.wrap = actions_parse_bool(wrap_s);
 }
 
-static gpointer setup_go_next_func(xmlNodePtr node) {
+static gpointer setup_go_next_func(GHashTable* options) {
   Options* o = g_slice_new0(Options);
-  setup_rel(o, node, TRUE, OB_DIRECTION_EAST);
+  setup_rel(o, options, TRUE, OB_DIRECTION_EAST);
   return o;
 }
 
-static gpointer setup_send_next_func(xmlNodePtr node) {
-  Options* o = setup_follow(node);
-  setup_rel(o, node, TRUE, OB_DIRECTION_EAST);
+static gpointer setup_send_next_func(GHashTable* options) {
+  Options* o = setup_follow(options);
+  setup_rel(o, options, TRUE, OB_DIRECTION_EAST);
   return o;
 }
 
-static gpointer setup_go_prev_func(xmlNodePtr node) {
+static gpointer setup_go_prev_func(GHashTable* options) {
   Options* o = g_slice_new0(Options);
-  setup_rel(o, node, TRUE, OB_DIRECTION_WEST);
+  setup_rel(o, options, TRUE, OB_DIRECTION_WEST);
   return o;
 }
 
-static gpointer setup_send_prev_func(xmlNodePtr node) {
-  Options* o = setup_follow(node);
-  setup_rel(o, node, TRUE, OB_DIRECTION_WEST);
+static gpointer setup_send_prev_func(GHashTable* options) {
+  Options* o = setup_follow(options);
+  setup_rel(o, options, TRUE, OB_DIRECTION_WEST);
   return o;
 }
 
-static gpointer setup_go_left_func(xmlNodePtr node) {
+static gpointer setup_go_left_func(GHashTable* options) {
   Options* o = g_slice_new0(Options);
-  setup_rel(o, node, FALSE, OB_DIRECTION_WEST);
+  setup_rel(o, options, FALSE, OB_DIRECTION_WEST);
   return o;
 }
 
-static gpointer setup_send_left_func(xmlNodePtr node) {
-  Options* o = setup_follow(node);
-  setup_rel(o, node, FALSE, OB_DIRECTION_WEST);
+static gpointer setup_send_left_func(GHashTable* options) {
+  Options* o = setup_follow(options);
+  setup_rel(o, options, FALSE, OB_DIRECTION_WEST);
   return o;
 }
 
-static gpointer setup_go_right_func(xmlNodePtr node) {
+static gpointer setup_go_right_func(GHashTable* options) {
   Options* o = g_slice_new0(Options);
-  setup_rel(o, node, FALSE, OB_DIRECTION_EAST);
+  setup_rel(o, options, FALSE, OB_DIRECTION_EAST);
   return o;
 }
 
-static gpointer setup_send_right_func(xmlNodePtr node) {
-  Options* o = setup_follow(node);
-  setup_rel(o, node, FALSE, OB_DIRECTION_EAST);
+static gpointer setup_send_right_func(GHashTable* options) {
+  Options* o = setup_follow(options);
+  setup_rel(o, options, FALSE, OB_DIRECTION_EAST);
   return o;
 }
 
-static gpointer setup_go_up_func(xmlNodePtr node) {
+static gpointer setup_go_up_func(GHashTable* options) {
   Options* o = g_slice_new0(Options);
-  setup_rel(o, node, FALSE, OB_DIRECTION_NORTH);
+  setup_rel(o, options, FALSE, OB_DIRECTION_NORTH);
   return o;
 }
 
-static gpointer setup_send_up_func(xmlNodePtr node) {
-  Options* o = setup_follow(node);
-  setup_rel(o, node, FALSE, OB_DIRECTION_NORTH);
+static gpointer setup_send_up_func(GHashTable* options) {
+  Options* o = setup_follow(options);
+  setup_rel(o, options, FALSE, OB_DIRECTION_NORTH);
   return o;
 }
 
-static gpointer setup_go_down_func(xmlNodePtr node) {
+static gpointer setup_go_down_func(GHashTable* options) {
   Options* o = g_slice_new0(Options);
-  setup_rel(o, node, FALSE, OB_DIRECTION_SOUTH);
+  setup_rel(o, options, FALSE, OB_DIRECTION_SOUTH);
   return o;
 }
 
-static gpointer setup_send_down_func(xmlNodePtr node) {
-  Options* o = setup_follow(node);
-  setup_rel(o, node, FALSE, OB_DIRECTION_SOUTH);
+static gpointer setup_send_down_func(GHashTable* options) {
+  Options* o = setup_follow(options);
+  setup_rel(o, options, FALSE, OB_DIRECTION_SOUTH);
   return o;
+}
+
+static Options* setup_absolute(guint desktop, gboolean send) {
+  Options* o = g_slice_new0(Options);
+  o->type = ABSOLUTE;
+  o->u.abs.desktop = desktop;
+  o->send = send;
+  o->follow = send;
+  return o;
+}
+
+static gpointer setup_go_first_func(GHashTable* options) {
+  return setup_absolute(0, FALSE);
+}
+
+static gpointer setup_go_second_func(GHashTable* options) {
+  return setup_absolute(1, FALSE);
+}
+
+static gpointer setup_go_third_func(GHashTable* options) {
+  return setup_absolute(2, FALSE);
+}
+
+static gpointer setup_go_fourth_func(GHashTable* options) {
+  return setup_absolute(3, FALSE);
+}
+
+static gpointer setup_send_first_func(GHashTable* options) {
+  return setup_absolute(0, TRUE);
+}
+
+static gpointer setup_send_second_func(GHashTable* options) {
+  return setup_absolute(1, TRUE);
+}
+
+static gpointer setup_send_third_func(GHashTable* options) {
+  return setup_absolute(2, TRUE);
+}
+
+static gpointer setup_send_fourth_func(GHashTable* options) {
+  return setup_absolute(3, TRUE);
 }

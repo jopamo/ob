@@ -106,6 +106,12 @@ void screen_update_layout(void);
 /*! Get desktop names from the root window property */
 void screen_update_desktop_names(void);
 
+/*! Set desktop names from config */
+void screen_set_names(char** names, size_t count);
+
+/*! Set the desktop popup duration */
+void screen_set_popup_time(int ms);
+
 /*! Installs or uninstalls a colormap for a client. If client is NULL, then
   it handles the root colormap. */
 void screen_install_colormap(struct _ObClient* client, gboolean install);

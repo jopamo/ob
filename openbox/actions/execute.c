@@ -21,7 +21,7 @@ typedef struct {
   ObActionsData* data;
 } Options;
 
-static gpointer setup_func(xmlNodePtr node);
+static gpointer setup_func(GHashTable* options);
 static void free_func(gpointer options);
 static gboolean run_func(ObActionsData* data, gpointer options);
 static void shutdown_func(void);
@@ -30,7 +30,7 @@ static void client_dest(ObClient* client, gpointer data);
 static GSList* prompt_opts = NULL;
 
 void action_execute_startup(void) {
-  actions_register("Execute", setup_func, free_func, run_func);
+  actions_register_opt("Execute", setup_func, free_func, run_func);
   actions_set_shutdown("Execute", shutdown_func);
   actions_set_modifies_focused_window("Execute", FALSE);
 
@@ -47,32 +47,33 @@ static void client_dest(ObClient* client, gpointer data) {
   }
 }
 
-static gpointer setup_func(xmlNodePtr node) {
-  xmlNodePtr n;
+static gboolean parse_bool(const char* val) {
+  return (val && (g_ascii_strcasecmp(val, "yes") == 0 || g_ascii_strcasecmp(val, "true") == 0 ||
+                  g_ascii_strcasecmp(val, "on") == 0));
+}
+
+static gpointer setup_func(GHashTable* options) {
   Options* o;
+  const char* val;
 
   o = g_slice_new0(Options);
 
-  if ((n = obt_xml_find_node(node, "command")) || (n = obt_xml_find_node(node, "execute"))) {
-    gchar* s = obt_xml_node_string(n);
-    o->cmd = obt_paths_expand_tilde(s);
-    g_free(s);
+  if ((val = g_hash_table_lookup(options, "command")) || (val = g_hash_table_lookup(options, "execute"))) {
+    o->cmd = obt_paths_expand_tilde(val);
   }
 
-  if ((n = obt_xml_find_node(node, "prompt")))
-    o->prompt = obt_xml_node_string(n);
+  if ((val = g_hash_table_lookup(options, "prompt")))
+    o->prompt = g_strdup(val);
 
-  if ((n = obt_xml_find_node(node, "startupnotify"))) {
-    xmlNodePtr m;
-    if ((m = obt_xml_find_node(n->children, "enabled")))
-      o->sn = obt_xml_node_bool(m);
-    if ((m = obt_xml_find_node(n->children, "name")))
-      o->sn_name = obt_xml_node_string(m);
-    if ((m = obt_xml_find_node(n->children, "icon")))
-      o->sn_icon = obt_xml_node_string(m);
-    if ((m = obt_xml_find_node(n->children, "wmclass")))
-      o->sn_wmclass = obt_xml_node_string(m);
-  }
+  if ((val = g_hash_table_lookup(options, "startupnotify.enabled")))
+    o->sn = parse_bool(val);
+  if ((val = g_hash_table_lookup(options, "startupnotify.name")))
+    o->sn_name = g_strdup(val);
+  if ((val = g_hash_table_lookup(options, "startupnotify.icon")))
+    o->sn_icon = g_strdup(val);
+  if ((val = g_hash_table_lookup(options, "startupnotify.wmclass")))
+    o->sn_wmclass = g_strdup(val);
+
   return o;
 }
 

@@ -52,7 +52,6 @@ configure_file(
 # Static data files
 install_data('openbox.desktop', install_dir: appsdir_rel)
 install_data('openbox.png', install_dir: pixmapdir_rel)
-install_data(['rc.xml', 'menu.xml'], install_dir: rcdir_rel)
 install_data('environment', install_dir: rcdir_rel, install_mode: 'rwxr-xr-x')
 
 install_data('autostart/openbox-xdg-autostart',

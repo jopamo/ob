@@ -1,7 +1,6 @@
 obt_sources = files(
   'display.c',
   'keyboard.c',
-  'xml.c',
   'ddparse.c',
   'link.c',
   'paths.c',
@@ -11,7 +10,7 @@ obt_sources = files(
 )
 
 obt_cargs = common_defines + feature_defines + ['-DG_LOG_DOMAIN="Obt"']
-obt_deps = [glib_dep, xml_dep, x11_dep, xext_dep, obx11_dep]
+obt_deps = [glib_dep, x11_dep, xext_dep, obx11_dep]
 obt_deps += xkbcommon_deps
 obt_deps += xrandr_dep
 if have_xdamage
@@ -41,7 +40,6 @@ obt_headers = files(
   'link.h',
   'display.h',
   'keyboard.h',
-  'xml.h',
   'paths.h',
   'prop.h',
   'signal.h',

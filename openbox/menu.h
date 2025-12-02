@@ -28,6 +28,7 @@
 struct _ObClient;
 struct _ObMenuFrame;
 struct _ObMenuEntryFrame;
+struct ob_menu;
 
 typedef struct _ObMenu ObMenu;
 typedef struct _ObMenuEntry ObMenuEntry;
@@ -158,6 +159,7 @@ struct _ObMenuEntry {
 
 void menu_startup(gboolean reconfig);
 void menu_shutdown(gboolean reconfig);
+void menu_set_config(struct ob_menu* menu_cfg);
 
 void menu_entry_ref(ObMenuEntry* self);
 void menu_entry_unref(ObMenuEntry* self);

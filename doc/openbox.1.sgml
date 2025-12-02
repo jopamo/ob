@@ -41,10 +41,16 @@ manpage.1: manpage.sgml
       <arg><option>--replace</option></arg>
       <arg><option>--reconfigure</option></arg>
       <arg><option>--restart</option></arg>
+      <arg><option>--exit</option></arg>
       <arg><option>--sm-disable</option></arg>
       <arg><option>--sync</option></arg>
+      <arg><option>--startup <replaceable>CMD</replaceable></option></arg>
       <arg><option>--debug</option></arg>
       <arg><option>--debug-focus</option></arg>
+      <arg><option>--debug-session</option></arg>
+      <arg><option>--config-file <replaceable>FILE</replaceable></option></arg>
+      <arg><option>--check-config</option></arg>
+      <arg><option>--dump-config</option></arg>
     </cmdsynopsis>
   </refsynopsisdiv>
   <refsect1>
@@ -91,8 +97,10 @@ manpage.1: manpage.sgml
 
     <para>The default configuration and menu files are installed in
       @configdir@/openbox/, and the user configuration is placed in
-      ~/.config/openbox/. You can copy the default configuration and menus
-      to ~/.config/openbox and edit it to your liking.</para>
+      ~/.config/openbox/. The window manager reads
+      <filename>config.yaml</filename> and, if present,
+      <filename>menu.yaml</filename> from that directory. You can copy the
+      default YAML files to ~/.config/openbox and edit them to your liking.</para>
   </refsect1>
   <refsect1>
     <title>OPTIONS</title>
@@ -179,6 +187,19 @@ manpage.1: manpage.sgml
         <term><option>--debug-session</option></term>
         <listitem>
           <para>Display debugging output for session management.</para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--check-config</option></term>
+        <listitem>
+          <para>Load the YAML configuration file and report validation
+            errors, then exit.</para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--dump-config</option></term>
+        <listitem>
+          <para>Print the current configuration as YAML to standard output.</para>
         </listitem>
       </varlistentry>
       <varlistentry>

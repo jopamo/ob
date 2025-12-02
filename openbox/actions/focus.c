@@ -9,25 +9,27 @@ typedef struct {
   gboolean stop_int;
 } Options;
 
-static gpointer setup_func(xmlNodePtr node);
+static gpointer setup_func(GHashTable* options);
 static void free_func(gpointer o);
 static gboolean run_func(ObActionsData* data, gpointer options);
 
 void action_focus_startup(void) {
-  actions_register("Focus", setup_func, free_func, run_func);
+  actions_register_opt("Focus", setup_func, free_func, run_func);
 }
 
-static gpointer setup_func(xmlNodePtr node) {
-  xmlNodePtr n;
+static gpointer setup_func(GHashTable* options) {
   Options* o;
+  const char* val;
 
   o = g_slice_new0(Options);
   o->stop_int = TRUE;
 
-  if ((n = obt_xml_find_node(node, "here")))
-    o->here = obt_xml_node_bool(n);
-  if ((n = obt_xml_find_node(node, "stopInteractive")))
-    o->stop_int = obt_xml_node_bool(n);
+  if (options && (val = g_hash_table_lookup(options, "here")))
+    o->here = (g_ascii_strcasecmp(val, "true") == 0 || g_ascii_strcasecmp(val, "yes") == 0 ||
+               g_ascii_strcasecmp(val, "on") == 0);
+  if (options && (val = g_hash_table_lookup(options, "stopInteractive")))
+    o->stop_int = (g_ascii_strcasecmp(val, "true") == 0 || g_ascii_strcasecmp(val, "yes") == 0 ||
+                   g_ascii_strcasecmp(val, "on") == 0);
   return o;
 }
 

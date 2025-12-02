@@ -5,6 +5,7 @@
 #include "openbox/screen.h"
 #include "openbox/config.h"
 #include <glib.h>
+#include <stdlib.h>
 
 typedef struct {
   gchar* name;
@@ -14,57 +15,73 @@ typedef struct {
   gboolean use_position;
 } Options;
 
-static gpointer setup_func(xmlNodePtr node);
+static gpointer setup_func(GHashTable* options);
 static void free_func(gpointer options);
 static gboolean run_func(ObActionsData* data, gpointer options);
 
 void action_showmenu_startup(void) {
-  actions_register("ShowMenu", setup_func, free_func, run_func);
+  actions_register_opt("ShowMenu", setup_func, free_func, run_func);
 }
 
-static gpointer setup_func(xmlNodePtr node) {
-  xmlNodePtr n, c;
+static void parse_gravity_string(const char* val, GravityCoord* coord) {
+  if (!val)
+    return;
+
+  if (!g_ascii_strcasecmp(val, "center")) {
+    coord->center = TRUE;
+    return;
+  }
+
+  const char* pos = val;
+  if (val[0] == '-')
+    coord->opposite = TRUE;
+  if (val[0] == '-' || val[0] == '+')
+    pos++;
+
+  gchar* dup = g_strdup(pos);
+  config_parse_relative_number(dup, &coord->pos, &coord->denom);
+  g_free(dup);
+}
+
+static gpointer setup_func(GHashTable* options) {
   Options* o;
-  gboolean x_pos_given = FALSE;
+  gboolean have_x = FALSE;
+  const char* val;
 
   o = g_slice_new0(Options);
   o->monitor = -1;
 
-  if ((n = obt_xml_find_node(node, "menu")))
-    o->name = obt_xml_node_string(n);
+  val = options ? g_hash_table_lookup(options, "menu") : NULL;
+  if (val)
+    o->name = g_strdup(val);
 
-  if ((n = obt_xml_find_node(node, "position"))) {
-    if ((c = obt_xml_find_node(n->children, "x"))) {
-      if (!obt_xml_node_contains(c, "default")) {
-        config_parse_gravity_coord(c, &o->position.x);
-        x_pos_given = TRUE;
-      }
-    }
+  val = options ? g_hash_table_lookup(options, "x") : NULL;
+  if (val) {
+    parse_gravity_string(val, &o->position.x);
+    have_x = TRUE;
+  }
 
-    if (x_pos_given && (c = obt_xml_find_node(n->children, "y"))) {
-      if (!obt_xml_node_contains(c, "default")) {
-        config_parse_gravity_coord(c, &o->position.y);
-        o->use_position = TRUE;
-      }
-    }
+  val = options ? g_hash_table_lookup(options, "y") : NULL;
+  if (val && have_x) {
+    parse_gravity_string(val, &o->position.y);
+    o->use_position = TRUE;
+  }
 
-    /* unlike client placement, x/y is needed to specify a monitor,
-     * either it's under the mouse or it's in an exact actual position */
-    if (o->use_position && (c = obt_xml_find_node(n->children, "monitor"))) {
-      if (!obt_xml_node_contains(c, "default")) {
-        gchar* s = obt_xml_node_string(c);
-        if (!g_ascii_strcasecmp(s, "mouse"))
-          o->monitor_type = OB_PLACE_MONITOR_MOUSE;
-        else if (!g_ascii_strcasecmp(s, "active"))
-          o->monitor_type = OB_PLACE_MONITOR_ACTIVE;
-        else if (!g_ascii_strcasecmp(s, "primary"))
-          o->monitor_type = OB_PLACE_MONITOR_PRIMARY;
-        else if (!g_ascii_strcasecmp(s, "all"))
-          o->monitor_type = OB_PLACE_MONITOR_ALL;
-        else
-          o->monitor = obt_xml_node_int(c) - 1;
-        g_free(s);
-      }
+  /* unlike client placement, x/y is needed to specify a monitor,
+   * either it's under the mouse or it's in an exact actual position */
+  if (o->use_position) {
+    val = options ? g_hash_table_lookup(options, "monitor") : NULL;
+    if (val) {
+      if (!g_ascii_strcasecmp(val, "mouse"))
+        o->monitor_type = OB_PLACE_MONITOR_MOUSE;
+      else if (!g_ascii_strcasecmp(val, "active"))
+        o->monitor_type = OB_PLACE_MONITOR_ACTIVE;
+      else if (!g_ascii_strcasecmp(val, "primary"))
+        o->monitor_type = OB_PLACE_MONITOR_PRIMARY;
+      else if (!g_ascii_strcasecmp(val, "all"))
+        o->monitor_type = OB_PLACE_MONITOR_ALL;
+      else
+        o->monitor = atoi(val) - 1;
     }
   }
   return o;

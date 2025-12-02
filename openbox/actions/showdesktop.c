@@ -1,4 +1,5 @@
 #include "openbox/actions.h"
+#include "openbox/actions/helpers.h"
 #include "openbox/screen.h"
 
 typedef struct {
@@ -7,21 +8,23 @@ typedef struct {
   gboolean strict;
 } Options;
 
-static gpointer setup_func(xmlNodePtr node);
+static gpointer setup_func(GHashTable* options);
 static void free_func(gpointer o);
 static gboolean run_func(ObActionsData* data, gpointer options);
 
 void action_showdesktop_startup(void) {
-  actions_register("ToggleShowDesktop", setup_func, free_func, run_func);
+  actions_register_opt("ToggleShowDesktop", setup_func, free_func, run_func);
 }
 
-static gpointer setup_func(xmlNodePtr node) {
-  xmlNodePtr n;
+static gpointer setup_func(GHashTable* options) {
   Options* o = g_slice_new0(Options);
+  const char* val;
+
   o->strict = FALSE;
 
-  if ((n = obt_xml_find_node(node, "strict")))
-    o->strict = obt_xml_node_bool(n);
+  val = options ? g_hash_table_lookup(options, "strict") : NULL;
+  if (val)
+    o->strict = actions_parse_bool(val);
 
   return o;
 }

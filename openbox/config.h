@@ -27,7 +27,6 @@
 #include "geom.h"
 #include "moveresize.h"
 #include "obrender/render.h"
-#include "obt/xml.h"
 
 #include <glib.h>
 
@@ -210,22 +209,19 @@ extern guint config_submenu_hide_delay;
 extern gboolean config_menu_manage_desktops;
 /*! Load & show icons in user-defined menus */
 extern gboolean config_menu_show_icons;
-/*! User-specified menu files */
-extern GSList* config_menu_files;
 /*! Per app settings */
 extern GSList* config_per_app_settings;
 
-void config_startup(ObtXmlInst* i);
+void config_load_defaults(void);
 void config_shutdown(void);
 
 /*! Create an ObAppSettings structure with the default values */
 ObAppSettings* config_create_app_settings(void);
+/*! Clears the app settings list */
+void config_clear_app_settings(void);
 /*! Copies any settings in src to dest, if they are their default value in
   src. */
 void config_app_settings_copy_non_defaults(const ObAppSettings* src, ObAppSettings* dest);
-/*! Parses an x geometry style position, with some extensions like ratios
-  and percentages */
-void config_parse_gravity_coord(xmlNodePtr node, GravityCoord* c);
 /*! Parses a rational number or percentage into num and denom */
 void config_parse_relative_number(gchar* s, gint* num, gint* denom);
 

@@ -10,46 +10,43 @@ typedef struct {
   guint32 corner;
 } Options;
 
-static gpointer setup_func(xmlNodePtr node);
+static gpointer setup_func(GHashTable* options);
 static void free_func(gpointer o);
 static gboolean run_func(ObActionsData* data, gpointer options);
 
 static guint32 pick_corner(gint x, gint y, gint cx, gint cy, gint cw, gint ch, gboolean shaded);
 
 void action_resize_startup(void) {
-  actions_register("Resize", setup_func, free_func, run_func);
+  actions_register_opt("Resize", setup_func, free_func, run_func);
 }
 
-static gpointer setup_func(xmlNodePtr node) {
-  xmlNodePtr n;
+static gpointer setup_func(GHashTable* options) {
   Options* o;
+  const char* edge;
 
   o = g_slice_new0(Options);
 
-  if ((n = obt_xml_find_node(node, "edge"))) {
-    gchar* s = obt_xml_node_string(n);
-
+  edge = options ? g_hash_table_lookup(options, "edge") : NULL;
+  if (edge) {
     o->corner_specified = TRUE;
-    if (!g_ascii_strcasecmp(s, "top"))
+    if (!g_ascii_strcasecmp(edge, "top"))
       o->corner = OBT_PROP_ATOM(NET_WM_MOVERESIZE_SIZE_TOP);
-    else if (!g_ascii_strcasecmp(s, "bottom"))
+    else if (!g_ascii_strcasecmp(edge, "bottom"))
       o->corner = OBT_PROP_ATOM(NET_WM_MOVERESIZE_SIZE_BOTTOM);
-    else if (!g_ascii_strcasecmp(s, "left"))
+    else if (!g_ascii_strcasecmp(edge, "left"))
       o->corner = OBT_PROP_ATOM(NET_WM_MOVERESIZE_SIZE_LEFT);
-    else if (!g_ascii_strcasecmp(s, "right"))
+    else if (!g_ascii_strcasecmp(edge, "right"))
       o->corner = OBT_PROP_ATOM(NET_WM_MOVERESIZE_SIZE_RIGHT);
-    else if (!g_ascii_strcasecmp(s, "topleft"))
+    else if (!g_ascii_strcasecmp(edge, "topleft"))
       o->corner = OBT_PROP_ATOM(NET_WM_MOVERESIZE_SIZE_TOPLEFT);
-    else if (!g_ascii_strcasecmp(s, "topright"))
+    else if (!g_ascii_strcasecmp(edge, "topright"))
       o->corner = OBT_PROP_ATOM(NET_WM_MOVERESIZE_SIZE_TOPRIGHT);
-    else if (!g_ascii_strcasecmp(s, "bottomleft"))
+    else if (!g_ascii_strcasecmp(edge, "bottomleft"))
       o->corner = OBT_PROP_ATOM(NET_WM_MOVERESIZE_SIZE_BOTTOMLEFT);
-    else if (!g_ascii_strcasecmp(s, "bottomright"))
+    else if (!g_ascii_strcasecmp(edge, "bottomright"))
       o->corner = OBT_PROP_ATOM(NET_WM_MOVERESIZE_SIZE_BOTTOMRIGHT);
     else
       o->corner_specified = FALSE;
-
-    g_free(s);
   }
   return o;
 }

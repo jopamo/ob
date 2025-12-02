@@ -3,6 +3,8 @@
 #include "openbox/screen.h"
 #include "openbox/frame.h"
 #include "openbox/config.h"
+#include "openbox/actions/helpers.h"
+#include <stdlib.h>
 
 enum { CURRENT_MONITOR = -1, ALL_MONITORS = -2, NEXT_MONITOR = -3, PREV_MONITOR = -4 };
 
@@ -18,21 +20,41 @@ typedef struct {
   gboolean h_sets_client_size;
 } Options;
 
-static gpointer setup_func(xmlNodePtr node);
+static gpointer setup_func(GHashTable* options);
 static void free_func(gpointer o);
 static gboolean run_func(ObActionsData* data, gpointer options);
 /* 3.4-compatibility */
-static gpointer setup_center_func(xmlNodePtr node);
+static gpointer setup_center_func(GHashTable* options);
 
 void action_moveresizeto_startup(void) {
-  actions_register("MoveResizeTo", setup_func, free_func, run_func);
+  actions_register_opt("MoveResizeTo", setup_func, free_func, run_func);
   /* 3.4-compatibility */
-  actions_register("MoveToCenter", setup_center_func, free_func, run_func);
+  actions_register_opt("MoveToCenter", setup_center_func, free_func, run_func);
 }
 
-static gpointer setup_func(xmlNodePtr node) {
-  xmlNodePtr n;
+static void parse_gravity_string(const char* val, GravityCoord* coord) {
+  if (!val)
+    return;
+
+  if (!g_ascii_strcasecmp(val, "center")) {
+    coord->center = TRUE;
+    return;
+  }
+
+  const char* pos = val;
+  if (val[0] == '-')
+    coord->opposite = TRUE;
+  if (val[0] == '-' || val[0] == '+')
+    pos++;
+
+  gchar* dup = g_strdup(pos);
+  config_parse_relative_number(dup, &coord->pos, &coord->denom);
+  g_free(dup);
+}
+
+static gpointer setup_func(GHashTable* options) {
   Options* o;
+  const char* val;
 
   o = g_slice_new0(Options);
   o->x.pos = G_MININT;
@@ -41,42 +63,45 @@ static gpointer setup_func(xmlNodePtr node) {
   o->h = G_MININT;
   o->monitor = CURRENT_MONITOR;
 
-  if ((n = obt_xml_find_node(node, "x")))
-    config_parse_gravity_coord(n, &o->x);
+  val = options ? g_hash_table_lookup(options, "x") : NULL;
+  if (val)
+    parse_gravity_string(val, &o->x);
 
-  if ((n = obt_xml_find_node(node, "y")))
-    config_parse_gravity_coord(n, &o->y);
+  val = options ? g_hash_table_lookup(options, "y") : NULL;
+  if (val)
+    parse_gravity_string(val, &o->y);
 
-  if ((n = obt_xml_find_node(node, "width"))) {
-    gchar* s = obt_xml_node_string(n);
-    if (g_ascii_strcasecmp(s, "current") != 0)
-      config_parse_relative_number(s, &o->w, &o->w_denom);
+  val = options ? g_hash_table_lookup(options, "width") : NULL;
+  if (val && g_ascii_strcasecmp(val, "current") != 0) {
+    gchar* s = g_strdup(val);
+    config_parse_relative_number(s, &o->w, &o->w_denom);
     g_free(s);
-
-    obt_xml_attr_bool(n, "client", &o->w_sets_client_size);
-  }
-  if ((n = obt_xml_find_node(node, "height"))) {
-    gchar* s = obt_xml_node_string(n);
-    if (g_ascii_strcasecmp(s, "current") != 0)
-      config_parse_relative_number(s, &o->h, &o->h_denom);
-    g_free(s);
-
-    obt_xml_attr_bool(n, "client", &o->h_sets_client_size);
   }
 
-  if ((n = obt_xml_find_node(node, "monitor"))) {
-    gchar* s = obt_xml_node_string(n);
-    if (g_ascii_strcasecmp(s, "current") != 0) {
-      if (!g_ascii_strcasecmp(s, "all"))
-        o->monitor = ALL_MONITORS;
-      else if (!g_ascii_strcasecmp(s, "next"))
-        o->monitor = NEXT_MONITOR;
-      else if (!g_ascii_strcasecmp(s, "prev"))
-        o->monitor = PREV_MONITOR;
-      else
-        o->monitor = obt_xml_node_int(n) - 1;
-    }
+  val = options ? g_hash_table_lookup(options, "height") : NULL;
+  if (val && g_ascii_strcasecmp(val, "current") != 0) {
+    gchar* s = g_strdup(val);
+    config_parse_relative_number(s, &o->h, &o->h_denom);
     g_free(s);
+  }
+
+  val = options ? g_hash_table_lookup(options, "width_client") : NULL;
+  if (val)
+    o->w_sets_client_size = actions_parse_bool(val);
+  val = options ? g_hash_table_lookup(options, "height_client") : NULL;
+  if (val)
+    o->h_sets_client_size = actions_parse_bool(val);
+
+  val = options ? g_hash_table_lookup(options, "monitor") : NULL;
+  if (val && g_ascii_strcasecmp(val, "current") != 0) {
+    if (!g_ascii_strcasecmp(val, "all"))
+      o->monitor = ALL_MONITORS;
+    else if (!g_ascii_strcasecmp(val, "next"))
+      o->monitor = NEXT_MONITOR;
+    else if (!g_ascii_strcasecmp(val, "prev"))
+      o->monitor = PREV_MONITOR;
+    else
+      o->monitor = atoi(val) - 1;
   }
 
   return o;
@@ -200,8 +225,10 @@ static gboolean run_func(ObActionsData* data, gpointer options) {
 }
 
 /* 3.4-compatibility */
-static gpointer setup_center_func(xmlNodePtr node) {
+static gpointer setup_center_func(GHashTable* options) {
   Options* o;
+
+  (void)options;
 
   o = g_slice_new0(Options);
   o->x.pos = G_MININT;

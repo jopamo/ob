@@ -18,12 +18,14 @@
 */
 
 #include "openbox/actions.h"
+#include "openbox/actions/helpers.h"
 #include "openbox/misc.h"
 #include "openbox/client.h"
 #include "openbox/frame.h"
 #include "openbox/screen.h"
 #include "openbox/focus.h"
 #include <glib.h>
+#include <stdlib.h>
 
 typedef enum {
   QUERY_TARGET_IS_ACTION_TARGET,
@@ -84,7 +86,7 @@ typedef struct {
   GSList* elseacts;
 } Options;
 
-static gpointer setup_func(xmlNodePtr node);
+static gpointer setup_func(GHashTable* options);
 static void free_func(gpointer options);
 static gboolean run_func_if(ObActionsData* data, gpointer options);
 static gboolean run_func_stop(ObActionsData* data, gpointer options);
@@ -93,42 +95,38 @@ static gboolean run_func_foreach(ObActionsData* data, gpointer options);
 static gboolean foreach_stop;
 
 void action_if_startup(void) {
-  actions_register("If", setup_func, free_func, run_func_if);
-  actions_register("Stop", NULL, NULL, run_func_stop);
-  actions_register("ForEach", setup_func, free_func, run_func_foreach);
+  actions_register_opt("If", setup_func, free_func, run_func_if);
+  actions_register_opt("Stop", NULL, NULL, run_func_stop);
+  actions_register_opt("ForEach", setup_func, free_func, run_func_foreach);
 
   actions_set_can_stop("Stop", TRUE);
 }
 
-static inline void set_bool(xmlNodePtr node, const char* name, gboolean* on, gboolean* off) {
-  xmlNodePtr n;
-
-  if ((n = obt_xml_find_node(node, name))) {
-    if (obt_xml_node_bool(n))
-      *on = TRUE;
-    else
-      *off = TRUE;
-  }
+static inline void set_bool_option(GHashTable* options, const char* name, gboolean* on, gboolean* off) {
+  const char* val = options ? g_hash_table_lookup(options, name) : NULL;
+  if (!val)
+    return;
+  if (actions_parse_bool(val))
+    *on = TRUE;
+  else
+    *off = TRUE;
 }
 
-static void setup_typed_match(TypedMatch* tm, xmlNodePtr n) {
-  gchar* s;
-  if ((s = obt_xml_node_string(n))) {
-    gchar* type = NULL;
-    if (!obt_xml_attr_string(n, "type", &type) || !g_ascii_strcasecmp(type, "pattern")) {
-      tm->type = MATCH_TYPE_PATTERN;
-      tm->m.pattern = g_pattern_spec_new(s);
-    }
-    else if (type && !g_ascii_strcasecmp(type, "regex")) {
-      tm->type = MATCH_TYPE_REGEX;
-      tm->m.regex = g_regex_new(s, 0, 0, NULL);
-    }
-    else if (type && !g_ascii_strcasecmp(type, "exact")) {
-      tm->type = MATCH_TYPE_EXACT;
-      tm->m.exact = g_strdup(s);
-    }
-    g_free(s);
-    g_free(type);
+static void setup_typed_match(TypedMatch* tm, const char* value, const char* type) {
+  if (!value)
+    return;
+
+  if (type && !g_ascii_strcasecmp(type, "pattern")) {
+    tm->type = MATCH_TYPE_PATTERN;
+    tm->m.pattern = g_pattern_spec_new(value);
+  }
+  else if (type && !g_ascii_strcasecmp(type, "regex")) {
+    tm->type = MATCH_TYPE_REGEX;
+    tm->m.regex = g_regex_new(value, 0, 0, NULL);
+  }
+  else {
+    tm->type = MATCH_TYPE_EXACT;
+    tm->m.exact = g_strdup(value);
   }
 }
 
@@ -149,6 +147,8 @@ static void free_typed_match(TypedMatch* tm) {
 }
 
 static gboolean check_typed_match(TypedMatch* tm, const gchar* s) {
+  if (!s)
+    return tm->type == MATCH_TYPE_NONE;
   switch (tm->type) {
     case MATCH_TYPE_PATTERN:
       return g_pattern_spec_match_string(tm->m.pattern, s);
@@ -162,106 +162,91 @@ static gboolean check_typed_match(TypedMatch* tm, const gchar* s) {
   g_assert_not_reached();
 }
 
-static void setup_query(Options* o, xmlNodePtr node, QueryTarget target) {
+static void setup_query(Options* o, GHashTable* options, QueryTarget target) {
   Query* q = g_slice_new0(Query);
   g_array_append_val(o->queries, q);
 
   q->target = target;
 
-  set_bool(node, "shaded", &q->shaded_on, &q->shaded_off);
-  set_bool(node, "maximized", &q->maxfull_on, &q->maxfull_off);
-  set_bool(node, "maximizedhorizontal", &q->maxhorz_on, &q->maxhorz_off);
-  set_bool(node, "maximizedvertical", &q->maxvert_on, &q->maxvert_off);
-  set_bool(node, "iconified", &q->iconic_on, &q->iconic_off);
-  set_bool(node, "focused", &q->focused, &q->unfocused);
-  set_bool(node, "urgent", &q->urgent_on, &q->urgent_off);
-  set_bool(node, "undecorated", &q->decor_off, &q->decor_on);
-  set_bool(node, "omnipresent", &q->omnipresent_on, &q->omnipresent_off);
+  set_bool_option(options, "shaded", &q->shaded_on, &q->shaded_off);
+  set_bool_option(options, "maximized", &q->maxfull_on, &q->maxfull_off);
+  set_bool_option(options, "maximizedhorizontal", &q->maxhorz_on, &q->maxhorz_off);
+  set_bool_option(options, "maximizedvertical", &q->maxvert_on, &q->maxvert_off);
+  set_bool_option(options, "iconified", &q->iconic_on, &q->iconic_off);
+  set_bool_option(options, "focused", &q->focused, &q->unfocused);
+  set_bool_option(options, "urgent", &q->urgent_on, &q->urgent_off);
+  set_bool_option(options, "undecorated", &q->decor_off, &q->decor_on);
+  set_bool_option(options, "omnipresent", &q->omnipresent_on, &q->omnipresent_off);
 
-  xmlNodePtr n;
-  if ((n = obt_xml_find_node(node, "desktop"))) {
-    gchar* s;
-    if ((s = obt_xml_node_string(n))) {
-      if (!g_ascii_strcasecmp(s, "current"))
-        q->desktop_current = TRUE;
-      if (!g_ascii_strcasecmp(s, "other"))
-        q->desktop_other = TRUE;
-      else
-        q->desktop_number = atoi(s);
-      g_free(s);
-    }
+  const char* s = options ? g_hash_table_lookup(options, "desktop") : NULL;
+  if (s) {
+    if (!g_ascii_strcasecmp(s, "current"))
+      q->desktop_current = TRUE;
+    else if (!g_ascii_strcasecmp(s, "other"))
+      q->desktop_other = TRUE;
+    else
+      q->desktop_number = atoi(s);
   }
-  if ((n = obt_xml_find_node(node, "activedesktop"))) {
-    q->screendesktop_number = obt_xml_node_int(n);
-  }
-  if ((n = obt_xml_find_node(node, "title"))) {
-    setup_typed_match(&q->title, n);
-  }
-  if ((n = obt_xml_find_node(node, "class"))) {
-    setup_typed_match(&q->class, n);
-  }
-  if ((n = obt_xml_find_node(node, "name"))) {
-    setup_typed_match(&q->name, n);
-  }
-  if ((n = obt_xml_find_node(node, "role"))) {
-    setup_typed_match(&q->role, n);
-  }
-  if ((n = obt_xml_find_node(node, "type"))) {
-    setup_typed_match(&q->type, n);
-  }
-  if ((n = obt_xml_find_node(node, "monitor"))) {
-    q->client_monitor = obt_xml_node_int(n);
-  }
+
+  s = options ? g_hash_table_lookup(options, "activedesktop") : NULL;
+  if (s)
+    q->screendesktop_number = atoi(s);
+
+  const char* title = options ? g_hash_table_lookup(options, "title") : NULL;
+  const char* title_type = options ? g_hash_table_lookup(options, "title_match") : NULL;
+  setup_typed_match(&q->title, title, title_type);
+
+  const char* class = options ? g_hash_table_lookup(options, "class") : NULL;
+  const char* class_type = options ? g_hash_table_lookup(options, "class_match") : NULL;
+  setup_typed_match(&q->class, class, class_type);
+
+  const char* name = options ? g_hash_table_lookup(options, "name") : NULL;
+  const char* name_type = options ? g_hash_table_lookup(options, "name_match") : NULL;
+  setup_typed_match(&q->name, name, name_type);
+
+  const char* role = options ? g_hash_table_lookup(options, "role") : NULL;
+  const char* role_type = options ? g_hash_table_lookup(options, "role_match") : NULL;
+  setup_typed_match(&q->role, role, role_type);
+
+  const char* type = options ? g_hash_table_lookup(options, "type") : NULL;
+  const char* type_match = options ? g_hash_table_lookup(options, "type_match") : NULL;
+  setup_typed_match(&q->type, type, type_match);
+
+  s = options ? g_hash_table_lookup(options, "monitor") : NULL;
+  if (s)
+    q->client_monitor = atoi(s);
 }
 
-static gpointer setup_func(xmlNodePtr node) {
+static void parse_actions_list(const char* val, GSList** list) {
+  if (!val)
+    return;
+  gchar** names = g_strsplit_set(val, ", ", 0);
+  for (gchar** it = names; it && *it; ++it) {
+    if (**it == '\0')
+      continue;
+    ObActionsAct* action = actions_parse_string(*it);
+    if (action)
+      *list = g_slist_append(*list, action);
+  }
+  g_strfreev(names);
+}
+
+static gpointer setup_func(GHashTable* options) {
   Options* o = g_slice_new0(Options);
 
   gboolean zero_terminated = FALSE;
   gboolean clear_to_zero_on_alloc = FALSE;
   o->queries = g_array_new(zero_terminated, clear_to_zero_on_alloc, sizeof(Query*));
 
-  xmlNodePtr n;
-  if ((n = obt_xml_find_node(node, "then"))) {
-    xmlNodePtr m;
+  parse_actions_list(options ? g_hash_table_lookup(options, "then") : NULL, &o->thenacts);
+  parse_actions_list(options ? g_hash_table_lookup(options, "else") : NULL, &o->elseacts);
 
-    m = obt_xml_find_node(n->children, "action");
-    while (m) {
-      ObActionsAct* action = actions_parse(m);
-      if (action)
-        o->thenacts = g_slist_append(o->thenacts, action);
-      m = obt_xml_find_node(m->next, "action");
-    }
-  }
-  if ((n = obt_xml_find_node(node, "else"))) {
-    xmlNodePtr m;
+  QueryTarget target = QUERY_TARGET_IS_ACTION_TARGET;
+  const char* target_str = options ? g_hash_table_lookup(options, "target") : NULL;
+  if (target_str && !g_ascii_strcasecmp(target_str, "focus"))
+    target = QUERY_TARGET_IS_FOCUS_TARGET;
 
-    m = obt_xml_find_node(n->children, "action");
-    while (m) {
-      ObActionsAct* action = actions_parse(m);
-      if (action)
-        o->elseacts = g_slist_append(o->elseacts, action);
-      m = obt_xml_find_node(m->next, "action");
-    }
-  }
-
-  xmlNodePtr query_node = obt_xml_find_node(node, "query");
-  if (!query_node) {
-    /* The default query if none is specified. It uses the conditions
-       found in the action's node. */
-    setup_query(o, node, QUERY_TARGET_IS_ACTION_TARGET);
-  }
-  else {
-    while (query_node) {
-      QueryTarget query_target = QUERY_TARGET_IS_ACTION_TARGET;
-      if (obt_xml_attr_contains(query_node, "target", "focus"))
-        query_target = QUERY_TARGET_IS_FOCUS_TARGET;
-
-      setup_query(o, query_node->children, query_target);
-
-      query_node = obt_xml_find_node(query_node->next, "query");
-    }
-  }
+  setup_query(o, options, target);
 
   return o;
 }

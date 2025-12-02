@@ -8,46 +8,45 @@ typedef struct {
   MaxDirection dir;
 } Options;
 
-static gpointer setup_func(xmlNodePtr node);
+static gpointer setup_func(GHashTable* options);
 static void free_func(gpointer o);
 static gboolean run_func_on(ObActionsData* data, gpointer options);
 static gboolean run_func_off(ObActionsData* data, gpointer options);
 static gboolean run_func_toggle(ObActionsData* data, gpointer options);
 /* 3.4-compatibility */
-static gpointer setup_both_func(xmlNodePtr node);
-static gpointer setup_horz_func(xmlNodePtr node);
-static gpointer setup_vert_func(xmlNodePtr node);
+static gpointer setup_both_func(GHashTable* options);
+static gpointer setup_horz_func(GHashTable* options);
+static gpointer setup_vert_func(GHashTable* options);
 
 void action_maximize_startup(void) {
-  actions_register("Maximize", setup_func, free_func, run_func_on);
-  actions_register("Unmaximize", setup_func, free_func, run_func_off);
-  actions_register("ToggleMaximize", setup_func, free_func, run_func_toggle);
+  actions_register_opt("Maximize", setup_func, free_func, run_func_on);
+  actions_register_opt("Unmaximize", setup_func, free_func, run_func_off);
+  actions_register_opt("ToggleMaximize", setup_func, free_func, run_func_toggle);
   /* 3.4-compatibility */
-  actions_register("MaximizeFull", setup_both_func, free_func, run_func_on);
-  actions_register("UnmaximizeFull", setup_both_func, free_func, run_func_off);
-  actions_register("ToggleMaximizeFull", setup_both_func, free_func, run_func_toggle);
-  actions_register("MaximizeHorz", setup_horz_func, free_func, run_func_on);
-  actions_register("UnmaximizeHorz", setup_horz_func, free_func, run_func_off);
-  actions_register("ToggleMaximizeHorz", setup_horz_func, free_func, run_func_toggle);
-  actions_register("MaximizeVert", setup_vert_func, free_func, run_func_on);
-  actions_register("UnmaximizeVert", setup_vert_func, free_func, run_func_off);
-  actions_register("ToggleMaximizeVert", setup_vert_func, free_func, run_func_toggle);
+  actions_register_opt("MaximizeFull", setup_both_func, free_func, run_func_on);
+  actions_register_opt("UnmaximizeFull", setup_both_func, free_func, run_func_off);
+  actions_register_opt("ToggleMaximizeFull", setup_both_func, free_func, run_func_toggle);
+  actions_register_opt("MaximizeHorz", setup_horz_func, free_func, run_func_on);
+  actions_register_opt("UnmaximizeHorz", setup_horz_func, free_func, run_func_off);
+  actions_register_opt("ToggleMaximizeHorz", setup_horz_func, free_func, run_func_toggle);
+  actions_register_opt("MaximizeVert", setup_vert_func, free_func, run_func_on);
+  actions_register_opt("UnmaximizeVert", setup_vert_func, free_func, run_func_off);
+  actions_register_opt("ToggleMaximizeVert", setup_vert_func, free_func, run_func_toggle);
 }
 
-static gpointer setup_func(xmlNodePtr node) {
-  xmlNodePtr n;
+static gpointer setup_func(GHashTable* options) {
   Options* o;
+  const char* dir;
 
   o = g_slice_new0(Options);
   o->dir = BOTH;
 
-  if ((n = obt_xml_find_node(node, "direction"))) {
-    gchar* s = obt_xml_node_string(n);
-    if (!g_ascii_strcasecmp(s, "vertical") || !g_ascii_strcasecmp(s, "vert"))
+  dir = options ? g_hash_table_lookup(options, "direction") : NULL;
+  if (dir) {
+    if (!g_ascii_strcasecmp(dir, "vertical") || !g_ascii_strcasecmp(dir, "vert"))
       o->dir = VERT;
-    else if (!g_ascii_strcasecmp(s, "horizontal") || !g_ascii_strcasecmp(s, "horz"))
+    else if (!g_ascii_strcasecmp(dir, "horizontal") || !g_ascii_strcasecmp(dir, "horz"))
       o->dir = HORZ;
-    g_free(s);
   }
 
   return o;
@@ -94,20 +93,23 @@ static gboolean run_func_toggle(ObActionsData* data, gpointer options) {
 }
 
 /* 3.4-compatibility */
-static gpointer setup_both_func(xmlNodePtr node) {
+static gpointer setup_both_func(GHashTable* options) {
   Options* o = g_slice_new0(Options);
+  (void)options;
   o->dir = BOTH;
   return o;
 }
 
-static gpointer setup_horz_func(xmlNodePtr node) {
+static gpointer setup_horz_func(GHashTable* options) {
   Options* o = g_slice_new0(Options);
+  (void)options;
   o->dir = HORZ;
   return o;
 }
 
-static gpointer setup_vert_func(xmlNodePtr node) {
+static gpointer setup_vert_func(GHashTable* options) {
   Options* o = g_slice_new0(Options);
+  (void)options;
   o->dir = VERT;
   return o;
 }

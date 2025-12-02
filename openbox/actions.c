@@ -45,8 +45,8 @@ struct _ObActionsDefinition {
 
   gboolean canbeinteractive;
   union {
-    ObActionsIDataSetupFunc i;
-    ObActionsDataSetupFunc n;
+    ObActionsIOptSetupFunc io;
+    ObActionsOptSetupFunc o;
   } setup;
   ObActionsDataFreeFunc free;
   ObActionsRunFunc run;
@@ -111,31 +111,32 @@ ObActionsDefinition* do_register(const gchar* name, ObActionsDataFreeFunc free, 
   def->shutdown = NULL;
   def->modifies_focused_window = TRUE;
   def->can_stop = FALSE;
+  /* Union will be set by caller */
 
   registered = g_slist_prepend(registered, def);
   return def;
 }
 
-gboolean actions_register_i(const gchar* name,
-                            ObActionsIDataSetupFunc setup,
-                            ObActionsDataFreeFunc free,
-                            ObActionsRunFunc run) {
+gboolean actions_register_i_opt(const gchar* name,
+                                ObActionsIOptSetupFunc setup,
+                                ObActionsDataFreeFunc free,
+                                ObActionsRunFunc run) {
   ObActionsDefinition* def = do_register(name, free, run);
   if (def) {
     def->canbeinteractive = TRUE;
-    def->setup.i = setup;
+    def->setup.io = setup;
   }
   return def != NULL;
 }
 
-gboolean actions_register(const gchar* name,
-                          ObActionsDataSetupFunc setup,
-                          ObActionsDataFreeFunc free,
-                          ObActionsRunFunc run) {
+gboolean actions_register_opt(const gchar* name,
+                              ObActionsOptSetupFunc setup,
+                              ObActionsDataFreeFunc free,
+                              ObActionsRunFunc run) {
   ObActionsDefinition* def = do_register(name, free, run);
   if (def) {
     def->canbeinteractive = FALSE;
-    def->setup.n = setup;
+    def->setup.o = setup;
   }
   return def != NULL;
 }
@@ -224,40 +225,48 @@ static ObActionsAct* actions_build_act_from_string(const gchar* name) {
   return act;
 }
 
+ObActionsAct* actions_create_with_options(const gchar* name, GHashTable* options) {
+  ObActionsAct* act = actions_build_act_from_string(name);
+  if (act) {
+    gboolean destroy_opts = FALSE;
+    GHashTable* opts = options;
+
+    if (!opts) {
+      opts = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+      destroy_opts = TRUE;
+    }
+
+    if (act->def->canbeinteractive && act->def->setup.io) {
+      act->options = act->def->setup.io(opts, &act->i_pre, &act->i_input, &act->i_cancel, &act->i_post);
+    }
+    else if (!act->def->canbeinteractive && act->def->setup.o) {
+      act->options = act->def->setup.o(opts);
+    }
+
+    if (destroy_opts)
+      g_hash_table_destroy(opts);
+  }
+  return act;
+}
+
 ObActionsAct* actions_parse_string(const gchar* name) {
   ObActionsAct* act = NULL;
 
   if ((act = actions_build_act_from_string(name))) {
     if (act->def->canbeinteractive) {
-      if (act->def->setup.i)
-        act->options = act->def->setup.i(NULL, &act->i_pre, &act->i_input, &act->i_cancel, &act->i_post);
+      if (act->def->setup.io) {
+        GHashTable* opts = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+        act->options = act->def->setup.io(opts, &act->i_pre, &act->i_input, &act->i_cancel, &act->i_post);
+        g_hash_table_destroy(opts);
+      }
     }
     else {
-      if (act->def->setup.n)
-        act->options = act->def->setup.n(NULL);
-    }
-  }
-
-  return act;
-}
-
-ObActionsAct* actions_parse(xmlNodePtr node) {
-  gchar* name;
-  ObActionsAct* act = NULL;
-
-  if (obt_xml_attr_string(node, "name", &name)) {
-    if ((act = actions_build_act_from_string(name))) {
-      /* there is more stuff to parse here */
-      if (act->def->canbeinteractive) {
-        if (act->def->setup.i)
-          act->options = act->def->setup.i(node->children, &act->i_pre, &act->i_input, &act->i_cancel, &act->i_post);
-      }
-      else {
-        if (act->def->setup.n)
-          act->options = act->def->setup.n(node->children);
+      if (act->def->setup.o) {
+        GHashTable* opts = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+        act->options = act->def->setup.o(opts);
+        g_hash_table_destroy(opts);
       }
     }
-    g_free(name);
   }
 
   return act;

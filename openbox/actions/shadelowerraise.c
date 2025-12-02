@@ -6,8 +6,8 @@ static gboolean run_func_ur(ObActionsData* data, gpointer options);
 
 void action_shadelowerraise_startup() {
   /* 3.4-compatibility */
-  actions_register("ShadeLower", NULL, NULL, run_func_sl);
-  actions_register("UnshadeRaise", NULL, NULL, run_func_ur);
+  actions_register_opt("ShadeLower", NULL, NULL, run_func_sl);
+  actions_register_opt("UnshadeRaise", NULL, NULL, run_func_ur);
 }
 
 /* Always return FALSE because its not interactive */

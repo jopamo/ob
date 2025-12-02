@@ -70,7 +70,7 @@ obt_api_subdir = 'openbox/@0@/obt'.format(obt_version)
 glib_dep = dependency('glib-2.0', version: '>=2.14.0')
 pango_dep = dependency('pango', version: '>=1.8.0')
 pangoxft_dep = dependency('pangoxft', version: '>=1.8.0')
-xml_dep = dependency('libxml-2.0', version: '>=2.6.0')
+yaml_dep = dependency('yaml-0.1')
 x11_dep = dependency('x11')
 xext_dep = dependency('xext')
 xrender_dep = dependency('xrender')
@@ -255,7 +255,7 @@ subdir('po')
 # ---------------------------------------------------------------------------
 # Install pkg-config files for the public libraries
 # ---------------------------------------------------------------------------
-obt_private_libs = [x11_dep, xext_dep, xrender_dep, xml_dep, glib_dep]
+obt_private_libs = [x11_dep, xext_dep, xrender_dep, glib_dep]
 obt_private_libs += xrandr_dep
 if have_xdamage
   obt_private_libs += xdamage_dep
@@ -269,7 +269,7 @@ pkgconfig.generate(
   subdirs: obt_api_subdir,
   libraries: libobt,
   libraries_private: obt_private_libs,
-  requires: ['glib-2.0', 'libxml-2.0'])
+  requires: ['glib-2.0'])
 
 obrender_requires = ['obt-3.5', 'glib-2.0', 'xft', 'pangoxft']
 if have_imlib
@@ -280,7 +280,7 @@ if have_librsvg
 endif
 
 obrender_private_libs = [
-  x11_dep, xext_dep, xrender_dep, glib_dep, xml_dep,
+  x11_dep, xext_dep, xrender_dep, glib_dep,
   pango_dep, pangoxft_dep,
 ]
 if have_imlib
@@ -307,9 +307,6 @@ install_data(
   [
     'HACKING.md',
     'COPYING',
-    'data/rc.xsd',
-    'data/menu.xsd',
-    'doc/rc-mouse-focus.xml',
   ],
   install_dir: docdir_rel)
 

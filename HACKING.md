@@ -4,7 +4,7 @@
 
 * **openbox** — core window manager code
 * **obrender** — `librender`, shared rendering routines
-* **obt** — shared utility library (display, xml, keyboard, xqueue)
+* **obt** — shared utility library (display, keyboard, xqueue)
 * **data** — default configuration, themes, menu files
 * **tests** — X11 regression tests and unit tests
 * **tools** — helper utilities (e.g. obxprop, themeupdate)

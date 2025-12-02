@@ -7,6 +7,7 @@
 #include "openbox/misc.h"
 #include "gettext.h"
 #include "obt/keyboard.h"
+#include "openbox/actions/helpers.h"
 
 typedef struct {
   gboolean interactive;
@@ -21,13 +22,13 @@ typedef struct {
 
 static gboolean cycling = FALSE;
 
-static gpointer setup_func(xmlNodePtr node);
-static gpointer setup_cycle_func(xmlNodePtr node,
+static gpointer setup_func(GHashTable* options);
+static gpointer setup_cycle_func(GHashTable* options,
                                  ObActionsIPreFunc* pre,
                                  ObActionsIInputFunc* input,
                                  ObActionsICancelFunc* cancel,
                                  ObActionsIPostFunc* post);
-static gpointer setup_target_func(xmlNodePtr node);
+static gpointer setup_target_func(GHashTable* options);
 static void free_func(gpointer options);
 static gboolean run_func(ObActionsData* data, gpointer options);
 static gboolean i_input_func(guint initial_state, XEvent* e, ObtIC* ic, gpointer options, gboolean* used);
@@ -36,128 +37,124 @@ static void i_cancel_func(gpointer options);
 static void end_cycle(gboolean cancel, guint state, Options* o);
 
 /* 3.4-compatibility */
-static gpointer setup_north_cycle_func(xmlNodePtr node,
+static gpointer setup_north_cycle_func(GHashTable* options,
                                        ObActionsIPreFunc* pre,
                                        ObActionsIInputFunc* in,
                                        ObActionsICancelFunc* c,
                                        ObActionsIPostFunc* post);
-static gpointer setup_south_cycle_func(xmlNodePtr node,
+static gpointer setup_south_cycle_func(GHashTable* options,
                                        ObActionsIPreFunc* pre,
                                        ObActionsIInputFunc* in,
                                        ObActionsICancelFunc* c,
                                        ObActionsIPostFunc* post);
-static gpointer setup_east_cycle_func(xmlNodePtr node,
+static gpointer setup_east_cycle_func(GHashTable* options,
                                       ObActionsIPreFunc* pre,
                                       ObActionsIInputFunc* in,
                                       ObActionsICancelFunc* c,
                                       ObActionsIPostFunc* post);
-static gpointer setup_west_cycle_func(xmlNodePtr node,
+static gpointer setup_west_cycle_func(GHashTable* options,
                                       ObActionsIPreFunc* pre,
                                       ObActionsIInputFunc* in,
                                       ObActionsICancelFunc* c,
                                       ObActionsIPostFunc* post);
-static gpointer setup_northwest_cycle_func(xmlNodePtr node,
+static gpointer setup_northwest_cycle_func(GHashTable* options,
                                            ObActionsIPreFunc* pre,
                                            ObActionsIInputFunc* in,
                                            ObActionsICancelFunc* c,
                                            ObActionsIPostFunc* post);
-static gpointer setup_northeast_cycle_func(xmlNodePtr node,
+static gpointer setup_northeast_cycle_func(GHashTable* options,
                                            ObActionsIPreFunc* pre,
                                            ObActionsIInputFunc* in,
                                            ObActionsICancelFunc* c,
                                            ObActionsIPostFunc* post);
-static gpointer setup_southwest_cycle_func(xmlNodePtr node,
+static gpointer setup_southwest_cycle_func(GHashTable* options,
                                            ObActionsIPreFunc* pre,
                                            ObActionsIInputFunc* in,
                                            ObActionsICancelFunc* c,
                                            ObActionsIPostFunc* post);
-static gpointer setup_southeast_cycle_func(xmlNodePtr node,
+static gpointer setup_southeast_cycle_func(GHashTable* options,
                                            ObActionsIPreFunc* pre,
                                            ObActionsIInputFunc* in,
                                            ObActionsICancelFunc* c,
                                            ObActionsIPostFunc* post);
-static gpointer setup_north_target_func(xmlNodePtr node);
-static gpointer setup_south_target_func(xmlNodePtr node);
-static gpointer setup_east_target_func(xmlNodePtr node);
-static gpointer setup_west_target_func(xmlNodePtr node);
-static gpointer setup_northwest_target_func(xmlNodePtr node);
-static gpointer setup_northeast_target_func(xmlNodePtr node);
-static gpointer setup_southwest_target_func(xmlNodePtr node);
-static gpointer setup_southeast_target_func(xmlNodePtr node);
+static gpointer setup_north_target_func(GHashTable* options);
+static gpointer setup_south_target_func(GHashTable* options);
+static gpointer setup_east_target_func(GHashTable* options);
+static gpointer setup_west_target_func(GHashTable* options);
+static gpointer setup_northwest_target_func(GHashTable* options);
+static gpointer setup_northeast_target_func(GHashTable* options);
+static gpointer setup_southwest_target_func(GHashTable* options);
+static gpointer setup_southeast_target_func(GHashTable* options);
 
 void action_directionalwindows_startup(void) {
-  actions_register_i("DirectionalCycleWindows", setup_cycle_func, free_func, run_func);
-  actions_register("DirectionalTargetWindow", setup_target_func, free_func, run_func);
+  actions_register_i_opt("DirectionalCycleWindows", setup_cycle_func, free_func, run_func);
+  actions_register_opt("DirectionalTargetWindow", setup_target_func, free_func, run_func);
   /* 3.4-compatibility */
-  actions_register_i("DirectionalFocusNorth", setup_north_cycle_func, free_func, run_func);
-  actions_register_i("DirectionalFocusSouth", setup_south_cycle_func, free_func, run_func);
-  actions_register_i("DirectionalFocusWest", setup_west_cycle_func, free_func, run_func);
-  actions_register_i("DirectionalFocusEast", setup_east_cycle_func, free_func, run_func);
-  actions_register_i("DirectionalFocusNorthWest", setup_northwest_cycle_func, free_func, run_func);
-  actions_register_i("DirectionalFocusNorthEast", setup_northeast_cycle_func, free_func, run_func);
-  actions_register_i("DirectionalFocusSouthWest", setup_southwest_cycle_func, free_func, run_func);
-  actions_register_i("DirectionalFocusSouthEast", setup_southeast_cycle_func, free_func, run_func);
-  actions_register("DirectionalTargetNorth", setup_north_target_func, free_func, run_func);
-  actions_register("DirectionalTargetSouth", setup_south_target_func, free_func, run_func);
-  actions_register("DirectionalTargetWest", setup_west_target_func, free_func, run_func);
-  actions_register("DirectionalTargetEast", setup_east_target_func, free_func, run_func);
-  actions_register("DirectionalTargetNorthWest", setup_northwest_target_func, free_func, run_func);
-  actions_register("DirectionalTargetNorthEast", setup_northeast_target_func, free_func, run_func);
-  actions_register("DirectionalTargetSouthWest", setup_southwest_target_func, free_func, run_func);
-  actions_register("DirectionalTargetSouthEast", setup_southeast_target_func, free_func, run_func);
+  actions_register_i_opt("DirectionalFocusNorth", setup_north_cycle_func, free_func, run_func);
+  actions_register_i_opt("DirectionalFocusSouth", setup_south_cycle_func, free_func, run_func);
+  actions_register_i_opt("DirectionalFocusWest", setup_west_cycle_func, free_func, run_func);
+  actions_register_i_opt("DirectionalFocusEast", setup_east_cycle_func, free_func, run_func);
+  actions_register_i_opt("DirectionalFocusNorthWest", setup_northwest_cycle_func, free_func, run_func);
+  actions_register_i_opt("DirectionalFocusNorthEast", setup_northeast_cycle_func, free_func, run_func);
+  actions_register_i_opt("DirectionalFocusSouthWest", setup_southwest_cycle_func, free_func, run_func);
+  actions_register_i_opt("DirectionalFocusSouthEast", setup_southeast_cycle_func, free_func, run_func);
+  actions_register_opt("DirectionalTargetNorth", setup_north_target_func, free_func, run_func);
+  actions_register_opt("DirectionalTargetSouth", setup_south_target_func, free_func, run_func);
+  actions_register_opt("DirectionalTargetWest", setup_west_target_func, free_func, run_func);
+  actions_register_opt("DirectionalTargetEast", setup_east_target_func, free_func, run_func);
+  actions_register_opt("DirectionalTargetNorthWest", setup_northwest_target_func, free_func, run_func);
+  actions_register_opt("DirectionalTargetNorthEast", setup_northeast_target_func, free_func, run_func);
+  actions_register_opt("DirectionalTargetSouthWest", setup_southwest_target_func, free_func, run_func);
+  actions_register_opt("DirectionalTargetSouthEast", setup_southeast_target_func, free_func, run_func);
 }
 
-static gpointer setup_func(xmlNodePtr node) {
-  xmlNodePtr n;
+static void parse_final_actions(const gchar* val, Options* o) {
+  if (!val)
+    return;
+  gchar** names = g_strsplit_set(val, ", ", 0);
+  for (gchar** it = names; it && *it; ++it) {
+    if (**it == '\0')
+      continue;
+    ObActionsAct* action = actions_parse_string(*it);
+    if (action)
+      o->actions = g_slist_append(o->actions, action);
+  }
+  g_strfreev(names);
+}
+
+static gpointer setup_func(GHashTable* options) {
   Options* o;
+  const gchar* val;
 
   o = g_slice_new0(Options);
   o->dialog = TRUE;
   o->bar = TRUE;
 
-  if ((n = obt_xml_find_node(node, "dialog")))
-    o->dialog = obt_xml_node_bool(n);
-  if ((n = obt_xml_find_node(node, "bar")))
-    o->bar = obt_xml_node_bool(n);
-  if ((n = obt_xml_find_node(node, "raise")))
-    o->raise = obt_xml_node_bool(n);
-  if ((n = obt_xml_find_node(node, "panels")))
-    o->dock_windows = obt_xml_node_bool(n);
-  if ((n = obt_xml_find_node(node, "desktop")))
-    o->desktop_windows = obt_xml_node_bool(n);
-  if ((n = obt_xml_find_node(node, "direction"))) {
-    gchar* s = obt_xml_node_string(n);
-    if (!g_ascii_strcasecmp(s, "north") || !g_ascii_strcasecmp(s, "up"))
-      o->direction = OB_DIRECTION_NORTH;
-    else if (!g_ascii_strcasecmp(s, "northwest"))
-      o->direction = OB_DIRECTION_NORTHWEST;
-    else if (!g_ascii_strcasecmp(s, "northeast"))
-      o->direction = OB_DIRECTION_NORTHEAST;
-    else if (!g_ascii_strcasecmp(s, "west") || !g_ascii_strcasecmp(s, "left"))
-      o->direction = OB_DIRECTION_WEST;
-    else if (!g_ascii_strcasecmp(s, "east") || !g_ascii_strcasecmp(s, "right"))
-      o->direction = OB_DIRECTION_EAST;
-    else if (!g_ascii_strcasecmp(s, "south") || !g_ascii_strcasecmp(s, "down"))
-      o->direction = OB_DIRECTION_SOUTH;
-    else if (!g_ascii_strcasecmp(s, "southwest"))
-      o->direction = OB_DIRECTION_SOUTHWEST;
-    else if (!g_ascii_strcasecmp(s, "southeast"))
-      o->direction = OB_DIRECTION_SOUTHEAST;
-    g_free(s);
+  if (options) {
+    val = g_hash_table_lookup(options, "dialog");
+    if (val)
+      o->dialog = actions_parse_bool(val);
+    val = g_hash_table_lookup(options, "bar");
+    if (val)
+      o->bar = actions_parse_bool(val);
+    val = g_hash_table_lookup(options, "raise");
+    if (val)
+      o->raise = actions_parse_bool(val);
+    val = g_hash_table_lookup(options, "panels");
+    if (val)
+      o->dock_windows = actions_parse_bool(val);
+    val = g_hash_table_lookup(options, "desktop");
+    if (val)
+      o->desktop_windows = actions_parse_bool(val);
+    val = g_hash_table_lookup(options, "direction");
+    if (val)
+      o->direction = actions_parse_direction(val);
+    val = g_hash_table_lookup(options, "finalactions");
+    if (val)
+      parse_final_actions(val, o);
   }
 
-  if ((n = obt_xml_find_node(node, "finalactions"))) {
-    xmlNodePtr m;
-
-    m = obt_xml_find_node(n->children, "action");
-    while (m) {
-      ObActionsAct* action = actions_parse(m);
-      if (action)
-        o->actions = g_slist_append(o->actions, action);
-      m = obt_xml_find_node(m->next, "action");
-    }
-  }
-  else {
+  if (!o->actions) {
     o->actions = g_slist_prepend(o->actions, actions_parse_string("Focus"));
     o->actions = g_slist_prepend(o->actions, actions_parse_string("Raise"));
     o->actions = g_slist_prepend(o->actions, actions_parse_string("Unshade"));
@@ -166,20 +163,20 @@ static gpointer setup_func(xmlNodePtr node) {
   return o;
 }
 
-static gpointer setup_cycle_func(xmlNodePtr node,
+static gpointer setup_cycle_func(GHashTable* options,
                                  ObActionsIPreFunc* pre,
                                  ObActionsIInputFunc* input,
                                  ObActionsICancelFunc* cancel,
                                  ObActionsIPostFunc* post) {
-  Options* o = setup_func(node);
+  Options* o = setup_func(options);
   o->interactive = TRUE;
   *input = i_input_func;
   *cancel = i_cancel_func;
   return o;
 }
 
-static gpointer setup_target_func(xmlNodePtr node) {
-  Options* o = setup_func(node);
+static gpointer setup_target_func(GHashTable* options) {
+  Options* o = setup_func(options);
   o->interactive = FALSE;
   return o;
 }
@@ -271,130 +268,130 @@ static void end_cycle(gboolean cancel, guint state, Options* o) {
 }
 
 /* 3.4-compatibility */
-static gpointer setup_north_cycle_func(xmlNodePtr node,
+static gpointer setup_north_cycle_func(GHashTable* options,
                                        ObActionsIPreFunc* pre,
                                        ObActionsIInputFunc* input,
                                        ObActionsICancelFunc* cancel,
                                        ObActionsIPostFunc* post) {
-  Options* o = setup_cycle_func(node, pre, input, cancel, post);
+  Options* o = setup_cycle_func(options, pre, input, cancel, post);
   o->direction = OB_DIRECTION_NORTH;
   return o;
 }
 
-static gpointer setup_south_cycle_func(xmlNodePtr node,
+static gpointer setup_south_cycle_func(GHashTable* options,
                                        ObActionsIPreFunc* pre,
                                        ObActionsIInputFunc* input,
                                        ObActionsICancelFunc* cancel,
                                        ObActionsIPostFunc* post) {
-  Options* o = setup_cycle_func(node, pre, input, cancel, post);
+  Options* o = setup_cycle_func(options, pre, input, cancel, post);
   o->direction = OB_DIRECTION_SOUTH;
   return o;
 }
 
-static gpointer setup_east_cycle_func(xmlNodePtr node,
+static gpointer setup_east_cycle_func(GHashTable* options,
                                       ObActionsIPreFunc* pre,
                                       ObActionsIInputFunc* input,
                                       ObActionsICancelFunc* cancel,
                                       ObActionsIPostFunc* post) {
-  Options* o = setup_cycle_func(node, pre, input, cancel, post);
+  Options* o = setup_cycle_func(options, pre, input, cancel, post);
   o->direction = OB_DIRECTION_EAST;
   return o;
 }
 
-static gpointer setup_west_cycle_func(xmlNodePtr node,
+static gpointer setup_west_cycle_func(GHashTable* options,
                                       ObActionsIPreFunc* pre,
                                       ObActionsIInputFunc* input,
                                       ObActionsICancelFunc* cancel,
                                       ObActionsIPostFunc* post) {
-  Options* o = setup_cycle_func(node, pre, input, cancel, post);
+  Options* o = setup_cycle_func(options, pre, input, cancel, post);
   o->direction = OB_DIRECTION_WEST;
   return o;
 }
 
-static gpointer setup_northwest_cycle_func(xmlNodePtr node,
+static gpointer setup_northwest_cycle_func(GHashTable* options,
                                            ObActionsIPreFunc* pre,
                                            ObActionsIInputFunc* input,
                                            ObActionsICancelFunc* cancel,
                                            ObActionsIPostFunc* post) {
-  Options* o = setup_cycle_func(node, pre, input, cancel, post);
+  Options* o = setup_cycle_func(options, pre, input, cancel, post);
   o->direction = OB_DIRECTION_NORTHWEST;
   return o;
 }
 
-static gpointer setup_northeast_cycle_func(xmlNodePtr node,
+static gpointer setup_northeast_cycle_func(GHashTable* options,
                                            ObActionsIPreFunc* pre,
                                            ObActionsIInputFunc* input,
                                            ObActionsICancelFunc* cancel,
                                            ObActionsIPostFunc* post) {
-  Options* o = setup_cycle_func(node, pre, input, cancel, post);
-  o->direction = OB_DIRECTION_EAST;
-  return o;
-}
-
-static gpointer setup_southwest_cycle_func(xmlNodePtr node,
-                                           ObActionsIPreFunc* pre,
-                                           ObActionsIInputFunc* input,
-                                           ObActionsICancelFunc* cancel,
-                                           ObActionsIPostFunc* post) {
-  Options* o = setup_cycle_func(node, pre, input, cancel, post);
-  o->direction = OB_DIRECTION_SOUTHWEST;
-  return o;
-}
-
-static gpointer setup_southeast_cycle_func(xmlNodePtr node,
-                                           ObActionsIPreFunc* pre,
-                                           ObActionsIInputFunc* input,
-                                           ObActionsICancelFunc* cancel,
-                                           ObActionsIPostFunc* post) {
-  Options* o = setup_cycle_func(node, pre, input, cancel, post);
-  o->direction = OB_DIRECTION_SOUTHEAST;
-  return o;
-}
-
-static gpointer setup_north_target_func(xmlNodePtr node) {
-  Options* o = setup_target_func(node);
-  o->direction = OB_DIRECTION_NORTH;
-  return o;
-}
-
-static gpointer setup_south_target_func(xmlNodePtr node) {
-  Options* o = setup_target_func(node);
-  o->direction = OB_DIRECTION_SOUTH;
-  return o;
-}
-
-static gpointer setup_east_target_func(xmlNodePtr node) {
-  Options* o = setup_target_func(node);
-  o->direction = OB_DIRECTION_EAST;
-  return o;
-}
-
-static gpointer setup_west_target_func(xmlNodePtr node) {
-  Options* o = setup_target_func(node);
-  o->direction = OB_DIRECTION_WEST;
-  return o;
-}
-
-static gpointer setup_northwest_target_func(xmlNodePtr node) {
-  Options* o = setup_target_func(node);
-  o->direction = OB_DIRECTION_NORTHWEST;
-  return o;
-}
-
-static gpointer setup_northeast_target_func(xmlNodePtr node) {
-  Options* o = setup_target_func(node);
+  Options* o = setup_cycle_func(options, pre, input, cancel, post);
   o->direction = OB_DIRECTION_NORTHEAST;
   return o;
 }
 
-static gpointer setup_southwest_target_func(xmlNodePtr node) {
-  Options* o = setup_target_func(node);
+static gpointer setup_southwest_cycle_func(GHashTable* options,
+                                           ObActionsIPreFunc* pre,
+                                           ObActionsIInputFunc* input,
+                                           ObActionsICancelFunc* cancel,
+                                           ObActionsIPostFunc* post) {
+  Options* o = setup_cycle_func(options, pre, input, cancel, post);
   o->direction = OB_DIRECTION_SOUTHWEST;
   return o;
 }
 
-static gpointer setup_southeast_target_func(xmlNodePtr node) {
-  Options* o = setup_target_func(node);
+static gpointer setup_southeast_cycle_func(GHashTable* options,
+                                           ObActionsIPreFunc* pre,
+                                           ObActionsIInputFunc* input,
+                                           ObActionsICancelFunc* cancel,
+                                           ObActionsIPostFunc* post) {
+  Options* o = setup_cycle_func(options, pre, input, cancel, post);
+  o->direction = OB_DIRECTION_SOUTHEAST;
+  return o;
+}
+
+static gpointer setup_north_target_func(GHashTable* options) {
+  Options* o = setup_target_func(options);
+  o->direction = OB_DIRECTION_NORTH;
+  return o;
+}
+
+static gpointer setup_south_target_func(GHashTable* options) {
+  Options* o = setup_target_func(options);
+  o->direction = OB_DIRECTION_SOUTH;
+  return o;
+}
+
+static gpointer setup_east_target_func(GHashTable* options) {
+  Options* o = setup_target_func(options);
+  o->direction = OB_DIRECTION_EAST;
+  return o;
+}
+
+static gpointer setup_west_target_func(GHashTable* options) {
+  Options* o = setup_target_func(options);
+  o->direction = OB_DIRECTION_WEST;
+  return o;
+}
+
+static gpointer setup_northwest_target_func(GHashTable* options) {
+  Options* o = setup_target_func(options);
+  o->direction = OB_DIRECTION_NORTHWEST;
+  return o;
+}
+
+static gpointer setup_northeast_target_func(GHashTable* options) {
+  Options* o = setup_target_func(options);
+  o->direction = OB_DIRECTION_NORTHEAST;
+  return o;
+}
+
+static gpointer setup_southwest_target_func(GHashTable* options) {
+  Options* o = setup_target_func(options);
+  o->direction = OB_DIRECTION_SOUTHWEST;
+  return o;
+}
+
+static gpointer setup_southeast_target_func(GHashTable* options) {
+  Options* o = setup_target_func(options);
   o->direction = OB_DIRECTION_SOUTHEAST;
   return o;
 }

@@ -21,7 +21,7 @@ endif
 if have_librsvg
   obrender_cargs += ['-DUSE_LIBRSVG']
 endif
-obrender_deps = [glib_dep, xml_dep, pango_dep, pangoxft_dep, x11_dep, xext_dep, xrender_dep]
+obrender_deps = [glib_dep, pango_dep, pangoxft_dep, x11_dep, xext_dep, xrender_dep]
 if have_imlib
   obrender_deps += imlib_dep
 endif
@@ -68,7 +68,7 @@ if get_option('rendertest')
     'test.c',
     include_directories: [common_includes],
     c_args: ['-DG_LOG_DOMAIN="RenderTest"'],
-    dependencies: [glib_dep, pango_dep, pangoxft_dep, xml_dep, x11_dep, xext_dep, xrender_dep],
+    dependencies: [glib_dep, pango_dep, pangoxft_dep, x11_dep, xext_dep, xrender_dep],
     link_with: [libobrender, libobt],
     build_by_default: true,
     install: false)

@@ -11,28 +11,27 @@ typedef struct {
   gint y_denom;
 } Options;
 
-static gpointer setup_func(xmlNodePtr node);
+static gpointer setup_func(GHashTable* options);
 static void free_func(gpointer o);
 static gboolean run_func(ObActionsData* data, gpointer options);
 
 void action_moverelative_startup(void) {
-  actions_register("MoveRelative", setup_func, free_func, run_func);
+  actions_register_opt("MoveRelative", setup_func, free_func, run_func);
 }
 
-static gpointer setup_func(xmlNodePtr node) {
-  xmlNodePtr n;
+static gpointer setup_func(GHashTable* options) {
   Options* o;
-  gchar* s;
+  const char* val;
 
   o = g_slice_new0(Options);
 
-  if ((n = obt_xml_find_node(node, "x"))) {
-    s = obt_xml_node_string(n);
+  if (options && (val = g_hash_table_lookup(options, "x"))) {
+    gchar* s = g_strdup(val);
     config_parse_relative_number(s, &o->x, &o->x_denom);
     g_free(s);
   }
-  if ((n = obt_xml_find_node(node, "y"))) {
-    s = obt_xml_node_string(n);
+  if (options && (val = g_hash_table_lookup(options, "y"))) {
+    gchar* s = g_strdup(val);
     config_parse_relative_number(s, &o->y, &o->y_denom);
     g_free(s);
   }

@@ -5,22 +5,23 @@ typedef struct {
   gchar* str;
 } Options;
 
-static gpointer setup_func(xmlNodePtr node);
+static gpointer setup_func(GHashTable* options);
 static void free_func(gpointer options);
 static gboolean run_func(ObActionsData* data, gpointer options);
 
 void action_debug_startup(void) {
-  actions_register("Debug", setup_func, free_func, run_func);
+  actions_register_opt("Debug", setup_func, free_func, run_func);
 }
 
-static gpointer setup_func(xmlNodePtr node) {
-  xmlNodePtr n;
+static gpointer setup_func(GHashTable* options) {
   Options* o;
+  const char* val;
 
   o = g_slice_new0(Options);
 
-  if ((n = obt_xml_find_node(node, "string")))
-    o->str = obt_xml_node_string(n);
+  val = options ? g_hash_table_lookup(options, "string") : NULL;
+  if (val)
+    o->str = g_strdup(val);
   return o;
 }
 

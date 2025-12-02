@@ -5,7 +5,7 @@
 static gboolean run_func(ObActionsData* data, gpointer options);
 
 void action_raise_startup(void) {
-  actions_register("Raise", NULL, NULL, run_func);
+  actions_register_opt("Raise", NULL, NULL, run_func);
 }
 
 /* Always return FALSE because its not interactive */
