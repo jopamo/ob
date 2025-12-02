@@ -1408,6 +1408,8 @@ void screen_update_areas(void) {
   VALIDATE_STRUTS(struts_top, top, monitor_area[screen_num_monitors].height / 2);
   VALIDATE_STRUTS(struts_bottom, bottom, monitor_area[screen_num_monitors].height / 2);
 
+  g_list_free(onscreen);
+
   dims = g_new(gulong, 4 * screen_num_desktops);
   for (i = 0; i < screen_num_desktops; ++i) {
     Rect* area = screen_area(i, SCREEN_AREA_ALL_MONITORS, NULL);
