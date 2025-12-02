@@ -444,6 +444,7 @@ void screen_startup(gboolean reconfig) {
 
 void screen_shutdown(gboolean reconfig) {
   pager_popup_free(desktop_popup);
+  desktop_popup = NULL;
 
   if (reconfig)
     return;
