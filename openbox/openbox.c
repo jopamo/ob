@@ -115,6 +115,58 @@ static void parse_env();
 static void parse_args(gint* argc, gchar** argv);
 static Cursor load_cursor(const gchar* name, guint fontval);
 static void run_startup_cmd(void);
+static gboolean load_menu_file_with_fallbacks(const gchar* name, struct ob_config* conf);
+
+static gboolean try_menu_path(const gchar* path, struct ob_config* conf) {
+  if (!path)
+    return FALSE;
+  return ob_config_load_menu_file(path, conf);
+}
+
+static gboolean load_menu_file_with_fallbacks(const gchar* name, struct ob_config* conf) {
+  if (!name || !conf)
+    return FALSE;
+
+  if (g_path_is_absolute(name))
+    return try_menu_path(name, conf);
+
+  /* user config dir first */
+  gchar* path = g_build_filename(g_get_user_config_dir(), "openbox", name, NULL);
+  gboolean ok = try_menu_path(path, conf);
+  g_free(path);
+  if (ok)
+    return TRUE;
+
+  /* system config dirs */
+  gchar** cfg_dirs = g_get_system_config_dirs();
+  if (cfg_dirs) {
+    for (guint i = 0; cfg_dirs[i]; ++i) {
+      path = g_build_filename(cfg_dirs[i], "openbox", name, NULL);
+      ok = try_menu_path(path, conf);
+      g_free(path);
+      if (ok)
+        break;
+    }
+    g_strfreev(cfg_dirs);
+  }
+  if (ok)
+    return TRUE;
+
+  /* system data dirs (for packaged defaults like share/openbox/menu.yaml) */
+  gchar** data_dirs = g_get_system_data_dirs();
+  if (data_dirs) {
+    for (guint i = 0; data_dirs[i]; ++i) {
+      path = g_build_filename(data_dirs[i], "openbox", name, NULL);
+      ok = try_menu_path(path, conf);
+      g_free(path);
+      if (ok)
+        break;
+    }
+    g_strfreev(data_dirs);
+  }
+
+  return ok;
+}
 
 gint main(gint argc, gchar** argv) {
   gchar* program_name;
@@ -336,19 +388,8 @@ gint main(gint argc, gchar** argv) {
         ob_mouse_apply(conf.mouse_bindings, conf.mouse_binding_count);
         ob_rules_apply(conf.window_rules, conf.window_rule_count);
 
-        if (conf.menu.file) {
-          gchar* menu_path;
-          if (g_path_is_absolute(conf.menu.file))
-            menu_path = g_strdup(conf.menu.file);
-          else
-            menu_path = g_build_filename(g_get_user_config_dir(), "openbox", conf.menu.file, NULL);
-
-          if (!ob_config_load_menu_file(menu_path, &conf)) {
-            /* Try system config dir? Or just warn. For now just warn. */
-            g_message("Failed to load menu file %s", menu_path);
-          }
-          g_free(menu_path);
-        }
+        if (conf.menu.file && !load_menu_file_with_fallbacks(conf.menu.file, &conf))
+          g_message("Failed to load menu file %s", conf.menu.file);
 
         ob_menu_apply(&conf.menu);
 
