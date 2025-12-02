@@ -13,6 +13,7 @@ openbox_sources = files(
   'actions/dockautohide.c',
   'actions/execute.c',
   'actions/exit.c',
+  'actions/helpers.c',
   'actions/focus.c',
   'actions/focustobottom.c',
   'actions/fullscreen.c',
@@ -61,6 +62,8 @@ openbox_sources = files(
   'menuframe.c',
   'mouse.c',
   'moveresize.c',
+  'ob_config.c',
+  'ob_config_yaml.c',
   'openbox.c',
   'ping.c',
   'place.c',
@@ -76,7 +79,7 @@ openbox_sources = files(
   'window.c',
 )
 
-openbox_deps = [glib_dep, xml_dep, x11_dep, xext_dep, pango_dep, pangoxft_dep]
+openbox_deps = [glib_dep, yaml_dep, x11_dep, xext_dep, pango_dep, pangoxft_dep]
 if have_libsn
   openbox_deps += libsn_dep
 endif

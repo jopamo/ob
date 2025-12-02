@@ -19,6 +19,7 @@
 
 #include "debug.h"
 #include "openbox.h"
+#include "ob_config.h"
 #include "session.h"
 #include "dock.h"
 #include "event.h"
@@ -50,7 +51,6 @@
 #include "obt/signal.h"
 #include "obt/prop.h"
 #include "obt/keyboard.h"
-#include "obt/xml.h"
 
 #ifdef HAVE_FCNTL_H
 #include <fcntl.h>
@@ -105,6 +105,8 @@ static guint remote_control = 0;
 static gboolean being_replaced = FALSE;
 static gchar* config_file = NULL;
 static gchar* startup_cmd = NULL;
+static gboolean check_config_mode = FALSE;
+static gboolean dump_config_mode = FALSE;
 
 static void signal_handler(gint signal, gpointer data);
 static void remove_args(gint* argc, gchar** argv, gint index, gint num);
@@ -138,6 +140,63 @@ gint main(gint argc, gchar** argv) {
   parse_args(&argc, argv);
   /* parse the environment variables */
   parse_env();
+
+  if (check_config_mode) {
+    struct ob_config conf;
+    ob_config_init_defaults(&conf);
+
+    gchar* path;
+    if (config_file)
+      path = g_strdup(config_file);
+    else
+      path = g_build_filename(g_get_user_config_dir(), "openbox", "config.yaml", NULL);
+
+    if (ob_config_load_yaml(path, &conf)) {
+      if (ob_config_validate(&conf, stderr)) {
+        g_print("Configuration file '%s' is valid.\n", path);
+        ob_config_free(&conf);
+        g_free(path);
+        exit(0);
+      }
+      else {
+        g_printerr("Configuration file '%s' is INVALID.\n", path);
+        ob_config_free(&conf);
+        g_free(path);
+        exit(1);
+      }
+    }
+    else {
+      g_printerr("Failed to load configuration file '%s'.\n", path);
+      ob_config_free(&conf);
+      g_free(path);
+      exit(1);
+    }
+  }
+
+  if (dump_config_mode) {
+    struct ob_config conf;
+    ob_config_init_defaults(&conf);
+
+    /* Optionally load existing config to dump it normalized? */
+    gchar* path;
+    if (config_file)
+      path = g_strdup(config_file);
+    else
+      path = g_build_filename(g_get_user_config_dir(), "openbox", "config.yaml", NULL);
+
+    if (ob_config_load_yaml(path, &conf)) {
+      /* Loaded successfully, dump it */
+    }
+    else {
+      /* Failed to load, dump defaults? Or error? */
+      g_printerr("Failed to load configuration file '%s', dumping defaults.\n", path);
+    }
+    g_free(path);
+
+    ob_config_dump_yaml(&conf, stdout);
+    ob_config_free(&conf);
+    exit(0);
+  }
 
   program_name = g_path_get_basename(argv[0]);
   g_set_prgname(program_name);
@@ -216,53 +275,38 @@ gint main(gint argc, gchar** argv) {
     event_reset_time();
 
     do {
-      gchar* xml_error_string = NULL;
-      ObPrompt* xmlprompt = NULL;
-
       if (reconfigure)
         obt_keyboard_reload();
 
+      /* Register all the available actions before applying config */
+      actions_startup(reconfigure);
+      config_load_defaults();
+
       {
-        ObtXmlInst* i;
+        struct ob_config conf;
+        ob_config_init_defaults(&conf);
 
-        /* startup the parsing so everything can register sections
-           of the rc */
-        i = obt_xml_instance_new();
-
-        /* register all the available actions */
-        actions_startup(reconfigure);
-        /* start up config which sets up with the parser */
-        config_startup(i);
-
-        /* parse/load user options */
-        if ((config_file && obt_xml_load_file(i, config_file, "openbox_config")) ||
-            obt_xml_load_config_file(i, "openbox", "rc.xml", "openbox_config")) {
-          obt_xml_tree_from_root(i);
-          obt_xml_close(i);
+        /* Load YAML config */
+        gchar* config_path = g_build_filename(g_get_user_config_dir(), "openbox", "config.yaml", NULL);
+        if (!ob_config_load_yaml(config_path, &conf)) {
+          g_message("Could not load config from %s", config_path);
         }
-        else {
-          g_message(_("Unable to find a valid config file, using some simple defaults"));
-          config_file = NULL;
+        g_free(config_path);
+
+        if (!ob_config_validate(&conf, stderr)) {
+          g_message("Invalid configuration.");
         }
 
-        if (config_file) {
-          gchar* p = g_filename_to_utf8(config_file, -1, NULL, NULL, NULL);
-          if (p)
-            OBT_PROP_SETS(obt_root(ob_screen), OB_CONFIG_FILE, p);
-          g_free(p);
-        }
-        else
-          OBT_PROP_ERASE(obt_root(ob_screen), OB_CONFIG_FILE);
+        ob_desktops_apply(&conf.desktops);
+        ob_theme_apply(&conf.theme);
+        ob_focus_apply(&conf.focus);
+        ob_placement_apply(&conf.placement);
+        ob_keyboard_apply(conf.keybinds, conf.keybind_count);
+        ob_mouse_apply(conf.mouse_bindings, conf.mouse_binding_count);
+        ob_rules_apply(conf.window_rules, conf.window_rule_count);
+        ob_menu_apply(&conf.menu);
 
-        if (obt_xml_last_error(i)) {
-          xml_error_string = g_strdup_printf(
-              _("One or more XML syntax errors were found while parsing the Openbox configuration files.  See stdout "
-                "for more information.  The last error seen was in file \"%s\" line %d, with message: %s"),
-              obt_xml_last_error_file(i), obt_xml_last_error_line(i), obt_xml_last_error_message(i));
-        }
-
-        /* we're done with parsing now, kill it */
-        obt_xml_instance_unref(i);
+        ob_config_free(&conf);
       }
 
       /* load the theme specified in the rc file */
@@ -352,20 +396,8 @@ gint main(gint argc, gchar** argv) {
 
       reconfigure = FALSE;
 
-      /* look for parsing errors */
-      if (xml_error_string) {
-        xmlprompt = prompt_show_message(xml_error_string, _("Openbox Syntax Error"), _("Close"));
-        g_free(xml_error_string);
-        xml_error_string = NULL;
-      }
-
       g_main_loop_run(ob_main_loop);
       ob_set_state(reconfigure ? OB_STATE_RECONFIGURING : OB_STATE_EXITING);
-
-      if (xmlprompt) {
-        prompt_unref(xmlprompt);
-        xmlprompt = NULL;
-      }
 
       if (!reconfigure)
         window_unmanage_all();
@@ -520,6 +552,8 @@ static void print_help(void) {
   g_print(_("\nDebugging options:\n"));
   g_print(_("  --sync              Run in synchronous mode\n"));
   g_print(_("  --startup CMD       Run CMD after starting\n"));
+  g_print(_("  --check-config      Check configuration file validity\n"));
+  g_print(_("  --dump-config       Dump current configuration to YAML\n"));
   g_print(_("  --debug             Display debugging output\n"));
   g_print(_("  --debug-focus       Display debugging output for focus handling\n"));
   g_print(_("  --debug-session     Display debugging output for session management\n"));
@@ -593,6 +627,12 @@ static void parse_args(gint* argc, gchar** argv) {
         --i; /* this arg was removed so go back */
         ob_debug("--startup %s", startup_cmd);
       }
+    }
+    else if (!strcmp(argv[i], "--check-config")) {
+      check_config_mode = TRUE;
+    }
+    else if (!strcmp(argv[i], "--dump-config")) {
+      dump_config_mode = TRUE;
     }
     else if (!strcmp(argv[i], "--debug")) {
       ob_debug_enable(OB_DEBUG_NORMAL, TRUE);
