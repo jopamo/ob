@@ -12,5 +12,5 @@ option('session_management', type: 'feature', value: 'auto',
        description: 'Enable X11 session management (libSM/libICE)')
 option('rendertest', type: 'boolean', value: false,
        description: 'Build the obrender/rendertest diagnostic tool')
-option('default_theme', type: 'string', value: 'Clearlooks',
+option('default_theme', type: 'string', value: 'Mikachu',
        description: 'Default Openbox theme compiled into libobrender')

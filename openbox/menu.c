@@ -34,79 +34,172 @@
 #include "client_list_menu.h"
 #include "client_list_combined_menu.h"
 #include "gettext.h"
-#include "obt/xml.h"
-#include "obt/paths.h"
-
-typedef struct _ObMenuParseState ObMenuParseState;
-
-struct _ObMenuParseState {
-  ObMenu* parent;
-  ObMenu* pipe_creator;
-};
+#include "ob_config.h"
 
 static GHashTable* menu_hash = NULL;
-static ObtXmlInst* menu_parse_inst;
-static ObMenuParseState menu_parse_state;
 static gboolean menu_can_hide = FALSE;
 static guint menu_timeout_id = 0;
+static struct ob_menu_item* configured_menu_items = NULL;
+static size_t configured_menu_count = 0;
 
 static void menu_destroy_hash_value(ObMenu* self);
-static void parse_menu_item(xmlNodePtr node, gpointer data);
-static void parse_menu_separator(xmlNodePtr node, gpointer data);
-static void parse_menu(xmlNodePtr node, gpointer data);
+static ObMenu* menu_from_name(gchar* name);
 static gunichar parse_shortcut(const gchar* label,
                                gboolean allow_shortcut,
                                gchar** strippedlabel,
                                guint* position,
                                gboolean* always_show);
+static GSList* menu_make_action_list(const char* action, const char* command, const char* menu_name);
+
+static void free_config_menu_items(struct ob_menu_item* items, size_t count) {
+  if (!items)
+    return;
+  for (size_t i = 0; i < count; ++i) {
+    g_free(items[i].label);
+    g_free(items[i].action_name);
+    g_free(items[i].command);
+    if (items[i].params)
+      g_hash_table_destroy(items[i].params);
+    if (items[i].submenu)
+      free_config_menu_items(items[i].submenu, items[i].submenu_count);
+  }
+  g_free(items);
+}
+
+void menu_set_config(struct ob_menu* menu_cfg) {
+  free_config_menu_items(configured_menu_items, configured_menu_count);
+  configured_menu_items = NULL;
+  configured_menu_count = 0;
+  if (!menu_cfg)
+    return;
+  configured_menu_items = menu_cfg->root;
+  configured_menu_count = menu_cfg->root_count;
+  menu_cfg->root = NULL;
+  menu_cfg->root_count = 0;
+}
+
+static GSList* menu_make_action_list(const char* action, const char* command, const char* menu_name) {
+  ObActionsAct* act = NULL;
+  if (command || menu_name) {
+    GHashTable* opts = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+    if (command)
+      g_hash_table_insert(opts, g_strdup("command"), g_strdup(command));
+    if (menu_name)
+      g_hash_table_insert(opts, g_strdup("menu"), g_strdup(menu_name));
+    act = actions_create_with_options(action, opts);
+    g_hash_table_destroy(opts);
+  }
+  else {
+    act = actions_parse_string(action);
+  }
+  if (!act)
+    return NULL;
+  return g_slist_append(NULL, act);
+}
+
+static void build_menu_recursive(ObMenu* parent, struct ob_menu_item* items, size_t count, const char* prefix) {
+  for (size_t i = 0; i < count; ++i) {
+    struct ob_menu_item* item = &items[i];
+    if (item->submenu && item->submenu_count) {
+      gchar* subname = g_strdup_printf("%s-%zu", prefix, i);
+      ObMenu* sub = menu_new(subname, item->label ? item->label : "", TRUE, NULL);
+      build_menu_recursive(sub, item->submenu, item->submenu_count, subname);
+      menu_add_submenu(parent, -1, subname);
+      g_free(subname);
+    }
+    else if (item->action_name) {
+      GSList* acts = NULL;
+      GHashTable* opts = item->params;
+      gboolean destroy_opts = FALSE;
+      const char* icon_path = NULL;
+
+      if (!opts && item->command) {
+        opts = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+        g_hash_table_insert(opts, g_strdup("command"), g_strdup(item->command));
+        destroy_opts = TRUE;
+      }
+      if (opts)
+        icon_path = g_hash_table_lookup(opts, "icon");
+
+      ObActionsAct* act = actions_create_with_options(item->action_name, opts);
+      if (act)
+        acts = g_slist_append(acts, act);
+
+      if (destroy_opts && opts)
+        g_hash_table_destroy(opts);
+
+      ObMenuEntry* e = menu_add_normal(parent, -1, item->label ? item->label : "", acts, TRUE);
+
+      if (icon_path && icon_path[0] && config_menu_show_icons) {
+        RrImage* img = RrImageNewFromName(ob_rr_icons, icon_path);
+        if (img) {
+          e->data.normal.icon = img;
+          e->data.normal.icon_alpha = 0xff;
+        }
+      }
+    }
+    else {
+      menu_add_separator(parent, -1, item->label);
+    }
+  }
+}
+
+static void build_menu_from_config(void) {
+  if (!configured_menu_items) {
+    /* Ensure the root menu exists even if empty. */
+    if (!menu_from_name("root-menu")) {
+      ObMenu* root = menu_new("root-menu", "Openbox", TRUE, NULL);
+      GSList* act;
+
+      act = menu_make_action_list("ShowMenu", NULL, "client-list-combined-menu");
+      if (act)
+        menu_add_normal(root, -1, _("Windows"), act, TRUE);
+
+      act = menu_make_action_list("Execute", "xterm", NULL);
+      if (act)
+        menu_add_normal(root, -1, _("Terminal"), act, TRUE);
+
+      menu_add_separator(root, -1, NULL);
+
+      act = menu_make_action_list("Reconfigure", NULL, NULL);
+      if (act)
+        menu_add_normal(root, -1, _("Reconfigure"), act, TRUE);
+
+      act = menu_make_action_list("Restart", NULL, NULL);
+      if (act)
+        menu_add_normal(root, -1, _("Restart"), act, TRUE);
+
+      act = menu_make_action_list("Exit", NULL, NULL);
+      if (act)
+        menu_add_normal(root, -1, _("Exit"), act, TRUE);
+    }
+    return;
+  }
+
+  ObMenu* root = menu_new("root-menu", "Openbox", TRUE, NULL);
+  build_menu_recursive(root, configured_menu_items, configured_menu_count, "root-menu");
+
+  free_config_menu_items(configured_menu_items, configured_menu_count);
+  configured_menu_items = NULL;
+  configured_menu_count = 0;
+}
+static void free_config_menu_items(struct ob_menu_item* items, size_t count);
+static void build_menu_from_config(void);
 
 void menu_startup(gboolean reconfig) {
-  gboolean loaded = FALSE;
-  GSList* it;
-
   menu_hash = g_hash_table_new_full(g_str_hash, g_str_equal, NULL, (GDestroyNotify)menu_destroy_hash_value);
 
   client_list_menu_startup(reconfig);
   client_list_combined_menu_startup(reconfig);
   client_menu_startup();
 
-  menu_parse_inst = obt_xml_instance_new();
-
-  menu_parse_state.parent = NULL;
-  menu_parse_state.pipe_creator = NULL;
-  obt_xml_register(menu_parse_inst, "menu", parse_menu, &menu_parse_state);
-  obt_xml_register(menu_parse_inst, "item", parse_menu_item, &menu_parse_state);
-  obt_xml_register(menu_parse_inst, "separator", parse_menu_separator, &menu_parse_state);
-
-  for (it = config_menu_files; it; it = g_slist_next(it)) {
-    if (obt_xml_load_config_file(menu_parse_inst, "openbox", it->data, "openbox_menu")) {
-      loaded = TRUE;
-      obt_xml_tree_from_root(menu_parse_inst);
-      obt_xml_close(menu_parse_inst);
-    }
-    else if (obt_xml_load_file(menu_parse_inst, it->data, "openbox_menu")) {
-      loaded = TRUE;
-      obt_xml_tree_from_root(menu_parse_inst);
-      obt_xml_close(menu_parse_inst);
-    }
-    else
-      g_message(_("Unable to find a valid menu file \"%s\""), (const gchar*)it->data);
-  }
-  if (!loaded) {
-    if (obt_xml_load_config_file(menu_parse_inst, "openbox", "menu.xml", "openbox_menu")) {
-      obt_xml_tree_from_root(menu_parse_inst);
-      obt_xml_close(menu_parse_inst);
-    }
-    else
-      g_message(_("Unable to find a valid menu file \"%s\""), "menu.xml");
-  }
-
-  g_assert(menu_parse_state.parent == NULL);
+  build_menu_from_config();
 }
 
 void menu_shutdown(gboolean reconfig) {
-  obt_xml_instance_unref(menu_parse_inst);
-  menu_parse_inst = NULL;
+  free_config_menu_items(configured_menu_items, configured_menu_count);
+  configured_menu_items = NULL;
+  configured_menu_count = 0;
 
   menu_frame_hide_all();
 
@@ -136,31 +229,13 @@ void menu_clear_pipe_caches(void) {
 }
 
 void menu_pipe_execute(ObMenu* self) {
-  gchar* output;
-  GError* err = NULL;
-
-  if (!self->execute)
+  /* Pipe menus were defined in the old XML format; they are not supported in the YAML
+     configuration flow yet. */
+  if (!self || !self->execute)
     return;
-  if (self->entries) /* the entries are already created and cached */
+  if (self->entries)
     return;
-
-  if (!g_spawn_command_line_sync(self->execute, &output, NULL, NULL, &err)) {
-    g_message(_("Failed to execute command for pipe-menu \"%s\": %s"), self->execute, err->message);
-    g_error_free(err);
-    return;
-  }
-
-  if (obt_xml_load_mem(menu_parse_inst, output, strlen(output), "openbox_pipe_menu")) {
-    menu_parse_state.pipe_creator = self;
-    menu_parse_state.parent = self;
-    obt_xml_tree_from_root(menu_parse_inst);
-    obt_xml_close(menu_parse_inst);
-  }
-  else {
-    g_message(_("Invalid output from pipe-menu \"%s\""), self->execute);
-  }
-
-  g_free(output);
+  g_message(_("Pipe-menu \"%s\" is not supported with YAML configuration"), self->execute);
 }
 
 static ObMenu* menu_from_name(gchar* name) {
@@ -253,105 +328,6 @@ static gunichar parse_shortcut(const gchar* label,
     }
   }
   return shortcut;
-}
-
-static void parse_menu_item(xmlNodePtr node, gpointer data) {
-  ObMenuParseState* state = data;
-  gchar* label;
-  gchar* icon;
-  ObMenuEntry* e;
-
-  if (state->parent) {
-    /* Don't try to extract "icon" attribute if icons in user-defined
-       menus are not enabled. */
-
-    if (obt_xml_attr_string_unstripped(node, "label", &label)) {
-      xmlNodePtr c;
-      GSList* acts = NULL;
-
-      c = obt_xml_find_node(node->children, "action");
-      while (c) {
-        ObActionsAct* action = actions_parse(c);
-        if (action)
-          acts = g_slist_append(acts, action);
-        c = obt_xml_find_node(c->next, "action");
-      }
-      e = menu_add_normal(state->parent, -1, label, acts, TRUE);
-
-      if (config_menu_show_icons && obt_xml_attr_string(node, "icon", &icon)) {
-        e->data.normal.icon = RrImageNewFromName(ob_rr_icons, icon);
-
-        if (e->data.normal.icon)
-          e->data.normal.icon_alpha = 0xff;
-
-        g_free(icon);
-      }
-      g_free(label);
-    }
-  }
-}
-
-static void parse_menu_separator(xmlNodePtr node, gpointer data) {
-  ObMenuParseState* state = data;
-
-  if (state->parent) {
-    gchar* label;
-
-    if (!obt_xml_attr_string_unstripped(node, "label", &label))
-      label = NULL;
-
-    menu_add_separator(state->parent, -1, label);
-    g_free(label);
-  }
-}
-
-static void parse_menu(xmlNodePtr node, gpointer data) {
-  ObMenuParseState* state = data;
-  gchar *name = NULL, *title = NULL, *script = NULL;
-  ObMenu* menu;
-  ObMenuEntry* e;
-  gchar* icon;
-
-  if (!obt_xml_attr_string(node, "id", &name))
-    goto parse_menu_fail;
-
-  if (!g_hash_table_lookup(menu_hash, name)) {
-    if (!obt_xml_attr_string_unstripped(node, "label", &title))
-      goto parse_menu_fail;
-
-    if ((menu = menu_new(name, title, TRUE, NULL))) {
-      menu->pipe_creator = state->pipe_creator;
-      if (obt_xml_attr_string(node, "execute", &script)) {
-        menu->execute = obt_paths_expand_tilde(script);
-      }
-      else {
-        ObMenu* old;
-
-        old = state->parent;
-        state->parent = menu;
-        obt_xml_tree(menu_parse_inst, node->children);
-        state->parent = old;
-      }
-    }
-  }
-
-  if (state->parent) {
-    e = menu_add_submenu(state->parent, -1, name);
-
-    if (config_menu_show_icons && obt_xml_attr_string(node, "icon", &icon)) {
-      e->data.submenu.icon = RrImageNewFromName(ob_rr_icons, icon);
-
-      if (e->data.submenu.icon)
-        e->data.submenu.icon_alpha = 0xff;
-
-      g_free(icon);
-    }
-  }
-
-parse_menu_fail:
-  g_free(name);
-  g_free(title);
-  g_free(script);
 }
 
 ObMenu* menu_new(const gchar* name, const gchar* title, gboolean allow_shortcut_selection, gpointer data) {
