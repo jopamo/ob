@@ -20,10 +20,36 @@
 
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <unistd.h>
 #include <X11/Xlib.h>
+#include <X11/Xlib-xcb.h>
 #include <X11/Xutil.h>
+#include <xcb/xcb.h>
+
+static xcb_atom_t intern_atom(xcb_connection_t* conn, const char* name) {
+  xcb_intern_atom_cookie_t cookie = xcb_intern_atom(conn, 0, strlen(name), name);
+  xcb_intern_atom_reply_t* reply = xcb_intern_atom_reply(conn, cookie, NULL);
+  xcb_atom_t atom = reply ? reply->atom : XCB_ATOM_NONE;
+  free(reply);
+  return atom;
+}
+
+static void send_change_state(xcb_connection_t* conn, xcb_window_t root, xcb_window_t win, xcb_atom_t change_state) {
+  xcb_client_message_event_t ev = {
+      .response_type = XCB_CLIENT_MESSAGE,
+      .format = 32,
+      .window = win,
+      .type = change_state,
+  };
+
+  ev.data.data32[0] = IconicState;
+  xcb_send_event(conn, 0, root, XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY | XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT,
+                 (const char*)&ev);
+  xcb_flush(conn);
+}
 
 static void sleep_for_ms(long ms) {
   struct timespec ts;
@@ -34,17 +60,32 @@ static void sleep_for_ms(long ms) {
 }
 
 int main() {
-  Display* display;
-  Window win;
+  Display* display = NULL;
+  xcb_connection_t* conn = NULL;
+  Window win = None;
   XEvent report;
-  XEvent msg;
+  xcb_atom_t change_state = XCB_ATOM_NONE;
   int x = 50, y = 50, h = 100, w = 400;
+  xcb_window_t root = XCB_WINDOW_NONE;
+  int ret = 1;
 
   display = XOpenDisplay(NULL);
 
   if (display == NULL) {
     fprintf(stderr, "couldn't connect to X server :0\n");
-    return 0;
+    return 1;
+  }
+  conn = XGetXCBConnection(display);
+  if (conn == NULL) {
+    fprintf(stderr, "couldn't get XCB connection\n");
+    goto out;
+  }
+  root = RootWindow(display, DefaultScreen(display));
+
+  change_state = intern_atom(conn, "WM_CHANGE_STATE");
+  if (change_state == XCB_ATOM_NONE) {
+    fprintf(stderr, "failed to intern WM_CHANGE_STATE\n");
+    goto out;
   }
 
   win = XCreateWindow(display, RootWindow(display, DefaultScreen(display)), x, y, w, h, 10, CopyFromParent,
@@ -56,22 +97,17 @@ int main() {
   XFlush(display);
   sleep_for_ms(1000);
 
-  msg.xclient.type = ClientMessage;
-  msg.xclient.message_type = XInternAtom(display, "WM_CHANGE_STATE", False);
-  msg.xclient.display = display;
-  msg.xclient.window = win;
-  msg.xclient.format = 32;
-  msg.xclient.data.l[0] = IconicState;
-  msg.xclient.data.l[1] = 0;
-  msg.xclient.data.l[2] = 0;
-  msg.xclient.data.l[3] = 0;
-  msg.xclient.data.l[4] = 0;
-  XSendEvent(display, RootWindow(display, DefaultScreen(display)), False,
-             SubstructureNotifyMask | SubstructureRedirectMask, &msg);
+  send_change_state(conn, root, win, change_state);
 
+  ret = 0;
   while (1) {
     XNextEvent(display, &report);
   }
 
-  return 1;
+out:
+  if (win != None)
+    XDestroyWindow(display, win);
+  if (display)
+    XCloseDisplay(display);
+  return ret;
 }

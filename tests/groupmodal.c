@@ -1,36 +1,52 @@
 // groupmodal.c for the Openbox window manager
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <X11/Xlib.h>
+#include <X11/Xlib-xcb.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
+#include <xcb/xcb.h>
+
+static xcb_atom_t intern_atom(xcb_connection_t* conn, const char* name) {
+  xcb_intern_atom_cookie_t cookie = xcb_intern_atom(conn, 0, strlen(name), name);
+  xcb_intern_atom_reply_t* reply = xcb_intern_atom_reply(conn, cookie, NULL);
+  xcb_atom_t atom = reply ? reply->atom : XCB_ATOM_NONE;
+  free(reply);
+  return atom;
+}
 
 int main() {
-  Display* display;
-  Window one, two, group;
+  Display* display = NULL;
+  xcb_connection_t* conn = NULL;
+  Window one = None, two = None, group = None;
   XEvent report;
   XWMHints* wmhints;
-  Atom state, modal;
+  xcb_atom_t state, modal;
+  int ret = 1;
 
-  // Open a connection to the X server
   display = XOpenDisplay(NULL);
   if (display == NULL) {
     fprintf(stderr, "Couldn't connect to X server :0\n");
     return 1;  // Return failure if X server connection fails
   }
+  conn = XGetXCBConnection(display);
+  if (conn == NULL) {
+    fprintf(stderr, "couldn't get XCB connection\n");
+    goto out;
+  }
 
-  // Intern Atoms
-  state = XInternAtom(display, "_NET_WM_STATE", True);
-  modal = XInternAtom(display, "_NET_WM_STATE_MODAL", True);
+  state = intern_atom(conn, "_NET_WM_STATE");
+  modal = intern_atom(conn, "_NET_WM_STATE_MODAL");
 
   // Check if atoms are valid
-  if (state == None || modal == None) {
+  if (state == XCB_ATOM_NONE || modal == XCB_ATOM_NONE) {
     fprintf(stderr, "Failed to intern atoms\n");
-    XCloseDisplay(display);  // Clean up and close display
-    return 1;                // Return failure if atoms cannot be interned
+    goto out;
   }
-  printf("Atoms successfully interned: _NET_WM_STATE = %lu, _NET_WM_STATE_MODAL = %lu\n", state, modal);
+  printf("Atoms successfully interned: _NET_WM_STATE = %u, _NET_WM_STATE_MODAL = %u\n", state, modal);
 
   // Create windows
   group = XCreateWindow(display, RootWindow(display, 0), 0, 0, 1, 1, 10, CopyFromParent, CopyFromParent, CopyFromParent,
@@ -63,7 +79,11 @@ int main() {
 
   // Set transient and modal state
   XSetTransientForHint(display, two, RootWindow(display, 0));
-  XChangeProperty(display, two, state, XA_ATOM, 32, PropModeReplace, (unsigned char*)&modal, 1);
+  {
+    uint32_t modal_val = modal;
+    xcb_change_property(conn, XCB_PROP_MODE_REPLACE, two, state, XCB_ATOM_ATOM, 32, 1, &modal_val);
+    xcb_flush(conn);
+  }
 
   // Set window group for both windows
   wmhints = XAllocWMHints();
@@ -87,14 +107,21 @@ int main() {
   XMapWindow(display, two);
   XFlush(display);
 
+  ret = 0;
   // Event loop
   while (1) {
     XNextEvent(display, &report);
     // Process events (currently does nothing, but could be extended)
   }
 
-  // Clean up and close display connection when done
-  XCloseDisplay(display);
-
-  return 0;  // Return success
+out:
+  if (one != None)
+    XDestroyWindow(display, one);
+  if (two != None)
+    XDestroyWindow(display, two);
+  if (group != None)
+    XDestroyWindow(display, group);
+  if (display)
+    XCloseDisplay(display);
+  return ret;
 }

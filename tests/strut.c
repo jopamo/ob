@@ -1,25 +1,38 @@
 /* strut.c for Openbox window manager */
 
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <X11/Xlib.h>
+#include <X11/Xlib-xcb.h>
 #include <X11/Xatom.h>
+#include <xcb/xcb.h>
 
-void test_strut_property(Display* display, Window win, Atom _net_strut) {
-  int s[4];
+static xcb_atom_t intern_atom(xcb_connection_t* conn, const char* name) {
+  xcb_intern_atom_cookie_t cookie = xcb_intern_atom(conn, 0, strlen(name), name);
+  xcb_intern_atom_reply_t* reply = xcb_intern_atom_reply(conn, cookie, NULL);
+  xcb_atom_t atom = reply ? reply->atom : XCB_ATOM_NONE;
+  free(reply);
+  return atom;
+}
+
+void test_strut_property(Display* display, xcb_connection_t* conn, Window win, xcb_atom_t _net_strut) {
+  uint32_t s[4];
 
   // Set top strut
   s[0] = 0;
   s[1] = 0;
   s[2] = 20;
   s[3] = 0;
-  XChangeProperty(display, win, _net_strut, XA_CARDINAL, 32, PropModeReplace, (unsigned char*)s, 4);
-  XFlush(display);
+  xcb_change_property(conn, XCB_PROP_MODE_REPLACE, win, _net_strut, XCB_ATOM_CARDINAL, 32, 4, s);
+  xcb_flush(conn);
   sleep(2);
 
   // Remove strut
-  XDeleteProperty(display, win, _net_strut);
-  XFlush(display);
+  xcb_delete_property(conn, win, _net_strut);
+  xcb_flush(conn);
   sleep(2);
 }
 
@@ -46,10 +59,12 @@ void handle_events(Display* display, Window win) {
 }
 
 int main() {
-  Display* display;
-  Window win;
-  Atom _net_strut;
+  Display* display = NULL;
+  xcb_connection_t* conn = NULL;
+  Window win = None;
+  xcb_atom_t _net_strut = XCB_ATOM_NONE;
   int x = 10, y = 10, h = 100, w = 400;
+  int ret = 1;
 
   // Connect to X server
   display = XOpenDisplay(NULL);
@@ -57,26 +72,42 @@ int main() {
     fprintf(stderr, "couldn't connect to X server :0\n");
     return 1;
   }
+  conn = XGetXCBConnection(display);
+  if (conn == NULL) {
+    fprintf(stderr, "couldn't get XCB connection\n");
+    goto out;
+  }
 
-  _net_strut = XInternAtom(display, "_NET_WM_STRUT", False);
+  _net_strut = intern_atom(conn, "_NET_WM_STRUT");
+  if (_net_strut == XCB_ATOM_NONE) {
+    fprintf(stderr, "failed to intern _NET_WM_STRUT\n");
+    goto out;
+  }
 
   // Create window
   win = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 10, CopyFromParent, CopyFromParent, CopyFromParent,
                       0, NULL);
+  if (win == None) {
+    fprintf(stderr, "failed to create window\n");
+    goto out;
+  }
   XSetWindowBackground(display, win, WhitePixel(display, 0));
   XMapWindow(display, win);
   XFlush(display);
 
   // Test strut property
-  test_strut_property(display, win, _net_strut);
+  test_strut_property(display, conn, win, _net_strut);
 
   // Listen for events
   XSelectInput(display, win, ExposureMask | StructureNotifyMask);
   handle_events(display, win);
 
-  // Clean up
-  XDestroyWindow(display, win);
-  XCloseDisplay(display);
+  ret = 0;
 
-  return 0;
+out:
+  if (win != None)
+    XDestroyWindow(display, win);
+  if (display)
+    XCloseDisplay(display);
+  return ret;
 }

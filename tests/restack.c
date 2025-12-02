@@ -17,29 +17,78 @@
 */
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <X11/Xlib.h>
+#include <X11/Xlib-xcb.h>
 #include <X11/Xatom.h>
+#include <xcb/xcb.h>
+
+static xcb_atom_t intern_atom(xcb_connection_t* conn, const char* name) {
+  xcb_intern_atom_cookie_t cookie = xcb_intern_atom(conn, 0, strlen(name), name);
+  xcb_intern_atom_reply_t* reply = xcb_intern_atom_reply(conn, cookie, NULL);
+  xcb_atom_t atom = reply ? reply->atom : XCB_ATOM_NONE;
+  free(reply);
+  return atom;
+}
+
+static void send_restack(xcb_connection_t* conn,
+                         xcb_window_t root,
+                         xcb_window_t win,
+                         xcb_atom_t restack,
+                         uint32_t detail) {
+  xcb_client_message_event_t ev = {
+      .response_type = XCB_CLIENT_MESSAGE,
+      .format = 32,
+      .window = win,
+      .type = restack,
+  };
+
+  ev.data.data32[0] = 2;
+  ev.data.data32[1] = 0;
+  ev.data.data32[2] = detail;
+
+  xcb_send_event(conn, 0, root, XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY | XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT,
+                 (const char*)&ev);
+  xcb_flush(conn);
+}
 
 int main() {
-  Display* display;
-  Window win;
+  Display* display = NULL;
+  xcb_connection_t* conn = NULL;
+  Window win = None;
   XEvent report;
-  Atom _restack;
-  XEvent msg;
+  xcb_atom_t _restack;
   int x = 10, y = 10, h = 100, w = 400;
+  xcb_window_t root = XCB_WINDOW_NONE;
+  int ret = 1;
 
   display = XOpenDisplay(NULL);
 
   if (display == NULL) {
     fprintf(stderr, "couldn't connect to X server :0\n");
-    return 0;
+    return 1;
   }
+  conn = XGetXCBConnection(display);
+  if (conn == NULL) {
+    fprintf(stderr, "couldn't get XCB connection\n");
+    goto out;
+  }
+  root = RootWindow(display, DefaultScreen(display));
 
-  _restack = XInternAtom(display, "_NET_RESTACK_WINDOW", False);
+  _restack = intern_atom(conn, "_NET_RESTACK_WINDOW");
+  if (_restack == XCB_ATOM_NONE) {
+    fprintf(stderr, "failed to intern _NET_RESTACK_WINDOW\n");
+    goto out;
+  }
 
   win = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 10, CopyFromParent, CopyFromParent, CopyFromParent,
                       0, NULL);
+  if (win == None) {
+    fprintf(stderr, "failed to create window\n");
+    goto out;
+  }
   XSetWindowBackground(display, win, WhitePixel(display, 0));
 
   XMapWindow(display, win);
@@ -48,86 +97,37 @@ int main() {
   printf("requesting bottom in 3\n");
   sleep(3);
 
-  msg.xclient.type = ClientMessage;
-  msg.xclient.message_type = _restack;
-  msg.xclient.display = display;
-  msg.xclient.window = win;
-  msg.xclient.format = 32;
-  msg.xclient.data.l[0] = 2l;
-  msg.xclient.data.l[1] = 0l;
-  msg.xclient.data.l[2] = Below;
-  msg.xclient.data.l[3] = 0l;
-  msg.xclient.data.l[4] = 0l;
-  XSendEvent(display, RootWindow(display, 0), False, SubstructureNotifyMask | SubstructureRedirectMask, &msg);
-  XFlush(display);
+  send_restack(conn, root, win, _restack, Below);
 
   printf("requesting top in 3\n");
   sleep(3);
 
-  msg.xclient.type = ClientMessage;
-  msg.xclient.message_type = _restack;
-  msg.xclient.display = display;
-  msg.xclient.window = win;
-  msg.xclient.format = 32;
-  msg.xclient.data.l[0] = 2l;
-  msg.xclient.data.l[1] = 0l;
-  msg.xclient.data.l[2] = Above;
-  msg.xclient.data.l[3] = 0l;
-  msg.xclient.data.l[4] = 0l;
-  XSendEvent(display, RootWindow(display, 0), False, SubstructureNotifyMask | SubstructureRedirectMask, &msg);
-  XFlush(display);
+  send_restack(conn, root, win, _restack, Above);
 
   printf("requesting bottomif in 3\n");
   sleep(3);
 
-  msg.xclient.type = ClientMessage;
-  msg.xclient.message_type = _restack;
-  msg.xclient.display = display;
-  msg.xclient.window = win;
-  msg.xclient.format = 32;
-  msg.xclient.data.l[0] = 2l;
-  msg.xclient.data.l[1] = 0l;
-  msg.xclient.data.l[2] = BottomIf;
-  msg.xclient.data.l[3] = 0l;
-  msg.xclient.data.l[4] = 0l;
-  XSendEvent(display, RootWindow(display, 0), False, SubstructureNotifyMask | SubstructureRedirectMask, &msg);
-  XFlush(display);
+  send_restack(conn, root, win, _restack, BottomIf);
 
   printf("requesting topif in 3\n");
   sleep(3);
 
-  msg.xclient.type = ClientMessage;
-  msg.xclient.message_type = _restack;
-  msg.xclient.display = display;
-  msg.xclient.window = win;
-  msg.xclient.format = 32;
-  msg.xclient.data.l[0] = 2l;
-  msg.xclient.data.l[1] = 0l;
-  msg.xclient.data.l[2] = TopIf;
-  msg.xclient.data.l[3] = 0l;
-  msg.xclient.data.l[4] = 0l;
-  XSendEvent(display, RootWindow(display, 0), False, SubstructureNotifyMask | SubstructureRedirectMask, &msg);
-  XFlush(display);
+  send_restack(conn, root, win, _restack, TopIf);
 
   printf("requesting opposite in 3\n");
   sleep(3);
 
-  msg.xclient.type = ClientMessage;
-  msg.xclient.message_type = _restack;
-  msg.xclient.display = display;
-  msg.xclient.window = win;
-  msg.xclient.format = 32;
-  msg.xclient.data.l[0] = 2l;
-  msg.xclient.data.l[1] = 0l;
-  msg.xclient.data.l[2] = Opposite;
-  msg.xclient.data.l[3] = 0l;
-  msg.xclient.data.l[4] = 0l;
-  XSendEvent(display, RootWindow(display, 0), False, SubstructureNotifyMask | SubstructureRedirectMask, &msg);
-  XFlush(display);
+  send_restack(conn, root, win, _restack, Opposite);
 
+  ret = 0;
   while (1) {
     XNextEvent(display, &report);
   }
 
-  return 1;
+out:
+  if (win != None)
+    XDestroyWindow(display, win);
+  if (display)
+    XCloseDisplay(display);
+  return ret;
 }

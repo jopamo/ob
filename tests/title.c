@@ -1,18 +1,30 @@
 // title.c for the Openbox window manager
 
-#include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <X11/Xlib.h>
+#include <X11/Xlib-xcb.h>
 #include <X11/Xutil.h>
+#include <xcb/xcb.h>
+
+static xcb_atom_t intern_atom(xcb_connection_t* conn, const char* name) {
+  xcb_intern_atom_cookie_t cookie = xcb_intern_atom(conn, 0, strlen(name), name);
+  xcb_intern_atom_reply_t* reply = xcb_intern_atom_reply(conn, cookie, NULL);
+  xcb_atom_t atom = reply ? reply->atom : XCB_ATOM_NONE;
+  free(reply);
+  return atom;
+}
 
 int main(int argc, char** argv) {
-  Display* display;
-  Window win;
+  Display* display = NULL;
+  xcb_connection_t* conn = NULL;
+  Window win = None;
   XEvent report;
   int x = 10, y = 10, h = 100, w = 400;
-  XSizeHints size;
   XTextProperty name;
-  Atom nameprop, nameenc;
+  xcb_atom_t nameprop, nameenc;
+  int ret = 1;
 
   if (argc < 2) {
     fprintf(stderr, "Usage: %s <window_title> [nameprop] [encoding]\n", argv[0]);
@@ -26,21 +38,34 @@ int main(int argc, char** argv) {
     fprintf(stderr, "couldn't connect to X server :0\n");
     return 1;
   }
+  conn = XGetXCBConnection(display);
+  if (conn == NULL) {
+    fprintf(stderr, "couldn't get XCB connection\n");
+    goto out;
+  }
 
   // Use the provided arguments for window property names and encoding
   if (argc > 2)
-    nameprop = XInternAtom(display, argv[2], False);
+    nameprop = intern_atom(conn, argv[2]);
   else
-    nameprop = XInternAtom(display, "WM_NAME", False);
+    nameprop = intern_atom(conn, "WM_NAME");
 
   if (argc > 3)
-    nameenc = XInternAtom(display, argv[3], False);
+    nameenc = intern_atom(conn, argv[3]);
   else
-    nameenc = XInternAtom(display, "STRING", False);
+    nameenc = intern_atom(conn, "STRING");
+  if (nameprop == XCB_ATOM_NONE || nameenc == XCB_ATOM_NONE) {
+    fprintf(stderr, "failed to intern name atoms\n");
+    goto out;
+  }
 
   // Create a simple window
   win = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 10, CopyFromParent, CopyFromParent, CopyFromParent,
                       0, NULL);
+  if (win == None) {
+    fprintf(stderr, "failed to create window\n");
+    goto out;
+  }
 
   // Set the window background color to white
   XSetWindowBackground(display, win, WhitePixel(display, 0));
@@ -50,7 +75,8 @@ int main(int argc, char** argv) {
   XSetWMName(display, win, &name);
 
   // Alternatively, you can set the window property directly (for example with XChangeProperty)
-  XChangeProperty(display, win, nameprop, nameenc, 8, PropModeReplace, (unsigned char*)argv[1], strlen(argv[1]));
+  xcb_change_property(conn, XCB_PROP_MODE_REPLACE, win, nameprop, nameenc, 8, strlen(argv[1]), argv[1]);
+  xcb_flush(conn);
 
   // Flush the display to ensure changes take effect
   XFlush(display);
@@ -82,5 +108,12 @@ int main(int argc, char** argv) {
     }
   }
 
-  return 0;
+  ret = 0;
+
+out:
+  if (win != None)
+    XDestroyWindow(display, win);
+  if (display)
+    XCloseDisplay(display);
+  return ret;
 }
