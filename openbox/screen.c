@@ -203,6 +203,7 @@ gboolean screen_annex(void) {
   xcb_configure_window(conn, support_win, XCB_CONFIG_WINDOW_STACK_MODE, &stack_mode);
   screen_support_win = support_win;
 
+  xcb_flush(conn);
   if (!replace_wm()) {
     xcb_destroy_window(conn, screen_support_win);
     xcb_flush(conn);

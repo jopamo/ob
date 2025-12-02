@@ -62,8 +62,6 @@ ObPopup* popup_new(void) {
   xcb_create_window(conn, depth, self->bg, obt_root(ob_screen), 0, 0, 1, 1, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT, visual,
                     mask, val);
 
-  OBT_PROP_SET32(self->bg, NET_WM_WINDOW_TYPE, ATOM, OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_TOOLTIP));
-
   self->text = xcb_generate_id(conn);
   /* mask and val are reused but override_redirect is not needed for child?
      Actually XCreateWindow takes mask/attrib.
@@ -76,9 +74,12 @@ ObPopup* popup_new(void) {
 
   xcb_create_window(conn, depth, self->text, self->bg, 0, 0, 1, 1, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT, visual, mask, val);
 
-  RrConfigureWindowBorder(ob_rr_theme->inst, self->bg, ob_rr_theme->obwidth, ob_rr_theme->osd_border_color);
-
   xcb_map_window(conn, self->text);
+
+  xcb_flush(conn);
+
+  OBT_PROP_SET32(self->bg, NET_WM_WINDOW_TYPE, ATOM, OBT_PROP_ATOM(NET_WM_WINDOW_TYPE_TOOLTIP));
+  RrConfigureWindowBorder(ob_rr_theme->inst, self->bg, ob_rr_theme->obwidth, ob_rr_theme->osd_border_color);
 
   stacking_add(INTERNAL_AS_WINDOW(self));
   window_add(&self->bg, INTERNAL_AS_WINDOW(self));

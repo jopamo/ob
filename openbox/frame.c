@@ -298,6 +298,8 @@ ObFrame* frame_new(ObClient* client) {
 
   set_theme_statics(self);
 
+  xcb_flush(conn);
+
   return self;
 }
 

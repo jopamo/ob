@@ -77,6 +77,8 @@ void focus_cycle_indicator_startup(gboolean reconfig) {
   focus_indicator.right.window = create_window(obt_root(ob_screen), mask, val);
   focus_indicator.bottom.window = create_window(obt_root(ob_screen), mask, val);
 
+  xcb_flush(conn);
+
   stacking_add(INTERNAL_AS_WINDOW(&focus_indicator.top));
   stacking_add(INTERNAL_AS_WINDOW(&focus_indicator.left));
   stacking_add(INTERNAL_AS_WINDOW(&focus_indicator.right));
