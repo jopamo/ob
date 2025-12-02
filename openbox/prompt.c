@@ -186,9 +186,13 @@ void prompt_unref(ObPrompt* self) {
     obt_keyboard_context_unref(self->ic);
 
     for (i = 0; i < self->n_buttons; ++i) {
+      g_free(self->button[i].text);
       window_remove(self->button[i].window);
       XDestroyWindow(obt_display, self->button[i].window);
     }
+
+    g_free(self->msg.text);
+    g_free(self->button);
 
     XDestroyWindow(obt_display, self->msg.window);
     XDestroyWindow(obt_display, self->super.window);
@@ -522,9 +526,12 @@ gboolean prompt_mouse_event(ObPrompt* self, XEvent* e) {
     render_button(self, but);
   }
   else if (e->type == ButtonRelease) {
-    if (but->hover)
-      prompt_run_callback(self, but->result);
     but->pressed = FALSE;
+    if (but->hover) {
+      /* prompt_run_callback may free the prompt, so avoid touching it after */
+      prompt_run_callback(self, but->result);
+      return TRUE;
+    }
   }
   else if (e->type == MotionNotify) {
     if (but->pressed) {

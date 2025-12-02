@@ -76,6 +76,7 @@
 #include <unistd.h>
 #endif
 #include <errno.h>
+#include <fontconfig/fontconfig.h>
 
 #include <X11/cursorfont.h>
 #if USE_XCURSOR
@@ -476,6 +477,7 @@ gint main(gint argc, gchar** argv) {
   RrThemeFree(ob_rr_theme);
   RrImageCacheUnref(ob_rr_icons);
   RrInstanceFree(ob_rr_inst);
+  FcFini();
 
   session_shutdown(being_replaced);
 

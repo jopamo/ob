@@ -2802,8 +2802,10 @@ static void client_calc_layer_internal(ObClient* self) {
   /* transients take on the layer of their parents */
   sit = client_search_all_top_parents(self);
 
-  for (; sit; sit = g_slist_next(sit))
-    client_calc_layer_recursive(sit->data, self, 0);
+  for (GSList* it = sit; it; it = g_slist_next(it))
+    client_calc_layer_recursive(it->data, self, 0);
+
+  g_slist_free(sit);
 }
 
 void client_calc_layer(ObClient* self) {
