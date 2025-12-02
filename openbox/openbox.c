@@ -145,7 +145,7 @@ static gboolean load_menu_file_with_fallbacks(const gchar* name, struct ob_confi
     return TRUE;
 
   /* system config dirs */
-  gchar** cfg_dirs = g_get_system_config_dirs();
+  const gchar* const* cfg_dirs = g_get_system_config_dirs();
   if (cfg_dirs) {
     for (guint i = 0; cfg_dirs[i]; ++i) {
       path = g_build_filename(cfg_dirs[i], "openbox", name, NULL);
@@ -154,7 +154,6 @@ static gboolean load_menu_file_with_fallbacks(const gchar* name, struct ob_confi
       if (ok)
         break;
     }
-    g_strfreev(cfg_dirs);
   }
   if (ok)
     return TRUE;
@@ -167,7 +166,7 @@ static gboolean load_menu_file_with_fallbacks(const gchar* name, struct ob_confi
     return TRUE;
 
   /* system data dirs (for packaged defaults like share/openbox/menu.yaml) */
-  gchar** data_dirs = g_get_system_data_dirs();
+  const gchar* const* data_dirs = g_get_system_data_dirs();
   if (data_dirs) {
     for (guint i = 0; data_dirs[i]; ++i) {
       path = g_build_filename(data_dirs[i], "openbox", name, NULL);
@@ -176,7 +175,6 @@ static gboolean load_menu_file_with_fallbacks(const gchar* name, struct ob_confi
       if (ok)
         break;
     }
-    g_strfreev(data_dirs);
   }
 
   return ok;
