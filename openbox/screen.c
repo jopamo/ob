@@ -1065,6 +1065,28 @@ void screen_update_layout(void)
   }
 }
 
+static char** screen_config_names = NULL;
+static size_t screen_config_names_count = 0;
+
+void screen_set_names(char** names, size_t count) {
+  g_strfreev(screen_config_names);
+  screen_config_names = NULL;
+  screen_config_names_count = 0;
+
+  if (names && count > 0) {
+    size_t i;
+    screen_config_names = g_malloc0(sizeof(char*) * (count + 1));
+    for (i = 0; i < count; ++i)
+      screen_config_names[i] = g_strdup(names[i]);
+    screen_config_names_count = count;
+  }
+  screen_update_desktop_names();
+}
+
+void screen_set_popup_time(int ms) {
+  config_desktop_popup_time = ms;
+}
+
 void screen_update_desktop_names(void) {
   guint i;
 
@@ -1078,22 +1100,35 @@ void screen_update_desktop_names(void) {
   else
     i = 0;
   if (i < screen_num_desktops) {
-    GSList* it;
+    GSList* it = NULL;
+    size_t c_idx = i;
 
     screen_desktop_names = g_renew(gchar*, screen_desktop_names, screen_num_desktops + 1);
     screen_desktop_names[screen_num_desktops] = NULL;
 
-    it = g_slist_nth(config_desktops_names, i);
+    if (!screen_config_names)
+      it = g_slist_nth(config_desktops_names, i);
 
     for (; i < screen_num_desktops; ++i) {
-      if (it && ((char*)it->data)[0]) /* not empty */
+      const char* name = NULL;
+
+      if (screen_config_names) {
+        if (c_idx < screen_config_names_count)
+          name = screen_config_names[c_idx++];
+      }
+      else {
+        if (it) {
+          name = (char*)it->data;
+          it = g_slist_next(it);
+        }
+      }
+
+      if (name && name[0]) /* not empty */
         /* use the names from the config file when possible */
-        screen_desktop_names[i] = g_strdup(it->data);
+        screen_desktop_names[i] = g_strdup(name);
       else
         /* make up a nice name if it's not though */
         screen_desktop_names[i] = g_strdup_printf(_("desktop %i"), i + 1);
-      if (it)
-        it = g_slist_next(it);
     }
 
     /* if we changed any names, then set the root property so we can
@@ -1101,8 +1136,9 @@ void screen_update_desktop_names(void) {
     OBT_PROP_SETSS(obt_root(ob_screen), NET_DESKTOP_NAMES, (const gchar* const*)screen_desktop_names);
   }
 
-  /* resize the pager for these names */
-  pager_popup_text_width_to_strings(desktop_popup, screen_desktop_names, screen_num_desktops);
+  /* resize the pager for these names once the popup exists */
+  if (desktop_popup)
+    pager_popup_text_width_to_strings(desktop_popup, screen_desktop_names, screen_num_desktops);
 }
 
 void screen_show_desktop(ObScreenShowDestopMode show_mode, ObClient* show_only) {
@@ -1259,8 +1295,7 @@ static void get_monitor_areas(Rect** areas, guint* nmonitors) {
   RECT_SET((*areas)[*nmonitors], l, t, r - l + 1, b - t + 1);
 
   for (i = 0; i < *nmonitors; ++i)
-    ob_debug("Monitor %d @ %d,%d %dx%d\n", i, (*areas)[i].x, (*areas)[i].y, (*areas)[i].width,
-             (*areas)[i].height);
+    ob_debug("Monitor %d @ %d,%d %dx%d\n", i, (*areas)[i].x, (*areas)[i].y, (*areas)[i].width, (*areas)[i].height);
   ob_debug("Full desktop @ %d,%d %dx%d\n", (*areas)[i].x, (*areas)[i].y, (*areas)[i].width, (*areas)[i].height);
 }
 
