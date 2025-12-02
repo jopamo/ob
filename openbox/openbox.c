@@ -290,6 +290,30 @@ gint main(gint argc, gchar** argv) {
         gchar* config_path = g_build_filename(g_get_user_config_dir(), "openbox", "config.yaml", NULL);
         if (!ob_config_load_yaml(config_path, &conf)) {
           g_message("Could not load config from %s", config_path);
+
+          if (!g_file_test(config_path, G_FILE_TEST_EXISTS)) {
+            /* Attempt to write default config */
+            gchar* config_dir = g_path_get_dirname(config_path);
+            if (g_mkdir_with_parents(config_dir, 0755) == 0) {
+              FILE* f = fopen(config_path, "w");
+              if (f) {
+                if (ob_config_dump_yaml(&conf, f)) {
+                  g_message("Generated default configuration at %s", config_path);
+                }
+                else {
+                  g_warning("Failed to write default configuration to %s", config_path);
+                }
+                fclose(f);
+              }
+              else {
+                g_warning("Failed to open %s for writing: %s", config_path, g_strerror(errno));
+              }
+            }
+            else {
+              g_warning("Failed to create directory %s: %s", config_dir, g_strerror(errno));
+            }
+            g_free(config_dir);
+          }
         }
         g_free(config_path);
 
