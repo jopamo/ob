@@ -119,6 +119,10 @@ for bin in "$builddir"/test-*; do
   if [ ! -x "$bin" ]; then
     continue
   fi
+  # Skip meson private directories
+  case "$bin" in
+    *.p) continue ;;
+  esac
   found_any=1
   if ! run_one "$bin"; then
     failed=1

@@ -56,7 +56,7 @@ Window findClient(Display* d, xcb_connection_t* conn, Window win, xcb_atom_t sta
   return None;
 }
 
-int main(int argc, char** argv) {
+int main(void) {
   Display* d = XOpenDisplay(NULL);
   if (!d) {
     fprintf(stderr, "couldn't connect to X server\n");
@@ -65,6 +65,7 @@ int main(int argc, char** argv) {
   xcb_connection_t* conn = XGetXCBConnection(d);
   if (!conn) {
     fprintf(stderr, "failed to acquire XCB connection\n");
+    XCloseDisplay(d);
     return 1;
   }
   int s = DefaultScreen(d);
@@ -72,6 +73,7 @@ int main(int argc, char** argv) {
   xcb_atom_t wm_state = intern_atom(conn, "WM_STATE", True);
   if (net_wm_icon == XCB_ATOM_NONE) {
     fprintf(stderr, "_NET_WM_ICON not available\n");
+    XCloseDisplay(d);
     return 1;
   }
   unsigned int winw = 0, winh = 0;
@@ -116,12 +118,14 @@ int main(int argc, char** argv) {
     if (!reply || reply->type == XCB_ATOM_NONE || reply->format != 32 || reply->value_len < 1) {
       printf("No icon found\n");
       free(reply);
+      XCloseDisplay(d);
       return 1;
     }
     values = (const uint32_t*)xcb_get_property_value(reply);
     if (!values) {
       free(reply);
       printf("No icon found\n");
+      XCloseDisplay(d);
       return 1;
     }
     w = values[0];
@@ -133,12 +137,14 @@ int main(int argc, char** argv) {
     if (!reply || reply->type == XCB_ATOM_NONE || reply->format != 32 || reply->value_len < 1) {
       printf("Failed to get height\n");
       free(reply);
+      XCloseDisplay(d);
       return 1;
     }
     values = (const uint32_t*)xcb_get_property_value(reply);
     if (!values) {
       free(reply);
       printf("Failed to get height\n");
+      XCloseDisplay(d);
       return 1;
     }
     h = values[0];
@@ -147,6 +153,7 @@ int main(int argc, char** argv) {
 
     if (w == 0 || h == 0) {
       printf("Invalid icon size\n");
+      XCloseDisplay(d);
       return 1;
     }
 
@@ -155,6 +162,7 @@ int main(int argc, char** argv) {
     if (!reply || reply->type == XCB_ATOM_NONE || reply->format != 32 || reply->value_len < w * h) {
       printf("Failed to get image data\n");
       free(reply);
+      XCloseDisplay(d);
       return 1;
     }
     bytes_left = reply->bytes_after;
@@ -162,6 +170,7 @@ int main(int argc, char** argv) {
     if (!values) {
       free(reply);
       printf("Failed to get image data\n");
+      XCloseDisplay(d);
       return 1;
     }
     prop_return[image] = g_memdup2(values, reply->value_len * sizeof(uint32_t));

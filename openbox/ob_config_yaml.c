@@ -60,11 +60,11 @@ static void parse_resize(yaml_document_t* doc, yaml_node_t* node, struct ob_resi
     if (strcmp(k, "drawContents") == 0)
       cfg->draw_contents = scalar_bool(doc, val, cfg->draw_contents);
     else if (strcmp(k, "popupShow") == 0) {
-      free(cfg->popup_show);
+      g_free(cfg->popup_show);
       cfg->popup_show = scalar_dup(doc, val);
     }
     else if (strcmp(k, "popupPosition") == 0) {
-      free(cfg->popup_position);
+      g_free(cfg->popup_position);
       cfg->popup_position = scalar_dup(doc, val);
     }
     else if (strcmp(k, "popupFixedPosition") == 0 && val->type == YAML_MAPPING_NODE) {
@@ -112,7 +112,7 @@ static void parse_dock(yaml_document_t* doc, yaml_node_t* node, struct ob_dock_c
       continue;
     const char* k = (const char*)key->data.scalar.value;
     if (strcmp(k, "position") == 0) {
-      free(cfg->position);
+      g_free(cfg->position);
       cfg->position = scalar_dup(doc, val);
     }
     else if (strcmp(k, "floatingX") == 0)
@@ -122,11 +122,11 @@ static void parse_dock(yaml_document_t* doc, yaml_node_t* node, struct ob_dock_c
     else if (strcmp(k, "noStrut") == 0)
       cfg->no_strut = scalar_bool(doc, val, cfg->no_strut);
     else if (strcmp(k, "stacking") == 0) {
-      free(cfg->stacking);
+      g_free(cfg->stacking);
       cfg->stacking = scalar_dup(doc, val);
     }
     else if (strcmp(k, "direction") == 0) {
-      free(cfg->direction);
+      g_free(cfg->direction);
       cfg->direction = scalar_dup(doc, val);
     }
     else if (strcmp(k, "autoHide") == 0)
@@ -136,7 +136,7 @@ static void parse_dock(yaml_document_t* doc, yaml_node_t* node, struct ob_dock_c
     else if (strcmp(k, "showDelay") == 0)
       cfg->show_delay = scalar_int(doc, val, cfg->show_delay);
     else if (strcmp(k, "moveButton") == 0) {
-      free(cfg->move_button);
+      g_free(cfg->move_button);
       cfg->move_button = scalar_dup(doc, val);
     }
   }
@@ -153,11 +153,11 @@ static void parse_theme(yaml_document_t* doc, yaml_node_t* node, struct ob_theme
       continue;
     const char* k = (const char*)key->data.scalar.value;
     if (strcmp(k, "name") == 0) {
-      free(theme->name);
+      g_free(theme->name);
       theme->name = scalar_dup(doc, val);
     }
     else if (strcmp(k, "titleLayout") == 0) {
-      free(theme->title_layout);
+      g_free(theme->title_layout);
       theme->title_layout = scalar_dup(doc, val);
     }
     else if (strcmp(k, "keepBorder") == 0)
@@ -169,12 +169,12 @@ static void parse_theme(yaml_document_t* doc, yaml_node_t* node, struct ob_theme
     else if (strcmp(k, "font") == 0 && val->type == YAML_SEQUENCE_NODE) {
       if (theme->fonts) {
         for (size_t i = 0; i < theme->font_count; i++) {
-          free(theme->fonts[i].place);
-          free(theme->fonts[i].name);
-          free(theme->fonts[i].weight);
-          free(theme->fonts[i].slant);
+          g_free(theme->fonts[i].place);
+          g_free(theme->fonts[i].name);
+          g_free(theme->fonts[i].weight);
+          g_free(theme->fonts[i].slant);
         }
-        free(theme->fonts);
+        g_free(theme->fonts);
       }
       theme->font_count = val->data.sequence.items.top - val->data.sequence.items.start;
       theme->fonts = calloc(theme->font_count, sizeof(struct ob_font_config));
@@ -225,8 +225,8 @@ static void parse_desktops(yaml_document_t* doc, yaml_node_t* node, struct ob_de
     else if (strcmp(k, "names") == 0 && val->type == YAML_SEQUENCE_NODE) {
       if (desktops->names) {
         for (size_t i = 0; i < desktops->names_count; i++)
-          free(desktops->names[i]);
-        free(desktops->names);
+          g_free(desktops->names[i]);
+        g_free(desktops->names);
       }
       size_t count = val->data.sequence.items.top - val->data.sequence.items.start;
       desktops->names = malloc(sizeof(char*) * count);
@@ -283,7 +283,7 @@ static void parse_placement(yaml_document_t* doc, yaml_node_t* node, struct ob_p
           place->policy = OB_CONFIG_PLACE_POLICY_SMART;
         else if (g_ascii_strcasecmp(s, "mouse") == 0)
           place->policy = OB_CONFIG_PLACE_POLICY_MOUSE;
-        free(s);
+        g_free(s);
       }
     }
     else if (strcmp(k, "center") == 0)
@@ -346,7 +346,7 @@ static void parse_keyboard(yaml_document_t* doc, yaml_node_t* node, struct ob_co
     if (key && key->type == YAML_SCALAR_NODE) {
       char* key_str = (char*)key->data.scalar.value;
       if (strcmp(key_str, "chainQuitKey") == 0) {
-        free(cfg->keyboard.chain_quit_key);
+        g_free(cfg->keyboard.chain_quit_key);
         cfg->keyboard.chain_quit_key = scalar_dup(doc, val);
       }
       else if (strcmp(key_str, "keybind") == 0 && val->type == YAML_SEQUENCE_NODE) {
@@ -457,7 +457,7 @@ static void parse_mouse(yaml_document_t* doc, yaml_node_t* node, struct ob_confi
                 cfg->mouse_binding_count++;
               }
             }
-            free(context_name);
+            g_free(context_name);
           }
         }
       }

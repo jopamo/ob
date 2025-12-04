@@ -9,10 +9,9 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
-int main() {
+int main(void) {
   Display* display;
   Window win;
-  XEvent report;
   int x = 50, y = 50, h = 100, w = 400;
 
   // Open connection to X server
@@ -43,5 +42,6 @@ int main() {
   XDestroyWindow(display, win);
   XSync(display, False);  // Flush requests to the server
 
+  XCloseDisplay(display);
   return 0;
 }

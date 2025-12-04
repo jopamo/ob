@@ -623,36 +623,36 @@ void ob_config_init_defaults(struct ob_config* cfg) {
 
 static void free_key_actions(struct ob_key_action* actions, size_t count) {
   for (size_t i = 0; i < count; i++) {
-    free(actions[i].name);
-    free(actions[i].command);
+    g_free(actions[i].name);
+    g_free(actions[i].command);
     if (actions[i].params)
       g_hash_table_destroy(actions[i].params);
   }
-  free(actions);
+  g_free(actions);
 }
 
 static void free_mouse_actions(struct ob_mouse_action* actions, size_t count) {
   for (size_t i = 0; i < count; i++) {
-    free(actions[i].name);
-    free(actions[i].command);
+    g_free(actions[i].name);
+    g_free(actions[i].command);
     if (actions[i].params)
       g_hash_table_destroy(actions[i].params);
   }
-  free(actions);
+  g_free(actions);
 }
 
 static void free_menu_items(struct ob_menu_item* items, size_t count) {
   for (size_t i = 0; i < count; i++) {
-    free(items[i].label);
-    free(items[i].action_name);
-    free(items[i].command);
+    g_free(items[i].label);
+    g_free(items[i].action_name);
+    g_free(items[i].command);
     if (items[i].params)
       g_hash_table_destroy(items[i].params);
     if (items[i].submenu) {
       free_menu_items(items[i].submenu, items[i].submenu_count);
     }
   }
-  free(items);
+  g_free(items);
 }
 
 void ob_config_free(struct ob_config* cfg) {
@@ -660,75 +660,75 @@ void ob_config_free(struct ob_config* cfg) {
     return;
 
   /* Theme */
-  free(cfg->theme.name);
-  free(cfg->theme.title_layout);
+  g_free(cfg->theme.name);
+  g_free(cfg->theme.title_layout);
   if (cfg->theme.fonts) {
     for (size_t i = 0; i < cfg->theme.font_count; i++) {
-      free(cfg->theme.fonts[i].place);
-      free(cfg->theme.fonts[i].name);
-      free(cfg->theme.fonts[i].weight);
-      free(cfg->theme.fonts[i].slant);
+      g_free(cfg->theme.fonts[i].place);
+      g_free(cfg->theme.fonts[i].name);
+      g_free(cfg->theme.fonts[i].weight);
+      g_free(cfg->theme.fonts[i].slant);
     }
-    free(cfg->theme.fonts);
+    g_free(cfg->theme.fonts);
   }
 
   /* Desktops */
   if (cfg->desktops.names) {
     for (size_t i = 0; i < cfg->desktops.names_count; i++) {
-      free(cfg->desktops.names[i]);
+      g_free(cfg->desktops.names[i]);
     }
-    free(cfg->desktops.names);
+    g_free(cfg->desktops.names);
   }
 
   /* Keybinds */
   if (cfg->keybinds) {
     for (size_t i = 0; i < cfg->keybind_count; i++) {
-      free(cfg->keybinds[i].key);
-      free(cfg->keybinds[i].context);
+      g_free(cfg->keybinds[i].key);
+      g_free(cfg->keybinds[i].context);
       if (cfg->keybinds[i].actions) {
         free_key_actions(cfg->keybinds[i].actions, cfg->keybinds[i].action_count);
       }
     }
-    free(cfg->keybinds);
+    g_free(cfg->keybinds);
   }
 
   /* Mouse bindings */
   if (cfg->mouse_bindings) {
     for (size_t i = 0; i < cfg->mouse_binding_count; i++) {
-      free(cfg->mouse_bindings[i].context);
-      free(cfg->mouse_bindings[i].button);
-      free(cfg->mouse_bindings[i].click);
+      g_free(cfg->mouse_bindings[i].context);
+      g_free(cfg->mouse_bindings[i].button);
+      g_free(cfg->mouse_bindings[i].click);
       if (cfg->mouse_bindings[i].actions) {
         free_mouse_actions(cfg->mouse_bindings[i].actions, cfg->mouse_bindings[i].action_count);
       }
     }
-    free(cfg->mouse_bindings);
+    g_free(cfg->mouse_bindings);
   }
 
   /* Window rules */
   if (cfg->window_rules) {
     for (size_t i = 0; i < cfg->window_rule_count; i++) {
-      free(cfg->window_rules[i].match_class);
-      free(cfg->window_rules[i].match_name);
-      free(cfg->window_rules[i].match_role);
+      g_free(cfg->window_rules[i].match_class);
+      g_free(cfg->window_rules[i].match_name);
+      g_free(cfg->window_rules[i].match_role);
     }
-    free(cfg->window_rules);
+    g_free(cfg->window_rules);
   }
 
   /* Menu */
   if (cfg->menu.root) {
     free_menu_items(cfg->menu.root, cfg->menu.root_count);
   }
-  free(cfg->menu.file);
+  g_free(cfg->menu.file);
 
   /* Others */
-  free(cfg->resize.popup_show);
-  free(cfg->resize.popup_position);
-  free(cfg->dock.position);
-  free(cfg->dock.stacking);
-  free(cfg->dock.direction);
-  free(cfg->dock.move_button);
-  free(cfg->keyboard.chain_quit_key);
+  g_free(cfg->resize.popup_show);
+  g_free(cfg->resize.popup_position);
+  g_free(cfg->dock.position);
+  g_free(cfg->dock.stacking);
+  g_free(cfg->dock.direction);
+  g_free(cfg->dock.move_button);
+  g_free(cfg->keyboard.chain_quit_key);
 
   memset(cfg, 0, sizeof(*cfg));
 }
