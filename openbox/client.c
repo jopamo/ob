@@ -749,7 +749,10 @@ void client_unmanage(ObClient* self) {
 
   /* free all data allocated in the client struct */
   RrImageUnref(self->icon_set);
+  g_slist_free(self->parents);
+  self->parents = NULL;
   g_slist_free(self->transients);
+  self->transients = NULL;
   g_free(self->startup_id);
   g_free(self->wm_command);
   g_free(self->title);
