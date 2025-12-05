@@ -132,7 +132,7 @@ static void RrTrueColorSetup(RrInstance* inst) {
   XFree(timage);
 }
 
-#define RrPseudoNcolors(inst) (1 << (inst->pseudo_bpc * 3))
+#define RrPseudoNcolors(inst) (1U << (inst->pseudo_bpc * 3))
 
 static void RrPseudoColorSetup(RrInstance* inst) {
   XColor icolors[256];
@@ -145,15 +145,15 @@ static void RrPseudoColorSetup(RrInstance* inst) {
   g_assert(inst->pseudo_bpc >= 1);
   _ncolors = RrPseudoNcolors(inst);
 
-  if (_ncolors > 1 << inst->depth) {
+  if ((guint32)_ncolors > 1U << inst->depth) {
     g_message("Invalid colormap size. Resizing.");
-    inst->pseudo_bpc = 1 << (inst->depth / 3) >> 3;
-    _ncolors = 1 << (inst->pseudo_bpc * 3);
+    inst->pseudo_bpc = 1U << (inst->depth / 3) >> 3;
+    _ncolors = 1U << (inst->pseudo_bpc * 3);
   }
 
   /* build a color cube */
   inst->pseudo_colors = g_new(XColor, _ncolors);
-  cpc = 1 << inst->pseudo_bpc; /* colors per channel */
+  cpc = 1U << inst->pseudo_bpc; /* colors per channel */
 
   for (n = 0, r = 0; r < cpc; r++)
     for (g = 0; g < cpc; g++)
@@ -178,7 +178,7 @@ static void RrPseudoColorSetup(RrInstance* inst) {
   /* get the allocated values from the X server
      (only the first 256 XXX why!?)
    */
-  incolors = (((1 << inst->depth) > 256) ? 256 : (1 << inst->depth));
+  incolors = (((1U << inst->depth) > 256) ? 256 : (1U << inst->depth));
   for (i = 0; i < incolors; i++)
     icolors[i].pixel = i;
   XQueryColors(inst->display, inst->colormap, icolors, incolors);

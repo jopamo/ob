@@ -507,7 +507,7 @@ gboolean RrPixmapToRGBA(const RrInstance* inst, Pixmap pmap, Pixmap mask, gint* 
     for (i = 0, y = 0; y < ph; ++y) {
       for (x = 0; x < pw; ++x, ++i) {
         if (!((((unsigned)xm->data[di + x / 8]) >> (x % 8)) & 0x1))
-          (*data)[i] &= ~(0xff << RrDefaultAlphaOffset);
+          (*data)[i] &= ~((guint)0xff << RrDefaultAlphaOffset);
       }
       di += xm->bytes_per_line;
     }

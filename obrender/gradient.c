@@ -81,7 +81,7 @@ void RrRender(RrAppearance* a, gint w, gint h) {
     r = a->surface.interlace_color->r;
     g = a->surface.interlace_color->g;
     b = a->surface.interlace_color->b;
-    current = (r << RrDefaultRedOffset) + (g << RrDefaultGreenOffset) + (b << RrDefaultBlueOffset);
+    current = ((guint)r << RrDefaultRedOffset) + ((guint)g << RrDefaultGreenOffset) + ((guint)b << RrDefaultBlueOffset);
     p = data;
     for (i = 0; i < h; i += 2, p += w)
       for (x = 0; x < w; ++x, ++p)
@@ -92,7 +92,7 @@ void RrRender(RrAppearance* a, gint w, gint h) {
     r = a->surface.border_color->r;
     g = a->surface.border_color->g;
     b = a->surface.border_color->b;
-    current = (r << RrDefaultRedOffset) + (g << RrDefaultGreenOffset) + (b << RrDefaultBlueOffset);
+    current = ((guint)r << RrDefaultRedOffset) + ((guint)g << RrDefaultGreenOffset) + ((guint)b << RrDefaultBlueOffset);
     for (off = 0, x = 0; x < w; ++x, off++) {
       *(data + off) = current;
       *(data + off + ((h - 1) * w)) = current;
@@ -145,7 +145,7 @@ static void highlight(RrSurface* s, RrPixel32* x, RrPixel32* y, gboolean raised)
     g = 0xFF;
   if (b > 0xFF)
     b = 0xFF;
-  *up = (r << RrDefaultRedOffset) + (g << RrDefaultGreenOffset) + (b << RrDefaultBlueOffset);
+  *up = ((guint)r << RrDefaultRedOffset) + ((guint)g << RrDefaultGreenOffset) + ((guint)b << RrDefaultBlueOffset);
 
   r = (*down >> RrDefaultRedOffset) & 0xFF;
   r -= (r * s->bevel_dark_adjust) >> 8;
@@ -153,7 +153,7 @@ static void highlight(RrSurface* s, RrPixel32* x, RrPixel32* y, gboolean raised)
   g -= (g * s->bevel_dark_adjust) >> 8;
   b = (*down >> RrDefaultBlueOffset) & 0xFF;
   b -= (b * s->bevel_dark_adjust) >> 8;
-  *down = (r << RrDefaultRedOffset) + (g << RrDefaultGreenOffset) + (b << RrDefaultBlueOffset);
+  *down = ((guint)r << RrDefaultRedOffset) + ((guint)g << RrDefaultGreenOffset) + ((guint)b << RrDefaultBlueOffset);
 }
 
 static void create_bevel_colors(RrAppearance* l) {
@@ -278,8 +278,8 @@ static void gradient_solid(RrAppearance* l, gint w, gint h) {
   RrSurface* sp = &l->surface;
   gint left = 0, top = 0, right = w - 1, bottom = h - 1;
 
-  pix = (sp->primary->r << RrDefaultRedOffset) + (sp->primary->g << RrDefaultGreenOffset) +
-        (sp->primary->b << RrDefaultBlueOffset);
+  pix = ((guint)sp->primary->r << RrDefaultRedOffset) + ((guint)sp->primary->g << RrDefaultGreenOffset) +
+        ((guint)sp->primary->b << RrDefaultBlueOffset);
 
   for (i = 0; i < w * h; i++)
     *data++ = pix;
@@ -396,8 +396,9 @@ static void gradient_solid(RrAppearance* l, gint w, gint h) {
   c->g = color##x[1];  \
   c->b = color##x[2]
 
-#define COLOR(x) \
-  ((color##x[0] << RrDefaultRedOffset) + (color##x[1] << RrDefaultGreenOffset) + (color##x[2] << RrDefaultBlueOffset))
+#define COLOR(x)                                                                               \
+  (((guint)color##x[0] << RrDefaultRedOffset) + ((guint)color##x[1] << RrDefaultGreenOffset) + \
+   ((guint)color##x[2] << RrDefaultBlueOffset))
 
 #define INCREMENT(x, i) (inc##x[i])
 

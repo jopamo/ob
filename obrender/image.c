@@ -594,8 +594,8 @@ static RsvgLoader* LoadWithRsvg(gchar* path, RrPixel32** pixel_data, gint* width
         g = (guint8)MIN(255, (guint)g * 255 / a);
         b = (guint8)MIN(255, (guint)b * 255 / a);
       }
-      out_row[x] = (a << RrDefaultAlphaOffset) | (r << RrDefaultRedOffset) | (g << RrDefaultGreenOffset) |
-                   (b << RrDefaultBlueOffset);
+      out_row[x] = ((guint)a << RrDefaultAlphaOffset) | ((guint)r << RrDefaultRedOffset) |
+                   ((guint)g << RrDefaultGreenOffset) | ((guint)b << RrDefaultBlueOffset);
     }
     in_row += in_stride;
     out_row += *width;
@@ -782,8 +782,8 @@ static RrImagePic* ResizeImage(RrPixel32* src, gulong srcW, gulong srcH, gulong 
       blue /= sumXY;
       alpha /= sumXY;
 
-      *dst++ = (red << RrDefaultRedOffset) | (green << RrDefaultGreenOffset) | (blue << RrDefaultBlueOffset) |
-               (alpha << RrDefaultAlphaOffset);
+      *dst++ = ((guint)red << RrDefaultRedOffset) | ((guint)green << RrDefaultGreenOffset) |
+               ((guint)blue << RrDefaultBlueOffset) | ((guint)alpha << RrDefaultAlphaOffset);
     }
   }
 
@@ -843,7 +843,7 @@ void DrawRGBA(RrPixel32* target,
     g = bgg + (((g - bgg) * a) >> 8);
     b = bgb + (((b - bgb) * a) >> 8);
 
-    *dest = ((r << RrDefaultRedOffset) | (g << RrDefaultGreenOffset) | (b << RrDefaultBlueOffset));
+    *dest = ((guint)r << RrDefaultRedOffset) | ((guint)g << RrDefaultGreenOffset) | ((guint)b << RrDefaultBlueOffset);
 
     dest++;
     source++;
