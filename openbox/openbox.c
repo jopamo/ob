@@ -426,6 +426,10 @@ gint main(gint argc, gchar** argv) {
 
     /* we remove the session arguments from argv, so put them back,
        also don't restore the session on restart */
+    gchar** new_argv = NULL;
+    gchar* duplicated_strings[3] = {NULL, NULL, NULL};
+    gint dup_index = 0;
+
     if (ob_sm_save_file != NULL || ob_sm_id != NULL) {
       gchar** nargv;
       gint i, l;
@@ -436,27 +440,42 @@ gint main(gint argc, gchar** argv) {
         nargv[i] = argv[i];
 
       if (ob_sm_save_file != NULL) {
-        nargv[i++] = g_strdup("--sm-save-file");
+        duplicated_strings[dup_index++] = g_strdup("--sm-save-file");
+        nargv[i++] = duplicated_strings[dup_index - 1];
         nargv[i++] = ob_sm_save_file;
       }
       if (ob_sm_id != NULL) {
-        nargv[i++] = g_strdup("--sm-client-id");
+        duplicated_strings[dup_index++] = g_strdup("--sm-client-id");
+        nargv[i++] = duplicated_strings[dup_index - 1];
         nargv[i++] = ob_sm_id;
       }
-      nargv[i++] = g_strdup("--sm-no-load");
+      duplicated_strings[dup_index++] = g_strdup("--sm-no-load");
+      nargv[i++] = duplicated_strings[dup_index - 1];
       g_assert(i == l);
       argv = nargv;
+      new_argv = nargv;
     }
 
     /* re-run me */
     execvp(argv[0], argv);                       /* try how we were run */
     execlp(argv[0], program_name, (gchar*)NULL); /* last resort */
+
+    /* If we reach here, both execs failed */
+    if (new_argv != NULL) {
+      gint j;
+      /* Free duplicated strings */
+      for (j = 0; j < dup_index; j++)
+        g_free(duplicated_strings[j]);
+      /* Free the argv array */
+      g_free(new_argv);
+    }
   }
 
   /* free stuff passed in from the command line or environment */
   g_free(ob_sm_save_file);
   g_free(ob_sm_id);
   g_free(program_name);
+  g_free(restart_path);
 
   if (!restart) {
     ob_debug_shutdown();
@@ -697,6 +716,7 @@ void ob_exit_with_error(const gchar* msg) {
 }
 
 void ob_restart_other(const gchar* path) {
+  g_free(restart_path);
   restart_path = g_strdup(path);
   ob_restart();
 }
