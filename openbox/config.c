@@ -928,12 +928,24 @@ typedef struct {
   const gchar* actname;
 } ObDefKeyBind;
 
+static void free_keylist(GList* list) {
+  GList* it;
+  for (it = list; it; it = it->next)
+    g_free(it->data);
+  g_list_free(list);
+}
+
 static void bind_default_keyboard(void) {
   ObDefKeyBind* it;
   ObDefKeyBind binds[] = {{"A-Tab", "NextWindow"}, {"S-A-Tab", "PreviousWindow"}, {"A-F4", "Close"}, {NULL, NULL}};
   for (it = binds; it->key; ++it) {
     GList* l = g_list_append(NULL, g_strdup(it->key));
-    keyboard_bind(l, actions_parse_string(it->actname));
+    ObActionsAct* act = actions_parse_string(it->actname);
+    if (act) {
+      if (!keyboard_bind(l, act))
+        actions_act_unref(act);
+    }
+    free_keylist(l);
   }
 }
 
