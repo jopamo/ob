@@ -72,7 +72,7 @@ if test_targets.length() > 0
   alias_target('x11-regression-tests', test_targets)
 endif
 
-test_timeout_s = 5
+test_timeout_s = 1
 test_runner = configure_file(
   input: 'run-x11-regressions.sh.in',
   output: 'run-x11-regressions.sh',

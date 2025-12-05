@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 /* override.c for the Openbox window manager */
 
 #include <stdio.h>
@@ -31,12 +32,12 @@ int main() {
   XMapWindow(display, win);
   XFlush(display);  // Correct usage of XFlush
 
-  sleep(1);  // Simulate a delay for the window to appear
+  usleep(100000);  // Simulate a delay for the window to appear
 
   // Unmap and remap the window to simulate window state change
   XUnmapWindow(display, win);
   XFlush(display);  // Correct usage of XFlush
-  sleep(1);
+  usleep(100000);
   XMapWindow(display, win);
   XFlush(display);  // Correct usage of XFlush
 

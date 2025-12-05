@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 /* -*- indent-tabs-mode: nil; tab-width: 4; c-basic-offset: 4; -*-
 
    resize.c for the Openbox window manager
@@ -42,7 +43,7 @@ int main() {
   XMapWindow(display, win);
   XFlush(display);
 
-  sleep(5);
+  usleep(100000);
   XResizeWindow(display, win, 600, 150);
 
   XSelectInput(display, win, ExposureMask | StructureNotifyMask);

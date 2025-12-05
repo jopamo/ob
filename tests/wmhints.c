@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 /* wmhints.c for the Openbox window manager */
 
 #include <stdint.h>
@@ -70,7 +71,7 @@ int main(int argc, char** argv) {
   XMapWindow(display, win);
   XFlush(display);
 
-  sleep(1);
+  usleep(100000);
   hints.flags = 2;
   hints.decorations = (1u << 3) | (1u << 1);  // Set border and title
   xcb_change_property(conn, XCB_PROP_MODE_REPLACE, win, prop, prop, 32, 5, &hints);

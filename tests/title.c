@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 // title.c for the Openbox window manager
 
 #include <stdio.h>
@@ -28,7 +29,7 @@ int main(int argc, char** argv) {
 
   if (argc < 2) {
     fprintf(stderr, "Usage: %s <window_title> [nameprop] [encoding]\n", argv[0]);
-    return 1;
+    return 0;
   }
 
   // Open connection to the X server

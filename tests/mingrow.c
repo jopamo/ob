@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 /* mingrow.c for the Openbox window manager */
 
 #include <stdio.h>
@@ -46,16 +47,16 @@ int main() {
   // Simulate waiting for some time (for CI purposes, we'll wait 4 seconds before resizing)
   printf("sleeping 4..");
   fflush(stdout);
-  sleep(1);
+  usleep(100000);
   printf("3..");
   fflush(stdout);
-  sleep(1);
+  usleep(100000);
   printf("2..");
   fflush(stdout);
-  sleep(1);
+  usleep(100000);
   printf("1..");
   fflush(stdout);
-  sleep(1);
+  usleep(100000);
   printf("\n");
 
   // Resize the window by changing the size hints

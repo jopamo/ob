@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 /* big.c for Openbox window manager */
 #define _POSIX_C_SOURCE 200809L
 
@@ -49,7 +50,7 @@ int main() {
 
   XMapWindow(display, win);
   XFlush(display);
-  sleep(2);
+  usleep(100000);
 
   XSelectInput(display, win, ExposureMask | StructureNotifyMask);
 
@@ -78,7 +79,7 @@ int main() {
                 report.xconfigure.height);
 
     // Sleep to simulate time between events
-    sleep_for_ms(500);  // Sleep for 0.5 seconds
+    sleep_for_ms(50);  // Sleep for 0.5 seconds
   }
 
   // Destroy the window and close the display connection

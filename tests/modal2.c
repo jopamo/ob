@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 /* modal2.c for the Openbox window manager */
 
 #include <stdio.h>

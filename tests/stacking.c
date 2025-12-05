@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 // stacking.c for the Openbox window manager
 
 #include <stdio.h>
@@ -46,10 +47,10 @@ int main() {
 
   XMapWindow(display, parent);
   XFlush(display);
-  sleep(3);
+  usleep(100000);
   XMapWindow(display, child1);
   XFlush(display);
-  sleep(3);
+  usleep(100000);
   XMapWindow(display, child2);
 
   while (1) {

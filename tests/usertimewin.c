@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 /* usertimewin.c ensures helper-window timestamps block unwanted focus */
 
 #include <X11/Xatom.h>
@@ -58,7 +59,7 @@ int main(void) {
                                          BlackPixel(display, screen), WhitePixel(display, screen));
   XMapWindow(display, focus_win);
   XFlush(display);
-  sleep(1);
+  usleep(100000);
 
   XSetInputFocus(display, focus_win, RevertToPointerRoot, CurrentTime);
   XSync(display, False);
@@ -82,7 +83,7 @@ int main(void) {
 
   XMapWindow(display, test_win);
   XFlush(display);
-  sleep(1);
+  usleep(100000);
 
   Window active = read_active_window(display, conn, active_atom);
 

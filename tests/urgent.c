@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 /* urgent.c for the Openbox window manager */
 
 #include <stdio.h>
@@ -79,7 +80,7 @@ int main() {
   XMapWindow(display, win);
   XFlush(display);
 
-  sleep(1);
+  usleep(100000);
 
   // Set the urgency hint on the window
   printf("urgent on\n");

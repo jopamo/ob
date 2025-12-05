@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 // fallback.c for the Openbox window manager
 #define _POSIX_C_SOURCE 200809L
 

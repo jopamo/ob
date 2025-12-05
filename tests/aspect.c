@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 /* aspect.c for Openbox window manager */
 #define _POSIX_C_SOURCE 200809L
 
@@ -97,7 +98,7 @@ int main(void) {
     XIfEvent(dpy, &ev, is_configure_for_window, (XPointer)(uintptr_t)win);
     printf("confignotify %d,%d-%ix%i\n", ev.xconfigure.x, ev.xconfigure.y, ev.xconfigure.width, ev.xconfigure.height);
     test_window(dpy, win, rx, ry, w, h);
-    sleep_for_ms(200);
+    sleep_for_ms(20);
   }
 
   // clean up client resources and quiesce the connection

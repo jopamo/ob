@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 // groupmodal.c for the Openbox window manager
 
 #include <stdio.h>
@@ -103,7 +104,7 @@ int main() {
   // Map the windows
   XMapWindow(display, one);
   XFlush(display);
-  sleep(1);  // Sleep to ensure the first window is mapped before the second
+  usleep(100000);  // Sleep to ensure the first window is mapped before the second
   XMapWindow(display, two);
   XFlush(display);
 

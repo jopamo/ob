@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 /* strut.c for Openbox window manager */
 
 #include <stdint.h>
@@ -28,12 +29,12 @@ void test_strut_property(Display* display, xcb_connection_t* conn, Window win, x
   s[3] = 0;
   xcb_change_property(conn, XCB_PROP_MODE_REPLACE, win, _net_strut, XCB_ATOM_CARDINAL, 32, 4, s);
   xcb_flush(conn);
-  sleep(2);
+  usleep(100000);
 
   // Remove strut
   xcb_delete_property(conn, win, _net_strut);
   xcb_flush(conn);
-  sleep(2);
+  usleep(100000);
 }
 
 void handle_events(Display* display, Window win) {

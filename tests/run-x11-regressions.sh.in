@@ -119,9 +119,10 @@ run_one() {
 
   if timeout "$timeout_s" "$@"; then
     return 0
+  else
+    status=$?
   fi
 
-  status=$?
   if [ "$status" -eq 124 ]; then
     echo "[timeout] $name exceeded ${timeout_s}s"
     return 0

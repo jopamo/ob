@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 /* -*- indent-tabs-mode: nil; tab-width: 4; c-basic-offset: 4; -*-
 
    extentsrequest.c for the Openbox window manager
@@ -95,27 +96,27 @@ int main() {
   XFlush(display);
 
   printf("requesting bottom in 3\n");
-  sleep(3);
+  usleep(100000);
 
   send_restack(conn, root, win, _restack, Below);
 
   printf("requesting top in 3\n");
-  sleep(3);
+  usleep(100000);
 
   send_restack(conn, root, win, _restack, Above);
 
   printf("requesting bottomif in 3\n");
-  sleep(3);
+  usleep(100000);
 
   send_restack(conn, root, win, _restack, BottomIf);
 
   printf("requesting topif in 3\n");
-  sleep(3);
+  usleep(100000);
 
   send_restack(conn, root, win, _restack, TopIf);
 
   printf("requesting opposite in 3\n");
-  sleep(3);
+  usleep(100000);
 
   send_restack(conn, root, win, _restack, Opposite);
 

@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 /* oldfullscreen.c for the Openbox window manager */
 
 #include <stdint.h>
@@ -79,7 +80,7 @@ int main(int argc, char** argv) {
 
   XSelectInput(display, win, StructureNotifyMask | ButtonPressMask);
 
-  sleep(1);
+  usleep(100000);
   XResizeWindow(display, win, w + 5, h + 5);
   XMoveWindow(display, win, x, y);
 

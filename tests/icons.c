@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 // icons.c for the Openbox window manager
 
 #include <X11/Xlib.h>

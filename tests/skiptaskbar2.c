@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 // skiptaskbar2.c for the Openbox window manager
 
 #include <stdint.h>
@@ -82,7 +83,7 @@ int main() {
   XMapWindow(display, win);
   XFlush(display);
 
-  sleep(1);
+  usleep(100000);
 
   send_state(conn, root, win, state, skip);
 

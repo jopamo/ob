@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 /*
  * fakeunmap.c for Openbox window manager
  *

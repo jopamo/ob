@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 /* grav.c for the Openbox window manager */
 
 #include <stdio.h>
@@ -42,7 +43,7 @@ int main() {
   h = 160;
   XMoveResizeWindow(display, win, 1172 - w - b * 2, 668 - h - b * 2, w, h);
   XFlush(display);
-  sleep(1);
+  usleep(100000);
   XResizeWindow(display, win, 900, 275);
 
   // Select input events to listen for

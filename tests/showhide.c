@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 /*
 
    showhide.c for the Openbox window manager
@@ -36,7 +37,7 @@ int main(void) {
   XFlush(display);           // Ensure the window gets displayed
 
   // Sleep to keep the window visible for 2 seconds
-  sleep(2);
+  usleep(100000);
 
   // Destroy the window after the delay
   XDestroyWindow(display, win);

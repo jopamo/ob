@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 // confignotify.c for the Openbox window manager
 
 #include <stdio.h>
@@ -26,7 +27,7 @@ int main() {
   XMapWindow(display, win);
   XFlush(display);
 
-  sleep(1);
+  usleep(100000);
   XResizeWindow(display, win, w + 5, h + 5);
   XMoveWindow(display, win, x, y);
 

@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 /* fullscreen.c for the Openbox window manager */
 
 #include <stdint.h>
@@ -77,11 +78,11 @@ int main() {
 
   XMapWindow(display, win);
   XFlush(display);
-  sleep(2);
+  usleep(100000);
 
   printf("fullscreen\n");
   send_state(conn, root, win, _net_state, _net_fs);
-  sleep(2);
+  usleep(100000);
 
   printf("restore\n");
   send_state(conn, root, win, _net_state, _net_fs);

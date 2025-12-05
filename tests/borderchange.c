@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 /* borderchange.c for Openbox window manager */
 
 #include <stdio.h>
@@ -50,7 +51,7 @@ int main(void) {
     }
   }
 
-  sleep(2);
+  usleep(100000);
 
   // set border width to 0
   printf("setting border to 0\n");
@@ -74,7 +75,7 @@ int main(void) {
     }
   }
 
-  sleep(2);
+  usleep(100000);
 
   // set border width to 50
   printf("setting border to 50\n");

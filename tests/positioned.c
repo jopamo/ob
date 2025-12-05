@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 /* positioned.c for the Openbox window manager */
 
 #include <string.h>

@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 // hidpi.c -- exercise scaling helpers for HiDPI setups
 
 #include <math.h>

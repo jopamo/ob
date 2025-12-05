@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 /* confignotifymax.c for the Openbox window manager */
 
 #include <stdio.h>
@@ -60,7 +61,7 @@ int main() {
   XMapWindow(display, win);
   XFlush(display);
 
-  sleep(1);  // Sleep to allow events to be processed
+  usleep(100000);  // Sleep to allow events to be processed
 
   // Resize and move the window
   XResizeWindow(display, win, w + 5, h + 5);

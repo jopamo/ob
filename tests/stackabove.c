@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 /* -*- indent-tabs-mode: nil; tab-width: 4; c-basic-offset: 4; -*-
 
    extentsrequest.c for the Openbox window manager

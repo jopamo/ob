@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 /* -*- indent-tabs-mode: nil; tab-width: 4; c-basic-offset: 4; -*-
 
    iconifydelay.c for the Openbox window manager
@@ -92,10 +93,10 @@ int main() {
                       CopyFromParent, CopyFromParent, 0, NULL);
   XSetWindowBackground(display, win, WhitePixel(display, DefaultScreen(display)));
 
-  sleep_for_ms(1000);
+  sleep_for_ms(100);
   XMapWindow(display, win);
   XFlush(display);
-  sleep_for_ms(1000);
+  sleep_for_ms(100);
 
   send_change_state(conn, root, win, change_state);
 
