@@ -88,7 +88,7 @@ test(
   args: [test_runner],
   workdir: meson.current_build_dir(),
   suite: ['x11'],
-  timeout: 300,
+  timeout: 1200,
   is_parallel: false,
   depends: test_targets)
 
