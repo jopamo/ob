@@ -769,9 +769,45 @@ void client_unmanage(ObClient* self) {
 }
 
 void client_fake_unmanage(ObClient* self) {
-  /* this is all that got allocated to get the decorations */
+  GSList* it;
 
+  /* tell our parent(s) that we're gone */
+  for (it = self->parents; it; it = g_slist_next(it))
+    ((ObClient*)it->data)->transients = g_slist_remove(((ObClient*)it->data)->transients, self);
+
+  /* tell our transients that we're gone */
+  for (it = self->transients; it; it = g_slist_next(it)) {
+    ((ObClient*)it->data)->parents = g_slist_remove(((ObClient*)it->data)->parents, self);
+  }
+
+  /* remove from its group */
+  if (self->group) {
+    group_remove(self->group, self);
+    self->group = NULL;
+  }
+
+  /* remove from stacking order */
+  stacking_remove(self);
+
+  /* remove from window map and reparent back */
+  frame_release_client(self->frame);
   frame_free(self->frame);
+
+  g_slist_free(self->parents);
+  g_slist_free(self->transients);
+  g_free(self->startup_id);
+  g_free(self->wm_command);
+  g_free(self->title);
+  g_free(self->icon_title);
+  g_free(self->original_title);
+  g_free(self->name);
+  g_free(self->class);
+  g_free(self->role);
+  g_free(self->group_name);
+  g_free(self->group_class);
+  g_free(self->client_machine);
+  g_free(self->sm_client_id);
+
   g_slice_free(ObClient, self);
 }
 
