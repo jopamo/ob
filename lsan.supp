@@ -1,0 +1,34 @@
+# LeakSanitizer suppressions for Openbox
+# fontconfig internal caches (process-lifetime)
+leak:FcInit
+leak:FcCharSetAddChar
+leak:FcCharSetCreate
+leak:FcConfig
+leak:XML_ParseBuffer
+leak:XML_ParserCreate
+leak:libfontconfig
+leak:libexpat
+
+# Pango/freetype/harfbuzz static data
+leak:pangoft2
+leak:pango_font_map
+leak:harfbuzz
+leak:freetype
+
+# GLib type system and once init
+leak:g_type_register_static
+leak:g_once_init_enter
+leak:g_private_get
+leak:g_quark_init
+
+# X11 resources that persist until exit
+leak:libX11
+leak:XInitThreads
+leak:XrmSetDatabase
+leak:XCreateGC
+leak:XOpenDisplay
+
+# Usage:
+# LSAN_OPTIONS="suppressions=lsan.supp:print_suppressions=1" ./build-meson-asan/openbox/openbox
+# To disable leak detection entirely:
+# ASAN_OPTIONS=detect_leaks=0 ./build-meson-asan/openbox/openbox
