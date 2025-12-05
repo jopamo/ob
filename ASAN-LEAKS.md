@@ -1,22 +1,5 @@
 # AddressSanitizer and LeakSanitizer for Openbox
 
-## Fixed leaks
-
-The following leaks in Openbox code have been fixed:
-
-1. **`openbox.c:434`** – `g_new0` leak in restart path (commit `ae6e3b10`)
-   - Added cleanup after failed `execvp`/`execlp` calls
-   - Free duplicated argument strings and the `nargv` array
-
-2. **`client_search_all_top_parents_internal`** – GSList leaks (commit `3117c935`)
-   - Added `g_slist_free` in `client_calc_layer_internal`
-   - Added `g_slist_free` in `find_highest_relative` (`stacking.c`)
-
-3. **`screen_area` / `screen_update_areas`** – Rect and GList leaks (commit `63b6b2d3`)
-   - Free `onscreen` GList in `screen_update_areas`
-   - Free `monitor_area` Rect in `place_client` early‑return path
-   - Free `carea` Rect in `moverelative` action
-
 ## Third‑party library leaks (false positives)
 
 Fontconfig, expat, and other libraries allocate process‑lifetime caches that
