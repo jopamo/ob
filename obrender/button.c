@@ -52,6 +52,9 @@ RrButton* RrButtonNew(const RrInstance* inst) {
 }
 
 void RrButtonFree(RrButton* b) {
+  if (!b)
+    return;
+
   /* colors */
   RrColorFree(b->focused_unpressed_color);
   RrColorFree(b->unfocused_unpressed_color);
@@ -92,4 +95,6 @@ void RrButtonFree(RrButton* b) {
   RrAppearanceFree(b->a_unfocused_pressed_toggled);
   RrAppearanceFree(b->a_focused_hover_toggled);
   RrAppearanceFree(b->a_unfocused_hover_toggled);
+
+  g_free(b);
 }
