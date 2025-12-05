@@ -1,0 +1,6 @@
+set pagination off
+handle SIGPIPE nostop noprint
+break free
+run --replace --sm-disable
+thread apply all bt
+quit

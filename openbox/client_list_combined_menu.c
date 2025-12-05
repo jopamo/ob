@@ -71,8 +71,10 @@ static gboolean self_update(ObMenuFrame* frame, gpointer data) {
 
         if (config_menu_show_icons) {
           e->data.normal.icon = client_icon(c);
-          RrImageRef(e->data.normal.icon);
-          e->data.normal.icon_alpha = c->iconic ? OB_ICONIC_ALPHA : 0xff;
+          if (e->data.normal.icon) {
+            RrImageRef(e->data.normal.icon);
+            e->data.normal.icon_alpha = c->iconic ? OB_ICONIC_ALPHA : 0xff;
+          }
         }
 
         e->data.normal.data = c;

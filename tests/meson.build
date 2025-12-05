@@ -20,7 +20,7 @@ foreach src : test_sources
     src,
     dependencies: test_deps,
     install: false,
-    build_by_default: false)
+    build_by_default: true)
   test_targets += exe
 endforeach
 
@@ -46,6 +46,7 @@ test_runner = configure_file(
     'TEST_BUILD_DIR': meson.current_build_dir(),
     'TEST_TIMEOUT_S': test_timeout_s,
     'OPENBOX_BIN': join_paths(meson.project_build_root(), 'openbox', 'openbox'),
+    'GDB_COMMANDS_PATH': join_paths(meson.project_source_root(), 'gdb_commands.txt'),
   })
 
 sh = find_program('sh')

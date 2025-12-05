@@ -61,13 +61,10 @@ int main() {
   XMapWindow(display, win);
   XFlush(display);
 
-  usleep(100000);  // Sleep to allow events to be processed
+  usleep(100000);  // Give Openbox some time to process the map request
 
-  // Resize and move the window
-  XResizeWindow(display, win, w + 5, h + 5);
-  XMoveWindow(display, win, x, y);
-
-  while (1) {
+  int configure_notify_count = 0;
+  while (configure_notify_count < 5) {  // Wait for a few configure notifies after setting max state
     XNextEvent(display, &report);
 
     switch (report.type) {
@@ -78,12 +75,10 @@ int main() {
         printf("exposed\n");
         break;
       case GravityNotify:
-        // Use %lx for Window (unsigned long) and cast
         printf("gravity notify event 0x%lx window 0x%lx x %d y %d\n", (unsigned long)report.xgravity.event,
                (unsigned long)report.xgravity.window, report.xgravity.x, report.xgravity.y);
         break;
       case ConfigureNotify: {
-        // Declare as unsigned long or cast to it when printing
         unsigned long se = (unsigned long)report.xconfigure.send_event;
         unsigned long event = (unsigned long)report.xconfigure.event;
         unsigned long wind = (unsigned long)report.xconfigure.window;
@@ -99,16 +94,13 @@ int main() {
             "confignotify send %lu ev 0x%lx win 0x%lx %i,%i-%ix%i bw %i\n"
             "             above 0x%lx ovrd %d\n",
             se, event, wind, cx, cy, cw, ch, bw, abv, ovrd);
+        configure_notify_count++;
         break;
       }
     }
-
-    // Exit after handling events
-    if (report.type == Expose && report.xexpose.count == 0) {
-      printf("Test completed. Closing the program.\n");
-      break;
-    }
   }
+
+  printf("Test completed after receiving configure notifies. Closing the program.\n");
 
   XDestroyWindow(display, win);
   ret = 0;

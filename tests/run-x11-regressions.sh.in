@@ -9,6 +9,9 @@ host_display="${DISPLAY:-}"
 test_display="${OPENBOX_TEST_DISPLAY:-:1}"
 test_screen="${OPENBOX_TEST_SCREEN:-1024x768x24}"
 started_xephyr=0
+started_xvfb=0
+found_any=0
+failed=0
 ob_pid=''
 xephyr_pid=''
 
@@ -16,6 +19,26 @@ if ! command -v xprop >/dev/null 2>&1; then
   echo "Skipping X11 regression tests: xprop is not available."
   exit 77
 fi
+
+run_one() {
+  bin=$1
+  printf 'Running %s\n' "$(basename "$bin")"
+  if command -v timeout >/dev/null 2>&1; then
+    if ! timeout "$timeout_s" "$bin"; then
+      status=$?
+      [ "$status" -eq 77 ] && return 0
+      echo "Test $bin failed with status $status" >&2
+      return "$status"
+    fi
+  else
+    if ! "$bin"; then
+      status=$?
+      [ "$status" -eq 77 ] && return 0
+      echo "Test $bin failed with status $status" >&2
+      return "$status"
+    fi
+  fi
+}
 
 start_xvfb() {
   Xvfb "$test_display" -screen 0 "$test_screen" -nolisten tcp >/dev/null 2>&1 &
@@ -75,14 +98,14 @@ trap cleanup EXIT INT TERM
 if ! DISPLAY="$test_display" xprop -root >/dev/null 2>&1; then
   if command -v Xvfb >/dev/null 2>&1; then
     if ! start_xvfb; then
-       echo "Skipping X11 regression tests: unable to start Xvfb on $test_display." >&2
-       exit 77
+      echo "Skipping X11 regression tests: unable to start Xvfb on $test_display." >&2
+      exit 77
     fi
   elif command -v Xephyr >/dev/null 2>&1; then
-     if ! start_xephyr; then
-        echo "Skipping X11 regression tests: unable to start Xephyr on $test_display." >&2
-        exit 77
-     fi
+    if ! start_xephyr; then
+      echo "Skipping X11 regression tests: unable to start Xephyr on $test_display." >&2
+      exit 77
+    fi
   else
     echo "Skipping X11 regression tests: Xvfb and Xephyr are not available."
     exit 77
@@ -91,9 +114,12 @@ fi
 DISPLAY="$test_display"
 export DISPLAY
 
+gdb_commands_path="@GDB_COMMANDS_PATH@"
+
 startup_openbox() {
-  export ASAN_OPTIONS="log_path=$builddir/asan.log:halt_on_error=1:abort_on_error=1:print_summary=1"
-  "${openbox_bin}" --replace --sm-disable >"$builddir/openbox-test.log" 2>"$builddir/openbox-asan.log" &
+  # ASAN_OPTIONS is disabled when GDB is active.
+  # export ASAN_OPTIONS="log_path=$builddir/asan.log:halt_on_error=1:abort_on_error=1:print_summary=1"
+  gdb -batch -x "$gdb_commands_path" --args "${openbox_bin}" --replace --sm-disable >"$builddir/openbox-test.log" 2>"$builddir/openbox-gdb.log" &
   ob_pid=$!
 
   for _ in $(seq 1 50); do
@@ -107,36 +133,13 @@ startup_openbox() {
   return 1
 }
 
-run_one() {
-  bin="$1"
-  name="$(basename "$bin")"
-  echo "[x11] $name"
-
-  if [ -n "${OPENBOX_TEST_WRAPPER:-}" ]; then
-    set -- $OPENBOX_TEST_WRAPPER "$bin"
-  else
-    set -- "$bin"
-  fi
-
-  if timeout "$timeout_s" "$@"; then
-    return 0
-  else
-    status=$?
-  fi
-
-  if [ "$status" -eq 124 ]; then
-    echo "[timeout] $name exceeded ${timeout_s}s"
-    return 0
-  fi
-
-  echo "[fail] $name exited with status $status" >&2
-  return 1
-}
-
 startup_openbox
 
-found_any=0
-failed=0
+if [ -f "$builddir/openbox-gdb.log" ]; then
+  echo "--- GDB Log Start ---"
+  cat "$builddir/openbox-gdb.log"
+  echo "--- GDB Log End ---"
+fi
 
 for bin in "$builddir"/test-*; do
   if [ ! -x "$bin" ]; then

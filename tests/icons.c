@@ -70,7 +70,7 @@ int main(void) {
     return 1;
   }
   int s = DefaultScreen(d);
-  xcb_atom_t net_wm_icon = intern_atom(conn, "_NET_WM_ICON", True);
+  xcb_atom_t net_wm_icon = intern_atom(conn, "_NET_WM_ICON", False);
   xcb_atom_t wm_state = intern_atom(conn, "WM_STATE", True);
   if (net_wm_icon == XCB_ATOM_NONE) {
     fprintf(stderr, "_NET_WM_ICON not available\n");

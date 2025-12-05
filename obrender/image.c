@@ -115,8 +115,9 @@ static void RrImageSetFree(RrImageSet* self) {
 
     /* remove all names associated with this RrImageSet */
     for (it = self->names; it; it = g_slist_next(it)) {
-      g_hash_table_remove(self->cache->name_table, it->data);
-      g_free(it->data);
+      if (g_hash_table_remove(self->cache->name_table, it->data)) {
+        g_free(it->data);
+      }
     }
     g_slist_free(self->names);
 
@@ -611,7 +612,7 @@ RrImage* RrImageNewFromName(RrImageCache* cache, const gchar* name) {
   RrImage* self;
   RrImageSet* set;
   gint w, h;
-  RrPixel32* data;
+  RrPixel32* data = NULL;  // Initialize data to NULL
   gchar* path;
   gboolean loaded;
 
@@ -632,12 +633,18 @@ RrImage* RrImageNewFromName(RrImageCache* cache, const gchar* name) {
     return self;
   }
 
-  /* XXX find the path via freedesktop icon spec (use obt) ! */
   path = g_strdup(name);
+
+  // Add file existence check
+  if (!g_file_test(path, G_FILE_TEST_EXISTS)) {
+    g_message("Cannot load image \"%s\" from file \"%s\": No such file or directory", name, path);
+    g_free(path);
+    return NULL;
+  }
 
   loaded = FALSE;
 #if defined(USE_LIBRSVG)
-  if (!loaded) {
+  if (!g_str_has_suffix(path, ".png") && !g_str_has_suffix(path, ".PNG")) {
     rsvg_loader = LoadWithRsvg(path, &data, &w, &h);
     loaded = !!rsvg_loader;
   }
