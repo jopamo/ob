@@ -29,7 +29,7 @@ jobs:
           sudo apt-get install -y \
             build-essential meson ninja-build pkg-config gettext docbook-to-man \
             clang gcc valgrind \
-            libx11-dev libxext-dev libxrender-dev libpango1.0-dev libglib2.0-dev \
+            libx11-dev libx11-xcb-dev libxext-dev libxrender-dev libpango1.0-dev libglib2.0-dev \
             libstartup-notification0-dev libxrandr-dev libxinerama-dev \
             libxcursor-dev libimlib2-dev librsvg2-dev libxml2-dev \
             xvfb x11-utils dbus-x11
