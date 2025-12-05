@@ -2579,13 +2579,15 @@ static void client_calc_layer_recursive(ObClient* self, ObClient* orig, ObStacki
 }
 
 static void client_calc_layer_internal(ObClient* self) {
-  GSList* sit;
+  GSList* list;
+  GSList* it;
 
   /* transients take on the layer of their parents */
-  sit = client_search_all_top_parents(self);
+  list = client_search_all_top_parents(self);
 
-  for (; sit; sit = g_slist_next(sit))
-    client_calc_layer_recursive(sit->data, self, 0);
+  for (it = list; it; it = g_slist_next(it))
+    client_calc_layer_recursive(it->data, self, 0);
+  g_slist_free(list);
 }
 
 void client_calc_layer(ObClient* self) {

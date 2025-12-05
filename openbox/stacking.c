@@ -478,6 +478,7 @@ static GList* find_highest_relative(ObClient* client) {
         }
       }
     }
+    g_slist_free(top);
   }
   return ret;
 }
