@@ -50,6 +50,7 @@ int main(void) {
   failures += expect_close("dpi-y override", RrDpiY(inst), 192.0, 0.5);
   RrInstanceFree(inst);
 
+  pango_xft_shutdown_display(dpy, DefaultScreen(dpy));
   XCloseDisplay(dpy);
 
   if (failures)

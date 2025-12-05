@@ -92,7 +92,8 @@ DISPLAY="$test_display"
 export DISPLAY
 
 startup_openbox() {
-  "${openbox_bin}" --replace --sm-disable >"$builddir/openbox-test.log" 2>&1 &
+  export ASAN_OPTIONS="log_path=$builddir/asan.log:halt_on_error=1:abort_on_error=1:print_summary=1"
+  "${openbox_bin}" --replace --sm-disable >"$builddir/openbox-test.log" 2>"$builddir/openbox-asan.log" &
   ob_pid=$!
 
   for _ in $(seq 1 50); do
