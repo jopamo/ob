@@ -56,13 +56,14 @@ static gboolean run_func(ObActionsData* data, gpointer options) {
     x = o->x;
     y = o->y;
     if (o->x_denom || o->y_denom) {
-      const Rect* carea;
+      Rect* carea;
 
       carea = screen_area(c->desktop, client_monitor(c), NULL);
       if (o->x_denom)
         x = (x * carea->width) / o->x_denom;
       if (o->y_denom)
         y = (y * carea->height) / o->y_denom;
+      g_slice_free(Rect, carea);
     }
     x = c->area.x + x;
     y = c->area.y + y;
