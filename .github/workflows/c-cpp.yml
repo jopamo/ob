@@ -32,7 +32,7 @@ jobs:
             libx11-dev libx11-xcb-dev libxkbcommon-dev libxext-dev libxrender-dev libpango1.0-dev libglib2.0-dev \
             libstartup-notification0-dev libxrandr-dev libxinerama-dev \
             libxcursor-dev libimlib2-dev librsvg2-dev libxml2-dev \
-            libxcb-sync-dev libxcb-icccm4-dev \
+            libxcb-sync-dev libxcb-icccm4-dev libxcb-shape0-dev \
             xvfb x11-utils dbus-x11
 
       - name: Prepare runtime suppressions
