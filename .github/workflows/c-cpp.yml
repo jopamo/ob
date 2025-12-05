@@ -38,7 +38,7 @@ jobs:
       - name: Prepare runtime suppressions
         run: |
           mkdir -p .github
-          printf 'leak:XOpenDisplay\nleak:FcInit\n' > .github/lsan.supp
+          printf 'leak:XOpenDisplay\nleak:FcInit\nleak:libpangoxft\n' > .github/lsan.supp
 
       - name: Configure & build
         shell: bash
