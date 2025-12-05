@@ -123,9 +123,9 @@ static guint keyboard_mask_from_names(const char* const* names, guint fallback) 
     return fallback;
 
   for (gint i = 0; names[i]; ++i) {
-    xkb_mod_mask_t mask = xkb_keymap_mod_get_mask(keyboard_keymap, names[i]);
-    if (mask)
-      return (guint)(mask & ALL_MASKS);
+    xkb_mod_index_t idx = xkb_keymap_mod_get_index(keyboard_keymap, names[i]);
+    if (idx != XKB_MOD_INVALID)
+      return (guint)((1U << idx) & ALL_MASKS);
   }
   return fallback;
 }
@@ -134,12 +134,12 @@ static void keyboard_update_modifiers(void) {
   static const char* caps_names[] = {XKB_MOD_NAME_CAPS, NULL};
   static const char* shift_names[] = {XKB_MOD_NAME_SHIFT, NULL};
   static const char* ctrl_names[] = {XKB_MOD_NAME_CTRL, NULL};
-  static const char* alt_names[] = {XKB_VMOD_NAME_ALT, XKB_MOD_NAME_ALT, NULL};
-  static const char* meta_names[] = {XKB_VMOD_NAME_META, "Meta", NULL};
-  static const char* super_names[] = {XKB_VMOD_NAME_SUPER, XKB_MOD_NAME_LOGO, "Super", NULL};
-  static const char* hyper_names[] = {XKB_VMOD_NAME_HYPER, "Hyper", NULL};
-  static const char* num_names[] = {XKB_VMOD_NAME_NUM, XKB_MOD_NAME_NUM, NULL};
-  static const char* scroll_names[] = {XKB_VMOD_NAME_SCROLL, "ScrollLock", NULL};
+  static const char* alt_names[] = {XKB_MOD_NAME_ALT, NULL};
+  static const char* meta_names[] = {"Meta", NULL};
+  static const char* super_names[] = {XKB_MOD_NAME_LOGO, "Super", NULL};
+  static const char* hyper_names[] = {"Hyper", NULL};
+  static const char* num_names[] = {XKB_MOD_NAME_NUM, NULL};
+  static const char* scroll_names[] = {"ScrollLock", NULL};
 
   modkeys_keys[OBT_KEYBOARD_MODKEY_CAPSLOCK] = keyboard_mask_from_names(caps_names, LockMask);
   modkeys_keys[OBT_KEYBOARD_MODKEY_SHIFT] = keyboard_mask_from_names(shift_names, ShiftMask);
