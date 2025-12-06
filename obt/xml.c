@@ -18,6 +18,7 @@
 
 #include "obt/xml.h"
 #include "obt/paths.h"
+#include "obt/obtyaml.h"
 
 #include <libxml/xinclude.h>
 #include <glib.h>
@@ -138,7 +139,43 @@ static gboolean load_file(ObtXmlInst* i,
     else
       path = g_build_filename(it->data, domain, filename, NULL);
 
-    if (stat(path, &s) >= 0) {
+#ifdef HAVE_YAML
+    {
+      gboolean try_yaml = FALSE;
+      gchar* yaml_path = NULL;
+
+      if (g_str_has_suffix(path, ".yaml")) {
+        try_yaml = TRUE;
+        yaml_path = g_strdup(path);
+      }
+      else if (g_str_has_suffix(path, ".xml")) {
+        yaml_path = g_strdup(path);
+        strcpy(yaml_path + strlen(yaml_path) - 4, ".yaml");
+        if (stat(yaml_path, &s) == 0) {
+          try_yaml = TRUE;
+        }
+        else {
+          g_free(yaml_path);
+          yaml_path = NULL;
+        }
+      }
+
+      if (try_yaml && yaml_path) {
+        gchar* xml_buf = NULL;
+        gsize xml_len = 0;
+        if (obt_yaml_to_xml(yaml_path, root_node, &xml_buf, &xml_len)) {
+          if (obt_xml_load_mem(i, xml_buf, xml_len, root_node)) {
+            i->path = g_strdup(yaml_path);
+            r = TRUE;
+          }
+          g_free(xml_buf);
+        }
+      }
+      g_free(yaml_path);
+    }
+#endif
+
+    if (!r && stat(path, &s) >= 0) {
       /* XML_PARSE_BLANKS is needed apparently, or the tree can end up
          with extra nodes in it. */
       i->doc = xmlReadFile(path, NULL, (XML_PARSE_NOBLANKS | XML_PARSE_RECOVER));

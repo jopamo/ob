@@ -52,9 +52,12 @@ int main() {
   sleep(3);
   XMapWindow(display, child2);
 
-  while (1) {
-    XNextEvent(display, &report);
+  int i;
+  for (i = 0; i < 50; ++i) {
+    while (XPending(display))
+      XNextEvent(display, &report);
+    usleep(100000);
   }
 
-  return 1;
+  return 0;
 }

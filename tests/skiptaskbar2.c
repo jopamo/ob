@@ -44,9 +44,12 @@ int main() {
   XSendEvent(display, RootWindow(display, DefaultScreen(display)), False,
              SubstructureNotifyMask | SubstructureRedirectMask, &ce);
 
-  while (1) {
-    XNextEvent(display, &report);
+  int i;
+  for (i = 0; i < 20; ++i) {
+    while (XPending(display))
+      XNextEvent(display, &report);
+    usleep(100000);
   }
 
-  return 1;
+  return 0;
 }

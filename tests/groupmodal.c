@@ -88,9 +88,11 @@ int main() {
   XFlush(display);
 
   // Event loop
-  while (1) {
-    XNextEvent(display, &report);
-    // Process events (currently does nothing, but could be extended)
+  int i;
+  for (i = 0; i < 20; ++i) {
+    while (XPending(display))
+      XNextEvent(display, &report);
+    usleep(100000);
   }
 
   // Clean up and close display connection when done

@@ -40,6 +40,7 @@ gint main() {
   obt_watch_add(watch, "/tmp/a", FALSE, func, NULL);
 
   loop = g_main_loop_new(NULL, FALSE);
+  g_timeout_add_seconds(1, (GSourceFunc)g_main_loop_quit, loop);
   g_main_loop_run(loop);
 
   return 0;

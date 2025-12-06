@@ -78,6 +78,7 @@ xext_dep = dependency('xext')
 xrender_dep = dependency('xrender')
 xau_dep = dependency('xau')
 intl_dep = cc.find_library('intl', required: false)
+yaml_dep = dependency('yaml-0.1', required: false)
 
 # Optional dependencies / features
 startup_opt = get_option('startup_notification')
@@ -246,6 +247,9 @@ endif
 if have_xsync
   feature_defines += ['-DSYNC']
 endif
+if yaml_dep.found()
+  feature_defines += ['-DHAVE_YAML']
+endif
 
 # This header simply carries the project version string.
 version_conf = configuration_data()
@@ -345,4 +349,5 @@ summary({
   'XSync': have_xsync,
   'XKB': have_xkb,
   'Session management': have_session,
+  'YAML support': yaml_dep.found(),
 }, bool_yn: true, section: 'Optional features')

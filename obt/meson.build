@@ -2,6 +2,7 @@ obt_sources = files(
   'display.c',
   'keyboard.c',
   'xml.c',
+  'obtyaml.c',
   'ddparse.c',
   'link.c',
   'paths.c',
@@ -12,6 +13,9 @@ obt_sources = files(
 
 obt_cargs = common_defines + feature_defines + ['-DG_LOG_DOMAIN="Obt"']
 obt_deps = [glib_dep, xml_dep, x11_dep, xext_dep]
+if yaml_dep.found()
+  obt_deps += yaml_dep
+endif
 if have_xinerama
   obt_deps += xinerama_dep
 endif
@@ -43,12 +47,14 @@ obt_headers = files(
   'display.h',
   'keyboard.h',
   'xml.h',
+  'obtyaml.h',
   'paths.h',
   'prop.h',
   'signal.h',
   'util.h',
   'xqueue.h',
 )
+
 install_headers(obt_headers + [obt_version_h], subdir: obt_api_subdir)
 
 obt_unittests = executable(

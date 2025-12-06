@@ -36,14 +36,17 @@ gint main(int argc, char** argv) {
   ObtPaths* obtpaths;
   ObtLink* dd;
   gchar* id;
+  const gchar* path;
 
   if (argc < 2) {
-    g_print("pass path to .desktop\n");
-    return 1;
+    path = "data/openbox.desktop";
+  }
+  else {
+    path = argv[1];
   }
 
   obtpaths = obt_paths_new();
-  dd = obt_link_from_ddfile(argv[1], obtpaths, "et", NULL, NULL);
+  dd = obt_link_from_ddfile(path, obtpaths, "et", NULL, NULL);
   obt_paths_unref(obtpaths);
   if (dd) {
     g_print("Success\n");

@@ -46,7 +46,7 @@ int main() {
   XFlush(display);
 
   printf("requesting bottom in 3\n");
-  sleep(3);
+  sleep(1);
 
   msg.xclient.type = ClientMessage;
   msg.xclient.message_type = _restack;
@@ -62,7 +62,7 @@ int main() {
   XFlush(display);
 
   printf("requesting top in 3\n");
-  sleep(3);
+  sleep(1);
 
   msg.xclient.type = ClientMessage;
   msg.xclient.message_type = _restack;
@@ -78,7 +78,7 @@ int main() {
   XFlush(display);
 
   printf("requesting bottomif in 3\n");
-  sleep(3);
+  sleep(1);
 
   msg.xclient.type = ClientMessage;
   msg.xclient.message_type = _restack;
@@ -94,7 +94,7 @@ int main() {
   XFlush(display);
 
   printf("requesting topif in 3\n");
-  sleep(3);
+  sleep(1);
 
   msg.xclient.type = ClientMessage;
   msg.xclient.message_type = _restack;
@@ -110,7 +110,7 @@ int main() {
   XFlush(display);
 
   printf("requesting opposite in 3\n");
-  sleep(3);
+  sleep(1);
 
   msg.xclient.type = ClientMessage;
   msg.xclient.message_type = _restack;
@@ -125,9 +125,12 @@ int main() {
   XSendEvent(display, RootWindow(display, 0), False, SubstructureNotifyMask | SubstructureRedirectMask, &msg);
   XFlush(display);
 
-  while (1) {
-    XNextEvent(display, &report);
+  int i;
+  for (i = 0; i < 20; ++i) {
+    while (XPending(display))
+      XNextEvent(display, &report);
+    usleep(100000);
   }
 
-  return 1;
+  return 0;
 }

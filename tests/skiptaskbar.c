@@ -1,6 +1,7 @@
 /* skiptaskbar.c for the Openbox window manager */
 
 #include <stdio.h>
+#include <unistd.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
@@ -51,8 +52,11 @@ int main() {
   XFlush(display);
 
   // Event loop (keeps the window alive)
-  while (1) {
-    XNextEvent(display, &report);
+  int i;
+  for (i = 0; i < 20; ++i) {
+    while (XPending(display))
+      XNextEvent(display, &report);
+    usleep(100000);
   }
 
   return 0;

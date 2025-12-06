@@ -56,7 +56,35 @@ configure_file(
 # Static data files
 install_data('openbox.desktop', install_dir: appsdir_rel)
 install_data('openbox.png', install_dir: pixmapdir_rel)
-install_data(['rc.xml', 'menu.xml'], install_dir: rcdir_rel)
+
+# Install the conversion tool for users
+install_data(
+  'xml2yaml.py',
+  rename: 'openbox-xml-to-yaml',
+  install_dir: bindir_rel,
+  install_mode: 'rwxr-xr-x'
+)
+
+if yaml_dep.found()
+  # Convert and install YAML configs
+  python_exe = find_program('python3')
+  conversion_script = files('xml2yaml.py')
+  
+  foreach f : ['rc', 'menu']
+    custom_target(
+      f + '.yaml',
+      input: f + '.xml',
+      output: f + '.yaml',
+      command: [python_exe, conversion_script, '@INPUT@', '@OUTPUT@'],
+      install: true,
+      install_dir: rcdir_rel
+    )
+  endforeach
+else
+  # Install XML configs
+  install_data(['rc.xml', 'menu.xml'], install_dir: rcdir_rel)
+endif
+
 install_data('environment', install_dir: rcdir_rel, install_mode: 'rwxr-xr-x')
 
 install_data(

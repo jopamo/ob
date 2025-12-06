@@ -57,22 +57,26 @@ int main() {
   XMapWindow(display, win);
   XFlush(display);
 
-  while (1) {
-    XNextEvent(display, &report);
+  int i;
+  for (i = 0; i < 20; ++i) {
+    while (XPending(display)) {
+      XNextEvent(display, &report);
 
-    switch (report.type) {
-      case Expose:
-        printf("exposed\n");
-        break;
-      case ConfigureNotify:
-        x = report.xconfigure.x;
-        y = report.xconfigure.y;
-        w = report.xconfigure.width;
-        h = report.xconfigure.height;
-        printf("confignotify %i,%i-%ix%i\n", x, y, w, h);
-        break;
+      switch (report.type) {
+        case Expose:
+          printf("exposed\n");
+          break;
+        case ConfigureNotify:
+          x = report.xconfigure.x;
+          y = report.xconfigure.y;
+          w = report.xconfigure.width;
+          h = report.xconfigure.height;
+          printf("confignotify %i,%i-%ix%i\n", x, y, w, h);
+          break;
+      }
     }
+    usleep(100000);
   }
 
-  return 1;
+  return 0;
 }

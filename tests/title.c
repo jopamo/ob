@@ -2,6 +2,7 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
@@ -13,10 +14,13 @@ int main(int argc, char** argv) {
   XSizeHints size;
   XTextProperty name;
   Atom nameprop, nameenc;
+  char* title;
 
   if (argc < 2) {
-    fprintf(stderr, "Usage: %s <window_title> [nameprop] [encoding]\n", argv[0]);
-    return 1;
+    title = "Default Title";
+  }
+  else {
+    title = argv[1];
   }
 
   // Open connection to the X server
@@ -45,12 +49,13 @@ int main(int argc, char** argv) {
   // Set the window background color to white
   XSetWindowBackground(display, win, WhitePixel(display, 0));
 
-  // Set the window title using the provided argument (argv[1])
-  XStringListToTextProperty(&argv[1], 1, &name);
+  // Set the window title using the provided argument
+  char* list[] = {title};
+  XStringListToTextProperty(list, 1, &name);
   XSetWMName(display, win, &name);
 
   // Alternatively, you can set the window property directly (for example with XChangeProperty)
-  XChangeProperty(display, win, nameprop, nameenc, 8, PropModeReplace, (unsigned char*)argv[1], strlen(argv[1]));
+  XChangeProperty(display, win, nameprop, nameenc, 8, PropModeReplace, (unsigned char*)title, strlen(title));
 
   // Flush the display to ensure changes take effect
   XFlush(display);
@@ -62,24 +67,28 @@ int main(int argc, char** argv) {
   XSelectInput(display, win, ExposureMask | StructureNotifyMask);
 
   // Event loop
-  while (1) {
-    XNextEvent(display, &report);
+  int i;
+  for (i = 0; i < 20; ++i) {
+    while (XPending(display)) {
+      XNextEvent(display, &report);
 
-    switch (report.type) {
-      case Expose:
-        // The window is exposed (redrawn)
-        printf("Window exposed\n");
-        break;
+      switch (report.type) {
+        case Expose:
+          // The window is exposed (redrawn)
+          printf("Window exposed\n");
+          break;
 
-      case ConfigureNotify:
-        // The window has been resized or moved
-        x = report.xconfigure.x;
-        y = report.xconfigure.y;
-        w = report.xconfigure.width;
-        h = report.xconfigure.height;
-        printf("Window configured: %i,%i-%ix%i\n", x, y, w, h);
-        break;
+        case ConfigureNotify:
+          // The window has been resized or moved
+          x = report.xconfigure.x;
+          y = report.xconfigure.y;
+          w = report.xconfigure.width;
+          h = report.xconfigure.height;
+          printf("Window configured: %i,%i-%ix%i\n", x, y, w, h);
+          break;
+      }
     }
+    usleep(100000);
   }
 
   return 0;
