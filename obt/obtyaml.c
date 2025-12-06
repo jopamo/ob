@@ -100,8 +100,10 @@ static void process_mapping(yaml_document_t* doc, yaml_node_t* node, const gchar
   GList* attrs = NULL;
   GList* children = NULL;
   GList* l;
+  gchar* action_value = NULL;
+  gchar* command_value = NULL;
 
-  /* First pass: separate attributes and children */
+  /* First pass: separate attributes and children, collect special values */
   for (pair = node->data.mapping.pairs.start; pair < node->data.mapping.pairs.top; pair++) {
     yaml_node_t* key_node = yaml_document_get_node(doc, pair->key);
     yaml_node_t* value_node = yaml_document_get_node(doc, pair->value);
@@ -110,6 +112,19 @@ static void process_mapping(yaml_document_t* doc, yaml_node_t* node, const gchar
       continue;
 
     gchar* key_str = (gchar*)key_node->data.scalar.value;
+
+    /* For item tag, collect action and command values for special handling */
+    if (strcmp(tag_name, "item") == 0) {
+      if (strcmp(key_str, "action") == 0 && value_node->type == YAML_SCALAR_NODE) {
+        action_value = g_strdup((gchar*)value_node->data.scalar.value);
+        continue; /* Don't add to children list */
+      }
+      else if ((strcmp(key_str, "command") == 0 || strcmp(key_str, "execute") == 0) &&
+               value_node->type == YAML_SCALAR_NODE) {
+        command_value = g_strdup((gchar*)value_node->data.scalar.value);
+        continue; /* Don't add to children list */
+      }
+    }
 
     if (is_attribute(tag_name, key_str) && value_node->type == YAML_SCALAR_NODE) {
       attrs = g_list_append(attrs, pair);
@@ -137,19 +152,65 @@ static void process_mapping(yaml_document_t* doc, yaml_node_t* node, const gchar
     g_string_append(out, "\"");
   }
 
-  if (!children) {
+  /* Special handling for separator - always produce <separator/> regardless of content */
+  if (strcmp(tag_name, "separator") == 0) {
+    g_string_append(out, "/>");
+    g_list_free(attrs);
+    g_list_free(children);
+    g_free(action_value);
+    g_free(command_value);
+    return;
+  }
+
+  if (!children && !action_value && !command_value) {
     g_string_append(out, "/>");
   }
   else {
     g_string_append(out, ">");
 
-    /* Write children */
+    /* Special handling for item tag: combine action and command into Openbox XML structure */
+    if (strcmp(tag_name, "item") == 0 && (action_value || command_value)) {
+      g_string_append(out, "<action");
+      if (action_value) {
+        g_string_append(out, " name=\"");
+        xml_escape(out, action_value);
+        g_string_append(out, "\"");
+      }
+      g_string_append(out, ">");
+      if (command_value) {
+        g_string_append(out, "<execute>");
+        xml_escape(out, command_value);
+        g_string_append(out, "</execute>");
+      }
+      g_string_append(out, "</action>");
+    }
+
+    /* Write remaining children */
     for (l = children; l; l = l->next) {
       yaml_node_pair_t* p = l->data;
       yaml_node_t* k = yaml_document_get_node(doc, p->key);
       yaml_node_t* v = yaml_document_get_node(doc, p->value);
 
       gchar* key_s = (gchar*)k->data.scalar.value;
+
+      /* Special handling for submenu */
+      if (strcmp(key_s, "submenu") == 0 && (strcmp(tag_name, "menu") == 0 || strcmp(tag_name, "item") == 0)) {
+        g_message("Processing submenu for %s tag, sequence length: %ld", tag_name,
+                  (long)(v->data.sequence.items.top - v->data.sequence.items.start));
+        /* submenu sequence items should be <item> elements */
+        if (v->type == YAML_SEQUENCE_NODE) {
+          yaml_node_item_t* sub_item;
+          for (sub_item = v->data.sequence.items.start; sub_item < v->data.sequence.items.top; sub_item++) {
+            yaml_node_t* sub_item_node = yaml_document_get_node(doc, *sub_item);
+            process_node(doc, sub_item_node, "item", out);
+          }
+        }
+        continue;
+      }
+      /* Rename command to execute if not already handled */
+      else if (strcmp(key_s, "command") == 0) {
+        key_s = "execute";
+      }
 
       if (strcmp(key_s, "_content") == 0 || strcmp(key_s, "content") == 0) {
         if (v->type == YAML_SCALAR_NODE) {
@@ -166,6 +227,8 @@ static void process_mapping(yaml_document_t* doc, yaml_node_t* node, const gchar
 
   g_list_free(attrs);
   g_list_free(children);
+  g_free(action_value);
+  g_free(command_value);
 }
 
 static void process_node(yaml_document_t* doc, yaml_node_t* node, const gchar* tag_name, GString* out) {
@@ -175,23 +238,46 @@ static void process_node(yaml_document_t* doc, yaml_node_t* node, const gchar* t
   g_message("process_node: tag='%s', node type=%d", tag_name, node->type);
   switch (node->type) {
     case YAML_SCALAR_NODE:
-      g_string_append_printf(out, "<%s>", tag_name);
-      xml_escape(out, (gchar*)node->data.scalar.value);
-      g_string_append_printf(out, "</%s>", tag_name);
+      /* Special handling for separator and action tags */
+      if (strcmp(tag_name, "separator") == 0) {
+        g_string_append(out, "<separator/>");
+      }
+      else if (strcmp(tag_name, "action") == 0) {
+        /* action scalar becomes <action name="value"/> */
+        g_string_append(out, "<action name=\"");
+        xml_escape(out, (gchar*)node->data.scalar.value);
+        g_string_append(out, "\"/>");
+      }
+      else {
+        g_string_append_printf(out, "<%s>", tag_name);
+        xml_escape(out, (gchar*)node->data.scalar.value);
+        g_string_append_printf(out, "</%s>", tag_name);
+      }
       break;
 
     case YAML_SEQUENCE_NODE: {
       yaml_node_item_t* item;
+      const gchar* xml_tag = tag_name;
+      /* Map YAML tag names to Openbox XML tag names */
+      if (strcmp(tag_name, "submenu") == 0) {
+        xml_tag = "menu";
+      }
       for (item = node->data.sequence.items.start; item < node->data.sequence.items.top; item++) {
         yaml_node_t* item_node = yaml_document_get_node(doc, *item);
-        process_node(doc, item_node, tag_name, out);
+        process_node(doc, item_node, xml_tag, out);
       }
       break;
     }
 
-    case YAML_MAPPING_NODE:
-      process_mapping(doc, node, tag_name, out);
+    case YAML_MAPPING_NODE: {
+      const gchar* xml_tag = tag_name;
+      /* Map YAML tag names to Openbox XML tag names */
+      if (strcmp(tag_name, "submenu") == 0) {
+        xml_tag = "menu";
+      }
+      process_mapping(doc, node, xml_tag, out);
       break;
+    }
 
     default:
       break;
@@ -206,8 +292,10 @@ gboolean obt_yaml_to_xml(const gchar* yaml_path, const gchar* root_node, gchar**
   GString* out;
   gboolean success = FALSE;
 
-  if (!fh)
+  if (!fh) {
+    g_message("Failed to open YAML file: %s", yaml_path);
     return FALSE;
+  }
 
   if (!yaml_parser_initialize(&parser)) {
     fclose(fh);
@@ -217,6 +305,7 @@ gboolean obt_yaml_to_xml(const gchar* yaml_path, const gchar* root_node, gchar**
   yaml_parser_set_input_file(&parser, fh);
 
   if (!yaml_parser_load(&parser, &doc)) {
+    g_message("yaml_parser_load failed");
     yaml_parser_delete(&parser);
     fclose(fh);
     return FALSE;
@@ -247,13 +336,14 @@ gboolean obt_yaml_to_xml(const gchar* yaml_path, const gchar* root_node, gchar**
         process_node(&doc, value_node, (gchar*)key_node->data.scalar.value, out);
       }
       else {
-        g_message("Key node not scalar: %p type=%d", key_node, key_node ? key_node->type : -1);
+        g_message("Key node not scalar: %p type=%d", (void*)key_node, key_node ? key_node->type : -1);
       }
     }
   }
   else {
-    /* Unexpected root type, maybe just scalar or sequence? Treat as content? */
-    /* For now, assume mapping is required at root */
+    /* Only mapping roots are supported for complex format */
+    g_message("Unsupported root node type: %d (expected mapping)", root->type);
+    goto cleanup;
   }
 
   g_string_append_printf(out, "</%s>\n", root_node);

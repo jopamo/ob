@@ -77,6 +77,15 @@ void ob_debug_shutdown(void) {
   g_log_remove_handler("Openbox", ob_handler_id);
   g_log_remove_handler("Openbox", ob_handler_prompt_id);
 
+  /* free any pending prompt messages */
+  if (prompt_queue) {
+    GList* it;
+    for (it = prompt_queue; it; it = it->next)
+      g_free(it->data);
+    g_list_free(prompt_queue);
+    prompt_queue = NULL;
+  }
+
   if (log_file) {
     fclose(log_file);
     log_file = NULL;

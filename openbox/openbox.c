@@ -242,8 +242,26 @@ gint main(gint argc, gchar** argv) {
           obt_xml_close(i);
         }
         else {
-          g_message(_("Unable to find a valid config file, using some simple defaults"));
-          config_file = NULL;
+          /* Try to install default config and retry */
+          g_message(_("Attempting to install default configuration files..."));
+          if (obt_xml_install_default_config(i, "openbox", "rc.xml")) {
+            g_message(_("Installed rc.xml, now installing menu.xml..."));
+            obt_xml_install_default_config(i, "openbox", "menu.xml");
+            /* Retry loading */
+            if (obt_xml_load_config_file(i, "openbox", "rc.xml", "openbox_config")) {
+              obt_xml_tree_from_root(i);
+              obt_xml_close(i);
+              config_file = NULL; /* still no explicit config file */
+            }
+            else {
+              g_message(_("Unable to find a valid config file, using some simple defaults"));
+              config_file = NULL;
+            }
+          }
+          else {
+            g_message(_("Unable to find a valid config file, using some simple defaults"));
+            config_file = NULL;
+          }
         }
 
         if (config_file) {

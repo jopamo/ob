@@ -22,6 +22,8 @@
 
 #include <libxml/xinclude.h>
 #include <glib.h>
+#include <glib/gstdio.h>
+#include <string.h>
 
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
@@ -55,6 +57,30 @@ struct _ObtXmlInst {
 };
 
 static void obt_xml_save_last_error(ObtXmlInst* inst);
+
+static gboolean copy_file(const gchar* src, const gchar* dest) {
+  gchar* contents = NULL;
+  gsize length = 0;
+  GError* error = NULL;
+  gboolean success = FALSE;
+
+  if (g_file_get_contents(src, &contents, &length, &error)) {
+    if (g_file_set_contents(dest, contents, length, &error)) {
+      success = TRUE;
+    }
+    else {
+      g_message("Failed to write file %s: %s", dest, error->message);
+      g_error_free(error);
+    }
+    g_free(contents);
+  }
+  else {
+    g_message("Failed to read file %s: %s", src, error ? error->message : "unknown error");
+    if (error)
+      g_error_free(error);
+  }
+  return success;
+}
 
 static void destfunc(struct Callback* c) {
   g_free(c->tag);
@@ -244,6 +270,116 @@ gboolean obt_xml_load_config_file(ObtXmlInst* i, const gchar* domain, const gcha
     paths = g_slist_delete_link(paths, paths);
   }
   return r;
+}
+
+gboolean obt_xml_install_default_config(ObtXmlInst* i, const gchar* domain, const gchar* filename) {
+  const gchar* config_home = obt_paths_config_home(i->xdg_paths);
+  GSList* dirs = obt_paths_config_dirs(i->xdg_paths);
+  GSList* it;
+  gboolean copied = FALSE;
+
+  g_message("obt_xml_install_default_config: domain=%s, filename=%s, config_home=%s", domain, filename, config_home);
+
+  /* Skip the first directory (config home) */
+  if (dirs)
+    dirs = g_slist_next(dirs);
+
+  for (it = dirs; it && !copied; it = g_slist_next(it)) {
+    const gchar* sysdir = it->data;
+    g_message("Checking system directory: %s", sysdir);
+    gchar* base_path = g_build_filename(sysdir, domain, filename, NULL);
+    g_message("Base path: %s", base_path);
+    gchar* yaml_path = NULL;
+    gchar* xml_path = NULL;
+
+    /* Determine if we should try YAML */
+#ifdef HAVE_YAML
+    if (g_str_has_suffix(base_path, ".yaml")) {
+      yaml_path = g_strdup(base_path);
+      xml_path = g_strdup_printf("%.*s.xml", (int)(strlen(base_path) - 5), base_path);
+    }
+    else
+#endif
+        if (g_str_has_suffix(base_path, ".xml")) {
+      const gsize base_len = strlen(base_path);
+#ifdef HAVE_YAML
+      yaml_path = g_strdup_printf("%.*s.yaml", (int)(base_len - 4), base_path);
+#endif
+      xml_path = g_strdup(base_path);
+    }
+    else {
+      /* Unknown extension, just try as given */
+      yaml_path = NULL;
+      xml_path = g_strdup(base_path);
+    }
+
+    /* Try YAML first if applicable */
+    if (yaml_path) {
+      g_message("Checking if YAML file exists: %s (exists=%d)", yaml_path, g_file_test(yaml_path, G_FILE_TEST_EXISTS));
+      g_message("access(%s, R_OK)=%d, errno=%d", yaml_path, access(yaml_path, R_OK), errno);
+    }
+    if (yaml_path && g_file_test(yaml_path, G_FILE_TEST_EXISTS)) {
+      gchar* user_dir = g_build_filename(config_home, domain, NULL);
+      gchar* user_path = g_build_filename(user_dir, filename, NULL);
+      /* Ensure filename has .yaml extension */
+      if (g_str_has_suffix(filename, ".xml")) {
+        g_free(user_path);
+        user_path = g_strdup_printf("%.*s.yaml", (int)(strlen(filename) - 4), filename);
+        user_path = g_build_filename(user_dir, user_path, NULL);
+      }
+
+      if (obt_paths_mkdir_path(user_dir, 0755)) {
+        if (copy_file(yaml_path, user_path)) {
+          g_message("Installed default config from %s to %s", yaml_path, user_path);
+          copied = TRUE;
+        }
+        else {
+          g_message("Failed to copy config from %s to %s", yaml_path, user_path);
+        }
+      }
+      else {
+        g_message("Failed to create directory %s", user_dir);
+      }
+      g_free(user_path);
+      g_free(user_dir);
+    }
+    /* Try XML */
+    if (xml_path) {
+      g_message("Checking if XML file exists: %s (exists=%d)", xml_path, g_file_test(xml_path, G_FILE_TEST_EXISTS));
+      g_message("access(%s, R_OK)=%d, errno=%d", xml_path, access(xml_path, R_OK), errno);
+    }
+    if (xml_path && g_file_test(xml_path, G_FILE_TEST_EXISTS)) {
+      gchar* user_dir = g_build_filename(config_home, domain, NULL);
+      gchar* user_path = g_build_filename(user_dir, filename, NULL);
+      /* Ensure filename has .xml extension */
+      if (g_str_has_suffix(filename, ".yaml")) {
+        g_free(user_path);
+        user_path = g_strdup_printf("%.*s.xml", (int)(strlen(filename) - 5), filename);
+        user_path = g_build_filename(user_dir, user_path, NULL);
+      }
+
+      if (obt_paths_mkdir_path(user_dir, 0755)) {
+        if (copy_file(xml_path, user_path)) {
+          g_message("Installed default config from %s to %s", xml_path, user_path);
+          copied = TRUE;
+        }
+        else {
+          g_message("Failed to copy config from %s to %s", xml_path, user_path);
+        }
+      }
+      else {
+        g_message("Failed to create directory %s", user_dir);
+      }
+      g_free(user_path);
+      g_free(user_dir);
+    }
+
+    g_free(yaml_path);
+    g_free(xml_path);
+    g_free(base_path);
+  }
+
+  return copied;
 }
 
 gboolean obt_xml_load_data_file(ObtXmlInst* i, const gchar* domain, const gchar* filename, const gchar* root_node) {

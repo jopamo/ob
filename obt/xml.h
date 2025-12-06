@@ -34,6 +34,7 @@ void obt_xml_instance_unref(ObtXmlInst* inst);
 
 gboolean obt_xml_load_file(ObtXmlInst* inst, const gchar* path, const gchar* root_node);
 gboolean obt_xml_load_config_file(ObtXmlInst* inst, const gchar* domain, const gchar* filename, const gchar* root_node);
+gboolean obt_xml_install_default_config(ObtXmlInst* inst, const gchar* domain, const gchar* filename);
 gboolean obt_xml_load_data_file(ObtXmlInst* inst, const gchar* domain, const gchar* filename, const gchar* root_node);
 gboolean obt_xml_load_theme_file(ObtXmlInst* inst,
                                  const gchar* theme,
