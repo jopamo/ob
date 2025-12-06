@@ -95,6 +95,7 @@ static gboolean is_attribute(const gchar* tag, const gchar* key) {
 static void process_node(yaml_document_t* doc, yaml_node_t* node, const gchar* tag_name, GString* out);
 
 static void process_mapping(yaml_document_t* doc, yaml_node_t* node, const gchar* tag_name, GString* out) {
+  g_message("process_mapping: tag='%s'", tag_name);
   yaml_node_pair_t* pair;
   GList* attrs = NULL;
   GList* children = NULL;
@@ -110,7 +111,7 @@ static void process_mapping(yaml_document_t* doc, yaml_node_t* node, const gchar
 
     gchar* key_str = (gchar*)key_node->data.scalar.value;
 
-    if (is_attribute(tag_name, key_str)) {
+    if (is_attribute(tag_name, key_str) && value_node->type == YAML_SCALAR_NODE) {
       attrs = g_list_append(attrs, pair);
     }
     else {
@@ -171,6 +172,7 @@ static void process_node(yaml_document_t* doc, yaml_node_t* node, const gchar* t
   if (!node)
     return;
 
+  g_message("process_node: tag='%s', node type=%d", tag_name, node->type);
   switch (node->type) {
     case YAML_SCALAR_NODE:
       g_string_append_printf(out, "<%s>", tag_name);
@@ -197,6 +199,7 @@ static void process_node(yaml_document_t* doc, yaml_node_t* node, const gchar* t
 }
 
 gboolean obt_yaml_to_xml(const gchar* yaml_path, const gchar* root_node, gchar** xml_out, gsize* len_out) {
+  g_message("obt_yaml_to_xml called: %s, root_node=%s", yaml_path, root_node);
   FILE* fh = fopen(yaml_path, "r");
   yaml_parser_t parser;
   yaml_document_t doc;
@@ -222,21 +225,29 @@ gboolean obt_yaml_to_xml(const gchar* yaml_path, const gchar* root_node, gchar**
   /* Check empty document */
   yaml_node_t* root = yaml_document_get_root_node(&doc);
   if (!root) {
+    g_message("YAML document has no root node");
     goto cleanup;
   }
 
   out = g_string_new("");
   g_string_append_printf(out, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<%s>\n", root_node);
 
+  g_message("YAML root node type: %d (1=SCALAR,2=SEQUENCE,4=MAPPING)", root->type);
   if (root->type == YAML_MAPPING_NODE) {
+    g_message("Root is mapping node");
     /* Iterate top level keys and treat them as children of root_node */
     yaml_node_pair_t* pair;
+    g_message("YAML mapping pairs: %ld", (long)(root->data.mapping.pairs.top - root->data.mapping.pairs.start));
     for (pair = root->data.mapping.pairs.start; pair < root->data.mapping.pairs.top; pair++) {
       yaml_node_t* key_node = yaml_document_get_node(&doc, pair->key);
       yaml_node_t* value_node = yaml_document_get_node(&doc, pair->value);
 
       if (key_node && key_node->type == YAML_SCALAR_NODE) {
+        g_message("Processing key: %s", key_node->data.scalar.value);
         process_node(&doc, value_node, (gchar*)key_node->data.scalar.value, out);
+      }
+      else {
+        g_message("Key node not scalar: %p type=%d", key_node, key_node ? key_node->type : -1);
       }
     }
   }
@@ -250,6 +261,8 @@ gboolean obt_yaml_to_xml(const gchar* yaml_path, const gchar* root_node, gchar**
   *xml_out = g_string_free(out, FALSE);
   *len_out = strlen(*xml_out);
   success = TRUE;
+  g_message("YAML to XML conversion succeeded (len=%zu): %.*s", *len_out, (int)(*len_out > 200 ? 200 : *len_out),
+            *xml_out);
 
 cleanup:
   yaml_document_delete(&doc);

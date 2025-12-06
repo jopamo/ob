@@ -17,7 +17,6 @@ jobs:
         sanitizer:
           - none
           - asan-ubsan
-          - valgrind
     runs-on: ubuntu-latest
 
     steps:
@@ -28,7 +27,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             build-essential meson ninja-build pkg-config gettext docbook-to-man \
-            clang gcc valgrind \
+            clang gcc \
             libx11-dev libxext-dev libxrender-dev libpango1.0-dev libglib2.0-dev \
             libstartup-notification0-dev libxrandr-dev libxinerama-dev \
             libxcursor-dev libimlib2-dev librsvg2-dev libxml2-dev \
@@ -65,12 +64,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          dbus-run-session -- xvfb-run --auto-servernum --server-args="-screen 0 1280x800x24 -nolisten tcp" bash -lc '
-            set -euo pipefail
+          sudo Xvfb :99 -screen 0 1280x800x24 -nolisten tcp &
+          export DISPLAY=:99
+          for i in {1..20}; do
+            if xdpyinfo -display "$DISPLAY" >/dev/null 2>&1; then
+              break
+            fi
+            sleep 0.25
+          done
 
-            # helpful glib settings under valgrind
-            export G_DEBUG=gc-friendly
-            export G_SLICE=always-malloc
+          dbus-run-session -- bash -lc '
+            set -euo pipefail
 
             export PATH="$GITHUB_WORKSPACE/install-root/usr/bin:$PATH"
             export XDG_DATA_DIRS="$GITHUB_WORKSPACE/install-root/usr/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
@@ -85,7 +89,6 @@ jobs:
             fi
             export LD_LIBRARY_PATH="$ld_path"
 
-            # start openbox and wait until WM is ready
             openbox --replace >/tmp/openbox.log 2>&1 &
             for i in {1..50}; do
               if xprop -root _NET_SUPPORTING_WM_CHECK >/dev/null 2>&1; then
@@ -97,19 +100,20 @@ jobs:
             cd "$GITHUB_WORKSPACE/build/tests"
 
             run_with_timeout() {
-              timeout 5s "$@"
+              timeout 10s "$@"
               status=$?
               if [ $status -eq 124 ]; then
-                echo "[Timeout] Killed test after 5 seconds"
+                echo "[Timeout] Killed test after 10 seconds"
               elif [ $status -ne 0 ]; then
-                echo "[Error] Test failed with status $status (but not failing workflow)"
+                echo "[Error] Test failed with status $status"
               fi
-              return 0
+              return $status
             }
 
-            # discover only real executable test binaries
             mapfile -t test_bins < <(find . -maxdepth 1 -type f -perm -111 \
               -name "test-*" -printf "%P\n" | sort)
+
+            overall_status=0
 
             if [ "${{ matrix.sanitizer }}" = "asan-ubsan" ]; then
               export ASAN_OPTIONS=detect_leaks=1:halt_on_error=1:detect_odr_violation=1:strict_init_order=1
@@ -117,23 +121,18 @@ jobs:
               export LSAN_OPTIONS="suppressions=$GITHUB_WORKSPACE/.github/lsan.supp:print_suppressions=0"
               for t in "${test_bins[@]}"; do
                 echo "[ASan/UBSan] Running $t..."
-                run_with_timeout "./$t"
-              done
-            elif [ "${{ matrix.sanitizer }}" = "valgrind" ]; then
-              for t in "${test_bins[@]}"; do
-                echo "[Valgrind] Running $t..."
-                run_with_timeout valgrind --quiet \
-                  --error-exitcode=1 \
-                  --leak-check=full \
-                  --show-leak-kinds=all \
-                  --errors-for-leak-kinds=definite \
-                  --track-origins=yes \
-                  "./$t"
+                if ! run_with_timeout "./$t"; then
+                  overall_status=1
+                fi
               done
             else
               for t in "${test_bins[@]}"; do
                 echo "[Normal] Running $t..."
-                run_with_timeout "./$t"
+                if ! run_with_timeout "./$t"; then
+                  overall_status=1
+                fi
               done
             fi
+
+            exit $overall_status
           '

@@ -139,6 +139,8 @@ static gboolean load_file(ObtXmlInst* i,
     else
       path = g_build_filename(it->data, domain, filename, NULL);
 
+    g_message("xml.c: trying path %s", path);
+
 #ifdef HAVE_YAML
     {
       gboolean try_yaml = FALSE;
@@ -149,8 +151,8 @@ static gboolean load_file(ObtXmlInst* i,
         yaml_path = g_strdup(path);
       }
       else if (g_str_has_suffix(path, ".xml")) {
-        yaml_path = g_strdup(path);
-        strcpy(yaml_path + strlen(yaml_path) - 4, ".yaml");
+        const gsize path_len = strlen(path);
+        yaml_path = g_strdup_printf("%.*s.yaml", (int)(path_len - 4), path);
         if (stat(yaml_path, &s) == 0) {
           try_yaml = TRUE;
         }
@@ -160,7 +162,9 @@ static gboolean load_file(ObtXmlInst* i,
         }
       }
 
+      g_message("xml.c: try_yaml=%d, yaml_path=%s", try_yaml, yaml_path ? yaml_path : "(null)");
       if (try_yaml && yaml_path) {
+        g_message("xml.c: trying YAML file %s", yaml_path);
         gchar* xml_buf = NULL;
         gsize xml_len = 0;
         if (obt_yaml_to_xml(yaml_path, root_node, &xml_buf, &xml_len)) {

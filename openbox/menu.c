@@ -50,6 +50,16 @@ static ObMenuParseState menu_parse_state;
 static gboolean menu_can_hide = FALSE;
 static guint menu_timeout_id = 0;
 
+static void dump_menu_hash(void) {
+  GList* keys = g_hash_table_get_keys(menu_hash);
+  GList* iter;
+  g_message("Menu hash contains %u entries:", g_hash_table_size(menu_hash));
+  for (iter = keys; iter; iter = iter->next) {
+    g_message("  - %s", (char*)iter->data);
+  }
+  g_list_free(keys);
+}
+
 static void menu_destroy_hash_value(ObMenu* self);
 static void parse_menu_item(xmlNodePtr node, gpointer data);
 static void parse_menu_separator(xmlNodePtr node, gpointer data);
@@ -101,6 +111,7 @@ void menu_startup(gboolean reconfig) {
       g_message(_("Unable to find a valid menu file \"%s\""), "menu.xml");
   }
 
+  dump_menu_hash();
   g_assert(menu_parse_state.parent == NULL);
 }
 
@@ -168,8 +179,10 @@ static ObMenu* menu_from_name(gchar* name) {
 
   g_assert(name != NULL);
 
-  if (!(self = g_hash_table_lookup(menu_hash, name)))
+  if (!(self = g_hash_table_lookup(menu_hash, name))) {
     g_message(_("Attempted to access menu \"%s\" but it does not exist"), name);
+    dump_menu_hash();
+  }
   return self;
 }
 
@@ -316,6 +329,7 @@ static void parse_menu(xmlNodePtr node, gpointer data) {
     goto parse_menu_fail;
 
   if (!g_hash_table_lookup(menu_hash, name)) {
+    g_message("parse_menu: creating new menu id=%s", name);
     if (!obt_xml_attr_string_unstripped(node, "label", &title))
       goto parse_menu_fail;
 
@@ -333,6 +347,9 @@ static void parse_menu(xmlNodePtr node, gpointer data) {
         state->parent = old;
       }
     }
+  }
+  else {
+    g_message("parse_menu: menu already exists id=%s", name);
   }
 
   if (state->parent) {
