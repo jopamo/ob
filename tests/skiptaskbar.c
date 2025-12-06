@@ -26,6 +26,7 @@ int main() {
 
   if (state == None || skip == None) {
     fprintf(stderr, "Failed to intern atoms\n");
+    XCloseDisplay(display);
     return 1;  // Return 1 if atom intern failed
   }
 
@@ -34,6 +35,7 @@ int main() {
 
   if (win == None) {
     fprintf(stderr, "Failed to create window\n");
+    XCloseDisplay(display);
     return 1;  // Return 1 if window creation fails
   }
 
@@ -56,8 +58,10 @@ int main() {
   for (i = 0; i < 20; ++i) {
     while (XPending(display))
       XNextEvent(display, &report);
-    usleep(100000);
+    usleep(50000);
   }
 
+  XDestroyWindow(display, win);
+  XCloseDisplay(display);
   return 0;
 }

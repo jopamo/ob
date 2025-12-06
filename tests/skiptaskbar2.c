@@ -17,7 +17,7 @@ int main() {
 
   if (display == NULL) {
     fprintf(stderr, "couldn't connect to X server :0\n");
-    return 0;
+    return 1;
   }
 
   state = XInternAtom(display, "_NET_WM_STATE", True);
@@ -31,7 +31,7 @@ int main() {
   XMapWindow(display, win);
   XFlush(display);
 
-  sleep(1);
+  usleep(500000);
 
   ce.xclient.type = ClientMessage;
   ce.xclient.message_type = state;
@@ -48,8 +48,10 @@ int main() {
   for (i = 0; i < 20; ++i) {
     while (XPending(display))
       XNextEvent(display, &report);
-    usleep(100000);
+    usleep(50000);
   }
 
+  XDestroyWindow(display, win);
+  XCloseDisplay(display);
   return 0;
 }

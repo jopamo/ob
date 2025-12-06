@@ -37,6 +37,23 @@ int main(int argc, char** argv) {
   // Select events to listen for
   XSelectInput(display, win, StructureNotifyMask | ButtonPressMask);
 
+  // Simulate a button press event to exit the loop
+  XEvent event;
+  memset(&event, 0, sizeof(event));
+  event.type = ButtonPress;
+  event.xbutton.button = 1;
+  event.xbutton.same_screen = True;
+  event.xbutton.window = win;
+  event.xbutton.root = RootWindow(display, DefaultScreen(display));
+  event.xbutton.subwindow = win;
+  event.xbutton.x = 1;
+  event.xbutton.y = 1;
+  event.xbutton.x_root = 1;
+  event.xbutton.y_root = 1;
+  event.xbutton.state = 0;
+  XSendEvent(display, win, False, ButtonPressMask, &event);
+  XFlush(display);
+
   // Simulate an event loop, exit after handling events
   while (1) {
     XNextEvent(display, &report);

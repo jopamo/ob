@@ -33,7 +33,7 @@ int main() {
 
   if (display == NULL) {
     fprintf(stderr, "couldn't connect to X server :0\n");
-    return 0;
+    return 1;
   }
 
   _restack = XInternAtom(display, "_NET_RESTACK_WINDOW", False);
@@ -46,7 +46,7 @@ int main() {
   XFlush(display);
 
   printf("requesting bottom in 3\n");
-  sleep(1);
+  usleep(500000);
 
   msg.xclient.type = ClientMessage;
   msg.xclient.message_type = _restack;
@@ -62,7 +62,7 @@ int main() {
   XFlush(display);
 
   printf("requesting top in 3\n");
-  sleep(1);
+  usleep(500000);
 
   msg.xclient.type = ClientMessage;
   msg.xclient.message_type = _restack;
@@ -78,7 +78,7 @@ int main() {
   XFlush(display);
 
   printf("requesting bottomif in 3\n");
-  sleep(1);
+  usleep(500000);
 
   msg.xclient.type = ClientMessage;
   msg.xclient.message_type = _restack;
@@ -94,7 +94,7 @@ int main() {
   XFlush(display);
 
   printf("requesting topif in 3\n");
-  sleep(1);
+  usleep(500000);
 
   msg.xclient.type = ClientMessage;
   msg.xclient.message_type = _restack;
@@ -110,7 +110,7 @@ int main() {
   XFlush(display);
 
   printf("requesting opposite in 3\n");
-  sleep(1);
+  usleep(500000);
 
   msg.xclient.type = ClientMessage;
   msg.xclient.message_type = _restack;
@@ -129,8 +129,10 @@ int main() {
   for (i = 0; i < 20; ++i) {
     while (XPending(display))
       XNextEvent(display, &report);
-    usleep(100000);
+    usleep(50000);
   }
 
+  XDestroyWindow(display, win);
+  XCloseDisplay(display);
   return 0;
 }

@@ -31,7 +31,7 @@ int main() {
 
   if (display == NULL) {
     fprintf(stderr, "couldn't connect to X server :0\n");
-    return 0;
+    return 1;
   }
 
   win = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 10, CopyFromParent, CopyFromParent, CopyFromParent,
@@ -42,7 +42,7 @@ int main() {
   XMapWindow(display, win);
   XFlush(display);
 
-  sleep(5);
+  usleep(500000);
   XResizeWindow(display, win, 600, 150);
 
   XSelectInput(display, win, ExposureMask | StructureNotifyMask);
@@ -62,7 +62,15 @@ int main() {
         printf("confignotify %i,%i-%ix%i\n", x, y, w, h);
         break;
     }
+
+    // Exit after processing the first event to avoid infinite loops in CI
+    if (report.type == Expose && report.xexpose.count == 0) {
+      printf("Test completed. Closing the program.\n");
+      break;
+    }
   }
 
-  return 1;
+  XDestroyWindow(display, win);
+  XCloseDisplay(display);
+  return 0;
 }

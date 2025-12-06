@@ -17,7 +17,7 @@ int main() {
 
   if (display == NULL) {
     fprintf(stderr, "couldn't connect to X server :0\n");
-    return 0;
+    return 1;
   }
 
   group = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 10, CopyFromParent, CopyFromParent, CopyFromParent,
@@ -46,18 +46,23 @@ int main() {
 
   XMapWindow(display, parent);
   XFlush(display);
-  sleep(3);
+  sleep(1);
   XMapWindow(display, child1);
   XFlush(display);
-  sleep(3);
+  sleep(1);
   XMapWindow(display, child2);
 
   int i;
   for (i = 0; i < 50; ++i) {
     while (XPending(display))
       XNextEvent(display, &report);
-    usleep(100000);
+    usleep(50000);
   }
 
+  XDestroyWindow(display, child2);
+  XDestroyWindow(display, child1);
+  XDestroyWindow(display, parent);
+  XDestroyWindow(display, group);
+  XCloseDisplay(display);
   return 0;
 }

@@ -35,7 +35,7 @@ int main() {
 
   if (display == NULL) {
     fprintf(stderr, "couldn't connect to X server :0\n");
-    return 0;
+    return 1;
   }
 
   state[0] = IconicState;
@@ -75,8 +75,10 @@ int main() {
           break;
       }
     }
-    usleep(100000);
+    usleep(50000);
   }
 
+  XDestroyWindow(display, win);
+  XCloseDisplay(display);
   return 0;
 }

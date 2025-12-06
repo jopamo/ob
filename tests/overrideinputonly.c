@@ -1,6 +1,7 @@
 /* overrideinputonly.c for the Openbox window manager */
 
 #include <stdio.h>
+#include <unistd.h>
 #include <X11/Xlib.h>
 #include <string.h>
 
@@ -38,13 +39,10 @@ int main(int argc, char* argv[]) {
   XFlush(display);
 
   // Simulate event handling
-  while (1) {
-    XNextEvent(display, &report);
-    // Exit after handling the first event to avoid an infinite loop in CI
-    if (report.type == Expose) {
-      printf("Expose event handled\n");
-      break;
-    }
+  for (i = 0; i < 20; ++i) {
+    while (XPending(display))
+      XNextEvent(display, &report);
+    usleep(50000);
   }
 
   // Clean up and close the display connection

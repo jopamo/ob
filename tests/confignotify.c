@@ -26,7 +26,7 @@ int main() {
   XMapWindow(display, win);
   XFlush(display);
 
-  sleep(1);
+  usleep(500000);
   XResizeWindow(display, win, w + 5, h + 5);
   XMoveWindow(display, win, x, y);
 
@@ -64,6 +64,12 @@ int main() {
             se, ev, win, x, y, w, h, bw, above, or);
         break;
       }
+    }
+
+    // Exit after processing the first event to avoid infinite loops in CI
+    if (report.type == Expose && report.xexpose.count == 0) {
+      printf("Test completed. Closing the program.\n");
+      break;
     }
   }
 

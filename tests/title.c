@@ -91,5 +91,8 @@ int main(int argc, char** argv) {
     usleep(100000);
   }
 
+  XFree(name.value);
+  XDestroyWindow(display, win);
+  XCloseDisplay(display);
   return 0;
 }

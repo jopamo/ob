@@ -32,7 +32,7 @@ int main() {
 
   if (display == NULL) {
     fprintf(stderr, "couldn't connect to X server :0\n");
-    return 0;
+    return 1;
   }
 
   win = XCreateWindow(display, RootWindow(display, DefaultScreen(display)), x, y, w, h, 10, CopyFromParent,
@@ -57,9 +57,14 @@ int main() {
   XSendEvent(display, RootWindow(display, DefaultScreen(display)), False,
              SubstructureNotifyMask | SubstructureRedirectMask, &msg);
 
-  while (1) {
-    XNextEvent(display, &report);
+  int i;
+  for (i = 0; i < 20; ++i) {
+    while (XPending(display))
+      XNextEvent(display, &report);
+    usleep(50000);
   }
 
-  return 1;
+  XDestroyWindow(display, win);
+  XCloseDisplay(display);
+  return 0;
 }

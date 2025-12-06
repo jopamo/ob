@@ -37,7 +37,7 @@ int main() {
 
   if (display == NULL) {
     fprintf(stderr, "couldn't connect to X server :0\n");
-    return 0;
+    return 1;
   }
 
   win = XCreateWindow(display, RootWindow(display, 0), x, y, w, h, 10, CopyFromParent, CopyFromParent, CopyFromParent,
@@ -47,16 +47,28 @@ int main() {
   XMapWindow(display, win);
   XFlush(display);
 
-  printf("requesting move in 10\n");
-  sleep(10);
+  printf("requesting move in 1\n");
+  sleep(1);
 
   frame = win;
-  while (XQueryTree(display, frame, &a, &p, &c, &n) && p != a)
+  while (XQueryTree(display, frame, &a, &p, &c, &n) && p != a) {
+    if (c)
+      XFree(c);
     frame = p;
+  }
+  if (c)
+    XFree(c);
+  c = NULL;
 
   changes.sibling = GO_ABOVE;
-  while (XQueryTree(display, changes.sibling, &a, &p, &c, &n) && p != a)
+  while (XQueryTree(display, changes.sibling, &a, &p, &c, &n) && p != a) {
+    if (c)
+      XFree(c);
     changes.sibling = p;
+  }
+  if (c)
+    XFree(c);
+  c = NULL;
 
   changes.stack_mode = Above;
   XConfigureWindow(display, frame, CWSibling | CWStackMode, &changes);
@@ -64,9 +76,14 @@ int main() {
 
   printf("moved 0x%lx above 0x%lx\n", frame, changes.sibling);
 
-  while (1) {
-    XNextEvent(display, &report);
+  int i;
+  for (i = 0; i < 20; ++i) {
+    while (XPending(display))
+      XNextEvent(display, &report);
+    usleep(50000);
   }
 
-  return 1;
+  XDestroyWindow(display, win);
+  XCloseDisplay(display);
+  return 0;
 }

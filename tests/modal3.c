@@ -1,6 +1,7 @@
 /* modal3.c for the Openbox window manager */
 
 #include <stdio.h>
+#include <unistd.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
@@ -59,12 +60,11 @@ int main() {
              SubstructureNotifyMask | SubstructureRedirectMask, &ce);
 
   // Event loop (wait for events to be processed)
-  while (1) {
-    XNextEvent(display, &report);
-    // Process events here (e.g., handle modal or expose events)
-    if (report.type == Expose) {
-      printf("Expose event\n");
-    }
+  int i;
+  for (i = 0; i < 20; ++i) {
+    while (XPending(display))
+      XNextEvent(display, &report);
+    usleep(50000);
   }
 
   // Cleanup and close the display connection

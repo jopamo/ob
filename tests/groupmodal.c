@@ -83,7 +83,7 @@ int main() {
   // Map the windows
   XMapWindow(display, one);
   XFlush(display);
-  sleep(1);  // Sleep to ensure the first window is mapped before the second
+  usleep(500000);  // Sleep to ensure the first window is mapped before the second
   XMapWindow(display, two);
   XFlush(display);
 
@@ -92,10 +92,13 @@ int main() {
   for (i = 0; i < 20; ++i) {
     while (XPending(display))
       XNextEvent(display, &report);
-    usleep(100000);
+    usleep(50000);
   }
 
   // Clean up and close display connection when done
+  XDestroyWindow(display, two);
+  XDestroyWindow(display, one);
+  XDestroyWindow(display, group);
   XCloseDisplay(display);
 
   return 0;  // Return success
